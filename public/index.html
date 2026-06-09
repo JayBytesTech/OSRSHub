@@ -423,6 +423,18 @@ body {
 .dash-panel-title { font-size: 13px; font-weight: bold; color: #3a2010; margin-bottom: 10px; display: flex; align-items: baseline; gap: 8px; }
 .dash-link { margin-left: auto; font-size: 11px; color: #2a6aaa; text-decoration: none; font-weight: 600; }
 .dash-link:hover { text-decoration: underline; }
+.dash-next-panel { border-color: #5aa83a; background: #eef3df; }
+.dash-next-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 5px;
+  cursor: pointer; background: #f7faef; border: 1px solid #cfe0b0; margin-bottom: 7px;
+  transition: background .15s, border-color .15s;
+}
+.dash-next-item:last-child { margin-bottom: 0; }
+.dash-next-item:hover { background: #e4f0d0; border-color: #5aa83a; }
+.dash-next-item.soft { background: #f3eed8; border-color: #d8c79a; }
+.dash-next-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+.dash-next-title { font-size: 13px; font-weight: 700; color: #2c1a08; }
+.dash-next-reason { font-size: 11px; color: #6a4a14; margin-top: 1px; }
 .dash-momentum-big { font-size: 30px; font-weight: bold; color: #2e6614; line-height: 1.1; }
 .dash-momentum-flat, .dash-momentum-note { font-size: 12px; color: #8a6030; }
 .dash-goal { margin-bottom: 10px; }
@@ -1124,6 +1136,104 @@ function accountValue() {
   return { score: Math.round(score), components };
 }
 
+// ── "WHAT TO DO NEXT?" RANKER (F1.3) ────────────────────────────────────────────
+// Deterministic, prerequisite-aware suggestions, goal-driven first. Returns an ordered,
+// deduped, capped list of { icon, title, reason, onclick } built from the F1.2 engine +
+// existing goal/money helpers. renderDashboard re-runs on every state change, so it's live.
+
+function goToQuest(name) {
+  switchTab('quests');
+  const search = document.getElementById('quest-search');
+  if (search) search.value = name;
+  setFilter('all');                       // clears any active filter so the quest is visible
+  renderQuests();
+  const items = document.querySelectorAll('#quest-list .quest-name');
+  for (const el of items) {
+    if (el.textContent.trim() === name) { el.closest('.quest-item').scrollIntoView({ block: 'center' }); break; }
+  }
+}
+
+function nextActions() {
+  const MAX = 6;
+  const completed = getCompleted();
+  const out = [];
+  const suggestedQuests = new Map();      // quest name -> index in `out` (dedupe across goals)
+
+  // Tier 1 — quest-goal next steps (the core, goal-driven).
+  for (const goal of getQuestGoals()) {
+    if (completed[goal]) continue;
+    const info = outstandingFor(goal, completed);
+    const ready = info.orderedQuests.filter(n => n.state === 'ready');
+    if (ready.length) {
+      // best startable step: reward first, then higher QP, then name.
+      ready.sort((a, b) => {
+        const ar = (REQS[a.name] && REQS[a.name].r) ? 1 : 0, br = (REQS[b.name] && REQS[b.name].r) ? 1 : 0;
+        if (ar !== br) return br - ar;
+        const aq = (QUESTS.find(q => q.name === a.name) || {}).qp || 0;
+        const bq = (QUESTS.find(q => q.name === b.name) || {}).qp || 0;
+        if (aq !== bq) return bq - aq;
+        return a.name.localeCompare(b.name);
+      });
+      const pick = ready[0].name;
+      if (suggestedQuests.has(pick)) {
+        const row = out[suggestedQuests.get(pick)];
+        row.reason = row.reason.replace(/toward .*/, `toward ${row._goals.concat(goal).join(' & ')}`);
+        row._goals.push(goal);
+      } else {
+        const reward = REQS[pick] && REQS[pick].r ? ` · 🎁 ${REQS[pick].r}` : '';
+        suggestedQuests.set(pick, out.length);
+        out.push({ icon: '▶', title: `Start ${pick}`, reason: `Next step toward ${goal}${reward}`,
+                   _goals: [goal], onclick: `goToQuest('${pick.replace(/'/g, "\\'")}')` });
+      }
+    } else {
+      // nothing startable — surface the nearest gated quest (no train-skill directive).
+      const nearest = info.orderedQuests.find(n => n.state === 'locked') || info.orderedQuests[0];
+      if (nearest) {
+        const bits = [];
+        (nearest.missingSkills || []).forEach(m => bits.push(`${m.need} ${m.skill}`));
+        if (nearest.missingQP) bits.push(`${nearest.missingQP} QP`);
+        out.push({ icon: '⏳', title: `${goal} — nothing startable yet`,
+                   reason: `Nearest: ${nearest.name}${bits.length ? ' needs ' + bits.join(', ') : ''}`,
+                   onclick: `goToQuest('${nearest.name.replace(/'/g, "\\'")}')`, _soft: true });
+      }
+    }
+  }
+
+  // Tier 2 — skill goals (goal-driven), closest to done first.
+  const skillRows = [];
+  for (const g of getGoals()) {
+    const st = STATS[g.skill]; if (!st) continue;
+    const curLvl = st[1], curXP = st[2];
+    if (curLvl >= g.target) continue;
+    const targetXP = xpForLevel(g.target), curLvlXP = xpForLevel(curLvl);
+    const need = targetXP - curLvlXP, got = curXP - curLvlXP;
+    const pct = need > 0 ? Math.min(100, (got / need) * 100) : 100;
+    skillRows.push({ icon: '📈', title: `Train ${g.skill} to ${g.target}`,
+                     reason: `${fmt(Math.max(0, targetXP - curXP))} XP to go · ${pct.toFixed(0)}%`,
+                     onclick: `switchTab('goals')`, _pct: pct });
+  }
+  skillRows.sort((a, b) => b._pct - a._pct).forEach(r => out.push(r));
+
+  // Tier 3 — top money method available now (opportunity).
+  let best = null, bestGp = -1;
+  for (const m of (MONEY.methods || [])) {
+    if (!methodStatus(m).ready) continue;
+    const gp = (LIVE_GP[m.name] && LIVE_GP[m.name].gphr != null) ? LIVE_GP[m.name].gphr
+             : (typeof m.gphr === 'number' ? m.gphr : 0);
+    if (gp > bestGp) { bestGp = gp; best = m; }
+  }
+  if (best) {
+    const live = LIVE_GP[best.name] && LIVE_GP[best.name].gphr != null;
+    out.push({ icon: '💰', title: `Make money: ${best.name}`,
+               reason: `~${fmt(bestGp)}/hr available now${live ? ' · 🟢 LIVE' : ''}`,
+               onclick: `switchTab('money');setMoneyFilter('ready')` });
+  }
+
+  const trimmed = out.slice(0, MAX);
+  const noGoals = !getQuestGoals().length && !getGoals().length;
+  return { actions: trimmed, prompt: noGoals ? 'Set a skill or quest goal for tailored quest suggestions.' : null };
+}
+
 function renderDashboard() {
   const body = document.getElementById('dash-body');
   if (!body) return;
@@ -1197,6 +1307,20 @@ function renderDashboard() {
     goalsHtml = skillHtml + questHtml;
   }
 
+  const next = nextActions();
+  const nextRows = next.actions.map(a =>
+    `<div class="dash-next-item${a._soft ? ' soft' : ''}" onclick="${a.onclick}" title="Go">
+       <span class="dash-next-icon">${a.icon}</span>
+       <div class="dash-next-text"><div class="dash-next-title">${a.title}</div><div class="dash-next-reason">${a.reason}</div></div>
+     </div>`).join('');
+  const nextBody = (nextRows || '') + (next.prompt
+    ? `<div class="dash-sub"${nextRows ? ' style="margin-top:8px"' : ''}>🎯 ${next.prompt}</div>` : '');
+  const nextPanel = `
+    <div class="dash-panel dash-next-panel">
+      <div class="dash-panel-title">🧭 What to do next</div>
+      ${nextBody || '<div class="dash-sub">Nothing to suggest yet — refresh your stats or add a goal.</div>'}
+    </div>`;
+
   const scoreRows = av.components.map(c => c.available
     ? `<div class="dash-score-row"><span>${c.label}</span><span class="dash-score-pct">${c.pct.toFixed(0)}%</span></div>
        <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${c.pct.toFixed(0)}%"></div></div>`
@@ -1221,6 +1345,7 @@ function renderDashboard() {
 
   body.innerHTML = `
     <div class="dash-grid">${tiles}</div>
+    ${nextPanel}
     ${scorePanel}
     <div class="dash-cols">
       <div class="dash-panel">
