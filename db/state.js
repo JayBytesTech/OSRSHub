@@ -8,9 +8,11 @@ module.exports = function makeState(db) {
   const insQuest = db.prepare('INSERT OR REPLACE INTO quest_completions (account_id, quest) VALUES (?, ?)');
   const insGoal  = db.prepare('INSERT OR REPLACE INTO goals (account_id, skill, target) VALUES (?, ?, ?)');
   const insQGoal = db.prepare('INSERT OR REPLACE INTO quest_goals (account_id, quest) VALUES (?, ?)');
+  const insPGoal = db.prepare('INSERT OR REPLACE INTO preset_goals (account_id, kind) VALUES (?, ?)');
   const delQuests = db.prepare('DELETE FROM quest_completions WHERE account_id = ?');
   const delGoals  = db.prepare('DELETE FROM goals WHERE account_id = ?');
   const delQGoals = db.prepare('DELETE FROM quest_goals WHERE account_id = ?');
+  const delPGoals = db.prepare('DELETE FROM preset_goals WHERE account_id = ?');
 
   function getState(accountId) {
     const completed = {};
@@ -19,15 +21,17 @@ module.exports = function makeState(db) {
     }
     const goals = db.prepare('SELECT skill, target FROM goals WHERE account_id = ? ORDER BY skill').all(accountId);
     const questGoals = db.prepare('SELECT quest FROM quest_goals WHERE account_id = ? ORDER BY quest').all(accountId).map(r => r.quest);
-    return { completed, goals, questGoals };
+    const presetGoals = db.prepare('SELECT kind FROM preset_goals WHERE account_id = ? ORDER BY kind').all(accountId).map(r => r.kind);
+    return { completed, goals, questGoals, presetGoals };
   }
 
   // Replace this account's entire state in one transaction. Returns inserted counts.
-  const replaceTx = db.transaction((accountId, completed, goals, questGoals) => {
+  const replaceTx = db.transaction((accountId, completed, goals, questGoals, presetGoals) => {
     delQuests.run(accountId);
     delGoals.run(accountId);
     delQGoals.run(accountId);
-    let quests = 0, goalCount = 0, questGoalCount = 0;
+    delPGoals.run(accountId);
+    let quests = 0, goalCount = 0, questGoalCount = 0, presetGoalCount = 0;
     for (const quest in (completed || {})) {
       if (!completed[quest]) continue;            // only store truthy completions
       insQuest.run(accountId, quest);
@@ -47,19 +51,27 @@ module.exports = function makeState(db) {
       insQGoal.run(accountId, q);
       questGoalCount++;
     }
-    return { quests, goals: goalCount, questGoals: questGoalCount };
+    const seenPG = new Set();
+    for (const k of (Array.isArray(presetGoals) ? presetGoals : [])) {
+      if (typeof k !== 'string' || !k || seenPG.has(k)) continue;
+      seenPG.add(k);
+      insPGoal.run(accountId, k);
+      presetGoalCount++;
+    }
+    return { quests, goals: goalCount, questGoals: questGoalCount, presetGoals: presetGoalCount };
   });
 
   function setState(accountId, payload) {
     const body = payload || {};
-    return replaceTx(accountId, body.completed || {}, body.goals || [], body.questGoals || []);
+    return replaceTx(accountId, body.completed || {}, body.goals || [], body.questGoals || [], body.presetGoals || []);
   }
 
   function count(accountId) {
     const q = db.prepare('SELECT COUNT(*) AS c FROM quest_completions WHERE account_id = ?').get(accountId).c;
     const g = db.prepare('SELECT COUNT(*) AS c FROM goals WHERE account_id = ?').get(accountId).c;
     const qg = db.prepare('SELECT COUNT(*) AS c FROM quest_goals WHERE account_id = ?').get(accountId).c;
-    return q + g + qg;
+    const pg = db.prepare('SELECT COUNT(*) AS c FROM preset_goals WHERE account_id = ?').get(accountId).c;
+    return q + g + qg + pg;
   }
 
   // One-time seed from the old vault state markdown (the ```json block).
@@ -68,7 +80,7 @@ module.exports = function makeState(db) {
     if (!m) return { quests: 0, goals: 0 };
     let data;
     try { data = JSON.parse(m[1]); } catch { return { quests: 0, goals: 0 }; }
-    return replaceTx(accountId, data.completed || {}, Array.isArray(data.goals) ? data.goals : [], Array.isArray(data.questGoals) ? data.questGoals : []);
+    return replaceTx(accountId, data.completed || {}, Array.isArray(data.goals) ? data.goals : [], Array.isArray(data.questGoals) ? data.questGoals : [], Array.isArray(data.presetGoals) ? data.presetGoals : []);
   }
 
   return { getState, setState, count, importFromVaultMarkdown };

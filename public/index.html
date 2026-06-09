@@ -355,6 +355,11 @@ body {
   white-space: nowrap;
 }
 .add-goal-btn:hover { background: #5c4030; }
+.preset-form { padding-top: 8px; padding-bottom: 8px; }
+.preset-btn { background: #2e6614; }
+.preset-btn:hover { background: #3a7a1c; }
+.preset-btn.added { background: #8a9a78; cursor: default; }
+.preset-btn:disabled { opacity: .85; }
 .goals-list { display: flex; flex-direction: column; gap: 10px; }
 .goal-card {
   background: #f0e4c8;
@@ -627,6 +632,10 @@ body {
       <input class="goal-input goal-quest-input" id="goal-quest" list="quest-options" placeholder="Search a quest… e.g. Dragon Slayer II">
       <datalist id="quest-options"></datalist>
       <button class="add-goal-btn" onclick="addQuestGoal()">+ Add Quest Goal</button>
+    </div>
+    <div class="add-goal-form preset-form">
+      <label>Presets</label>
+      <button class="add-goal-btn preset-btn" id="preset-quest_cape" onclick="addPresetGoal('quest_cape')">🧢 + Quest Cape</button>
     </div>
     <div class="goals-list" id="goals-list"></div>
   </div>
@@ -981,6 +990,13 @@ function getQuestGoals() {
 function saveQuestGoalsLocal(g) {
   try { localStorage.setItem('osrs_nullyn_questgoals', JSON.stringify(g)); } catch {}
 }
+// Preset goals: high-level goal kinds, e.g. 'quest_cape' (complete every quest).
+function getPresetGoals() {
+  try { const v = JSON.parse(localStorage.getItem('osrs_nullyn_presetgoals') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function savePresetGoalsLocal(g) {
+  try { localStorage.setItem('osrs_nullyn_presetgoals', JSON.stringify(g)); } catch {}
+}
 
 // First-run offline seed (matches vault as of 2026-06-08)
 const SEED_VERSION = 'v2';
@@ -1022,6 +1038,7 @@ async function loadVaultState() {
     if (data.completed) saveCompletedLocal(data.completed);
     if (Array.isArray(data.goals)) saveGoalsLocal(data.goals);
     if (Array.isArray(data.questGoals)) saveQuestGoalsLocal(data.questGoals);
+    if (Array.isArray(data.presetGoals)) savePresetGoalsLocal(data.presetGoals);
     SYNC.available = true;
     setSyncBadge('ok', '\u2601 Synced to vault');
     renderQuests(); renderGoals(); populateGoalSelect(); populateQuestGoalDatalist(); renderDashboard(); recordAccountValue();
@@ -1038,7 +1055,7 @@ function scheduleVaultSave() {
   saveTimer = setTimeout(saveVaultState, 700);
 }
 async function saveVaultState() {
-  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals() };
+  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals() };
   try {
     const r = await fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!r.ok) throw new Error('save ' + r.status);
@@ -1199,6 +1216,23 @@ function nextActions() {
     }
   }
 
+  // Tier 1b — Quest Cape preset (goal-driven): the best startable quest overall.
+  if (getPresetGoals().includes('quest_cape')) {
+    const cs = questCapeStatus(completed);
+    if (cs.nextBest) {
+      if (suggestedQuests.has(cs.nextBest)) {
+        const row = out[suggestedQuests.get(cs.nextBest)];
+        row.reason = row.reason.replace(/toward .*/, `toward ${row._goals.concat('Quest Cape').join(' & ')}`);
+        row._goals.push('Quest Cape');
+      } else {
+        const reward = REQS[cs.nextBest] && REQS[cs.nextBest].r ? ` · 🎁 ${REQS[cs.nextBest].r}` : '';
+        suggestedQuests.set(cs.nextBest, out.length);
+        out.push({ icon: '▶', title: `Start ${cs.nextBest}`, reason: `Next step toward Quest Cape${reward}`,
+                   _goals: ['Quest Cape'], onclick: `goToQuest('${cs.nextBest.replace(/'/g, "\\'")}')` });
+      }
+    }
+  }
+
   // Tier 2 — skill goals (goal-driven), closest to done first.
   const skillRows = [];
   for (const g of getGoals()) {
@@ -1230,7 +1264,7 @@ function nextActions() {
   }
 
   const trimmed = out.slice(0, MAX);
-  const noGoals = !getQuestGoals().length && !getGoals().length;
+  const noGoals = !getQuestGoals().length && !getGoals().length && !getPresetGoals().length;
   return { actions: trimmed, prompt: noGoals ? 'Set a skill or quest goal for tailored quest suggestions.' : null };
 }
 
@@ -1275,8 +1309,9 @@ function renderDashboard() {
   else                    momentum = `<div class="dash-momentum-flat">No total-level change in the last ${dayLabel(mo.days)}.</div>`;
 
   const questGoals = getQuestGoals();
+  const presetGoals = getPresetGoals();
   let goalsHtml;
-  if (!goals.length && !questGoals.length) {
+  if (!goals.length && !questGoals.length && !presetGoals.length) {
     goalsHtml = `<div class="no-goals">No goals yet — <a class="dash-link" style="margin:0" href="#" onclick="switchTab('goals');return false;">add one</a> to track progress.</div>`;
   } else {
     const skillHtml = goals.map(g => {
@@ -1304,7 +1339,15 @@ function renderDashboard() {
         <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div>
       </div>`;
     }).join('');
-    goalsHtml = skillHtml + questHtml;
+    let presetHtml = '';
+    if (presetGoals.includes('quest_cape')) {
+      const cs = questCapeStatus(completed);
+      presetHtml = `<div class="dash-goal">
+        <div class="dash-goal-top"><span>🧢 Quest Cape</span><span class="dash-goal-lvl">${cs.remaining === 0 ? '✓ done' : `${cs.remaining} to go · ${cs.pct}%`}</span></div>
+        <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${cs.pct}%"></div></div>
+      </div>`;
+    }
+    goalsHtml = skillHtml + questHtml + presetHtml;
   }
 
   const next = nextActions();
@@ -1929,12 +1972,98 @@ function questGoalCard(name, completed) {
   return card;
 }
 
+// ── PRESET GOALS — Quest Cape (complete every quest) ────────────────────────────
+const QUEST_CAPE_KEY = '__quest_cape__';   // sentinel for the shared expandedGoals Set
+
+// Best startable quest by the same heuristic the F1.3 ranker uses (reward, then QP).
+function bestReadyQuestName(names) {
+  return names.slice().sort((a, b) => {
+    const ar = (REQS[a] && REQS[a].r) ? 1 : 0, br = (REQS[b] && REQS[b].r) ? 1 : 0;
+    if (ar !== br) return br - ar;
+    const aq = (QUESTS.find(q => q.name === a) || {}).qp || 0;
+    const bq = (QUESTS.find(q => q.name === b) || {}).qp || 0;
+    if (aq !== bq) return bq - aq;
+    return a.localeCompare(b);
+  })[0] || null;
+}
+
+function questCapeStatus(completed) {
+  completed = completed || getCompleted();
+  const capeQuests = QUESTS.filter(q => q.type !== 'mini');   // Quest Cape excludes miniquests
+  const total = capeQuests.length;
+  const done = capeQuests.filter(q => completed[q.name]).length;
+  const remaining = total - done;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const readyNow = capeQuests.filter(q => !completed[q.name] && questStatus(q, completed).state === 'ready').map(q => q.name);
+  return { total, done, remaining, pct, readyNow, nextBest: bestReadyQuestName(readyNow) };
+}
+
+function addPresetGoal(kind) {
+  const presets = getPresetGoals();
+  if (presets.includes(kind)) return;
+  presets.push(kind);
+  savePresetGoalsLocal(presets);
+  renderGoals(); renderDashboard();
+  scheduleVaultSave();
+}
+function deletePresetGoal(kind) {
+  savePresetGoalsLocal(getPresetGoals().filter(k => k !== kind));
+  if (kind === 'quest_cape') expandedGoals.delete(QUEST_CAPE_KEY);
+  renderGoals(); renderDashboard();
+  scheduleVaultSave();
+}
+function refreshPresetButtons() {
+  const btn = document.getElementById('preset-quest_cape');
+  if (!btn) return;
+  const active = getPresetGoals().includes('quest_cape');
+  btn.disabled = active;
+  btn.classList.toggle('added', active);
+  btn.textContent = active ? '🧢 Quest Cape added' : '🧢 + Quest Cape';
+}
+
+function questCapeCard() {
+  const completed = getCompleted();
+  const s = questCapeStatus(completed);
+  const expanded = expandedGoals.has(QUEST_CAPE_KEY);
+  const doneAll = s.remaining === 0;
+  const card = document.createElement('div');
+  card.className = 'goal-card quest-goal-card';
+  let body = `
+    <div class="goal-header">
+      <span class="goal-emoji">🧢</span>
+      <span class="goal-skill-name">Quest Cape</span>
+      ${doneAll ? '<span class="goal-levels done">✓ Quest Cape!</span>' : `<span class="goal-levels">${s.remaining} quest${s.remaining === 1 ? '' : 's'} to go</span>`}
+      <button class="goal-delete" onclick="deletePresetGoal('quest_cape')" title="Remove">✕</button>
+    </div>
+    <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${s.pct}%"></div></div>
+    <div class="goal-xp-info">
+      <span>${s.done} / ${s.total} quests done</span>
+      <span>${s.pct}%${doneAll ? '' : ` · <button class="quest-expand${expanded ? ' open' : ''}" onclick="toggleGoalTree('${QUEST_CAPE_KEY}')">${expanded ? '▾' : '▸'} startable now (${s.readyNow.length})</button>`}</span>
+    </div>`;
+  if (expanded && !doneAll) {
+    const lockedCount = s.remaining - s.readyNow.length;
+    const list = s.readyNow.length
+      ? s.readyNow.slice().sort((a, b) => a.localeCompare(b)).map(n =>
+          `<div class="rt-node rt-ready"><span class="rt-icon">○</span> <a href="#" onclick="goToQuest('${n.replace(/'/g, "\\'")}');return false;">${n}</a></div>`).join('')
+      : `<div class="rt-node rt-locked">Nothing startable right now — finish a prerequisite or train a skill.</div>`;
+    body += `<div class="quest-tree">
+      <div class="rt-summary">▶ Startable now (${s.readyNow.length})</div>
+      ${list}
+      ${lockedCount > 0 ? `<div class="rt-ref">…and ${lockedCount} more locked by other quests or levels.</div>` : ''}
+    </div>`;
+  }
+  card.innerHTML = body;
+  return card;
+}
+
 function renderGoals() {
   const goals = getGoals();
   const questGoals = getQuestGoals();
+  const presetGoals = getPresetGoals();
   const list = document.getElementById('goals-list');
-  if (!goals.length && !questGoals.length) {
-    list.innerHTML = '<div class="no-goals">No goals yet — add a skill or quest goal above to track your progress.</div>';
+  refreshPresetButtons();
+  if (!goals.length && !questGoals.length && !presetGoals.length) {
+    list.innerHTML = '<div class="no-goals">No goals yet — add a skill, quest, or preset goal above to track your progress.</div>';
     return;
   }
   list.innerHTML = '';
@@ -1968,6 +2097,7 @@ function renderGoals() {
 
   const completed = getCompleted();
   questGoals.forEach(name => list.appendChild(questGoalCard(name, completed)));
+  if (presetGoals.includes('quest_cape')) list.appendChild(questCapeCard());
 }
 
 // ── CHAT ────────────────────────────────────────────────
