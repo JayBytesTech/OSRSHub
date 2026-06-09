@@ -1014,14 +1014,24 @@ function switchTab(name) {
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 
-// Total-level change over the last `days` daily snapshots; null if history too short.
-function totalDelta(days) {
+// Total-level gain over ~the last `targetDays` of CALENDAR time, measured against the most
+// recent snapshot on/before the cutoff date (falls back to the oldest snapshot when history
+// is younger than the window). Returns { delta, days } where days is the ACTUAL span measured,
+// so the label can stay honest; null if there are fewer than 2 snapshots.
+function totalDelta(targetDays) {
   const t = HISTORY && HISTORY.skills && HISTORY.skills.Total;
-  if (!Array.isArray(t) || t.length < 2) return null;
+  const dates = HISTORY && HISTORY.dates;
+  if (!Array.isArray(t) || !Array.isArray(dates) || t.length < 2) return null;
   const last = t.length - 1;
-  const prev = Math.max(0, last - days);
-  if (prev === last) return null;
-  return t[last] - t[prev];
+  const asDate = (s) => new Date(s + 'T00:00:00');
+  const cutoff = asDate(dates[last]);
+  cutoff.setDate(cutoff.getDate() - targetDays);
+  let baseIdx = 0;                                   // fallback: oldest snapshot
+  for (let i = last - 1; i >= 0; i--) {
+    if (asDate(dates[i]) <= cutoff) { baseIdx = i; break; }
+  }
+  const days = Math.round((asDate(dates[last]) - asDate(dates[baseIdx])) / 86400000);
+  return { delta: t[last] - t[baseIdx], days };
 }
 
 function renderDashboard() {
@@ -1033,7 +1043,7 @@ function renderDashboard() {
   const earnedQP   = doneQuests.reduce((s, q) => s + q.qp, 0);
   const readyCount = QUESTS.filter(q => questStatus(q, completed).state === 'ready').length;
   const goals      = getGoals();
-  const delta      = totalDelta(7);
+  const mo         = totalDelta(7);
 
   const tile = (emoji, label, value, sub, attrs) =>
     `<div class="dash-tile${attrs ? ' ' + attrs.cls : ''}"${attrs && attrs.onclick ? ` onclick="${attrs.onclick}" title="${attrs.title || ''}"` : ''}>
@@ -1058,9 +1068,10 @@ function renderDashboard() {
     stub('📒', 'Collection Log');
 
   let momentum;
-  if (delta === null)   momentum = `<div class="dash-momentum-note">Not enough history yet — check back after a few daily snapshots.</div>`;
-  else if (delta > 0)   momentum = `<div class="dash-momentum-big">▲ +${delta}</div><div class="dash-sub">total levels gained in the last 7 days</div>`;
-  else                  momentum = `<div class="dash-momentum-flat">No total-level change in the last 7 days.</div>`;
+  const dayLabel = (n) => `${n} day${n === 1 ? '' : 's'}`;
+  if (mo === null)        momentum = `<div class="dash-momentum-note">Not enough history yet — check back after a few daily snapshots.</div>`;
+  else if (mo.delta > 0)  momentum = `<div class="dash-momentum-big">▲ +${mo.delta}</div><div class="dash-sub">total levels gained in the last ${dayLabel(mo.days)}</div>`;
+  else                    momentum = `<div class="dash-momentum-flat">No total-level change in the last ${dayLabel(mo.days)}.</div>`;
 
   let goalsHtml;
   if (!goals.length) {
