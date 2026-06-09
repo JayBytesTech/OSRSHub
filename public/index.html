@@ -374,6 +374,10 @@ body {
 .goal-progress-wrap { height: 10px; background: #d4c080; border-radius: 5px; overflow: hidden; }
 .goal-progress-bar { height: 100%; background: linear-gradient(90deg, #1a6aaa, #44aaee); border-radius: 5px; transition: width 0.4s; }
 .goal-xp-info { display: flex; justify-content: space-between; font-size: 11px; color: #6a4a14; margin-top: 5px; flex-wrap: wrap; gap: 4px; }
+.goal-quest-input { width: auto; flex: 1; min-width: 220px; }
+.quest-goal-card .goal-skill-name a { color: inherit; text-decoration: none; }
+.quest-goal-card .goal-skill-name a:hover { text-decoration: underline; }
+.goal-levels.done { color: #1d6b10; font-weight: 700; }
 .goal-delete {
   background: none; border: none;
   color: #aa3010; cursor: pointer;
@@ -605,6 +609,12 @@ body {
       <label>Target</label>
       <input class="goal-input" id="goal-target" type="number" min="2" max="99" placeholder="e.g. 70">
       <button class="add-goal-btn" onclick="addGoal()">+ Add Goal</button>
+    </div>
+    <div class="add-goal-form">
+      <label>Quest</label>
+      <input class="goal-input goal-quest-input" id="goal-quest" list="quest-options" placeholder="Search a quest… e.g. Dragon Slayer II">
+      <datalist id="quest-options"></datalist>
+      <button class="add-goal-btn" onclick="addQuestGoal()">+ Add Quest Goal</button>
     </div>
     <div class="goals-list" id="goals-list"></div>
   </div>
@@ -931,6 +941,7 @@ async function loadQuestData() {
   }
   // Re-render anything that depends on requirement data.
   if (document.getElementById('quest-list')) renderQuests();
+  if (document.getElementById('goals-list')) renderGoals();
   if (document.getElementById('dash-body')) renderDashboard();
 }
 
@@ -950,6 +961,13 @@ function getGoals() {
 }
 function saveGoalsLocal(g) {
   try { localStorage.setItem('osrs_nullyn_goals', JSON.stringify(g)); } catch {}
+}
+// Quest goals: an array of quest names the player is working toward (F1.1).
+function getQuestGoals() {
+  try { const v = JSON.parse(localStorage.getItem('osrs_nullyn_questgoals') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function saveQuestGoalsLocal(g) {
+  try { localStorage.setItem('osrs_nullyn_questgoals', JSON.stringify(g)); } catch {}
 }
 
 // First-run offline seed (matches vault as of 2026-06-08)
@@ -991,9 +1009,10 @@ async function loadVaultState() {
     const data = await r.json();
     if (data.completed) saveCompletedLocal(data.completed);
     if (Array.isArray(data.goals)) saveGoalsLocal(data.goals);
+    if (Array.isArray(data.questGoals)) saveQuestGoalsLocal(data.questGoals);
     SYNC.available = true;
     setSyncBadge('ok', '\u2601 Synced to vault');
-    renderQuests(); renderGoals(); populateGoalSelect(); renderDashboard(); recordAccountValue();
+    renderQuests(); renderGoals(); populateGoalSelect(); populateQuestGoalDatalist(); renderDashboard(); recordAccountValue();
   } catch (e) {
     SYNC.available = false; SYNC.lastError = String(e);
     setSyncBadge('warn', '\u26a0 Local only');
@@ -1007,7 +1026,7 @@ function scheduleVaultSave() {
   saveTimer = setTimeout(saveVaultState, 700);
 }
 async function saveVaultState() {
-  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals() };
+  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals() };
   try {
     const r = await fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!r.ok) throw new Error('save ' + r.status);
@@ -1145,11 +1164,12 @@ function renderDashboard() {
   else if (mo.delta > 0)  momentum = `<div class="dash-momentum-big">▲ +${mo.delta}</div><div class="dash-sub">total levels gained in the last ${dayLabel(mo.days)}</div>`;
   else                    momentum = `<div class="dash-momentum-flat">No total-level change in the last ${dayLabel(mo.days)}.</div>`;
 
+  const questGoals = getQuestGoals();
   let goalsHtml;
-  if (!goals.length) {
+  if (!goals.length && !questGoals.length) {
     goalsHtml = `<div class="no-goals">No goals yet — <a class="dash-link" style="margin:0" href="#" onclick="switchTab('goals');return false;">add one</a> to track progress.</div>`;
   } else {
-    goalsHtml = goals.map(g => {
+    const skillHtml = goals.map(g => {
       const [, curLvl, curXP] = STATS[g.skill] || [0, 1, 0];
       const targetXP = xpForLevel(g.target), curLvlXP = xpForLevel(curLvl);
       const need = targetXP - curLvlXP, got = curXP - curLvlXP;
@@ -1159,6 +1179,22 @@ function renderDashboard() {
         <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div>
       </div>`;
     }).join('');
+    const questHtml = questGoals.map(name => {
+      if (completed[name]) {
+        return `<div class="dash-goal">
+          <div class="dash-goal-top"><span>📜 ${name}</span><span class="dash-goal-lvl">✓ done</span></div>
+          <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:100%"></div></div>
+        </div>`;
+      }
+      const out = outstandingFor(name, completed);
+      const remaining = out.orderedQuests.length, total = out.total || 1;
+      const pct = Math.round(((total - remaining) / total) * 100);
+      return `<div class="dash-goal">
+        <div class="dash-goal-top"><span>📜 ${name}</span><span class="dash-goal-lvl">${remaining} to go · ${pct}%</span></div>
+        <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('');
+    goalsHtml = skillHtml + questHtml;
   }
 
   const scoreRows = av.components.map(c => c.available
@@ -1337,17 +1373,18 @@ function outstandingFor(name, completed) {
   const seen = new Set();
   const orderedQuests = [];
   const skillGaps = {};
-  let unknowns = 0;
+  let unknowns = 0, total = 0;
   (function walk(node) {
     node.prereqs.forEach(walk);                 // post-order → deepest prereqs first
     if (seen.has(node.name)) return;
     seen.add(node.name);
+    if (node.tracked) total++;                  // distinct tracked quests in the tree (incl. done)
     if (node.state === 'untracked' || node.done) return;
     if (node.state === 'unknown') unknowns++;
     node.missingSkills.forEach(m => { skillGaps[m.skill] = Math.max(skillGaps[m.skill] || 0, m.need); });
     orderedQuests.push(node);
   })(tree);
-  return { tree, orderedQuests, skillGaps, unknowns };
+  return { tree, orderedQuests, skillGaps, unknowns, total };
 }
 
 let questFilter = 'all';
@@ -1682,11 +1719,97 @@ function deleteGoal(skill) {
   scheduleVaultSave();
 }
 
+// ── QUEST GOALS (F1.1) ──────────────────────────────────────────────────────────
+let expandedGoals = new Set();   // which quest-goal cards have their tree expanded
+function toggleGoalTree(name) {
+  if (expandedGoals.has(name)) expandedGoals.delete(name); else expandedGoals.add(name);
+  renderGoals();
+}
+
+function populateQuestGoalDatalist() {
+  const dl = document.getElementById('quest-options');
+  if (!dl) return;
+  const completed = getCompleted();
+  const goalSet = new Set(getQuestGoals());
+  dl.innerHTML = '';
+  QUESTS.filter(q => !completed[q.name] && !goalSet.has(q.name))
+        .map(q => q.name).sort()
+        .forEach(n => { const o = document.createElement('option'); o.value = n; dl.appendChild(o); });
+}
+
+function addQuestGoal() {
+  const input = document.getElementById('goal-quest');
+  const name = (input.value || '').trim();
+  if (!name) { alert('Type or pick a quest.'); return; }
+  const known = QUESTS.find(q => q.name.toLowerCase() === name.toLowerCase());
+  if (!known) { alert("That quest isn't in the quest list — check the spelling."); return; }
+  const goals = getQuestGoals();
+  if (goals.includes(known.name)) { alert(`${known.name} is already a goal.`); input.value = ''; return; }
+  if (getCompleted()[known.name] && !confirm(`${known.name} is already completed. Add it anyway?`)) return;
+  goals.push(known.name);
+  saveQuestGoalsLocal(goals);
+  input.value = '';
+  renderGoals(); populateQuestGoalDatalist(); renderDashboard();
+  scheduleVaultSave();
+}
+
+function deleteQuestGoal(name) {
+  saveQuestGoalsLocal(getQuestGoals().filter(n => n !== name));
+  expandedGoals.delete(name);
+  renderGoals(); populateQuestGoalDatalist(); renderDashboard();
+  scheduleVaultSave();
+}
+
+// A quest goal decomposes via the F1.2 engine: progress = prerequisite quests done.
+function questGoalCard(name, completed) {
+  const card = document.createElement('div');
+  card.className = 'goal-card quest-goal-card';
+  const escaped = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const link = `<a href="${wikiUrl(name)}" target="_blank" rel="noopener">${name}</a>`;
+  const delBtn = `<button class="goal-delete" onclick="deleteQuestGoal('${escaped}')" title="Remove">✕</button>`;
+
+  if (completed[name]) {
+    card.innerHTML = `
+      <div class="goal-header">
+        <span class="goal-emoji">📜</span>
+        <span class="goal-skill-name">${link}</span>
+        <span class="goal-levels done">✓ Completed</span>
+        ${delBtn}
+      </div>
+      <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:100%"></div></div>
+      <div class="goal-xp-info"><span>Quest complete</span><span>100%</span></div>`;
+    return card;
+  }
+
+  const out       = outstandingFor(name, completed);
+  const remaining = out.orderedQuests.length;            // incomplete tracked quests (incl. target)
+  const total     = out.total || 1;
+  const doneCount = Math.max(0, total - remaining);
+  const pct       = Math.round((doneCount / total) * 100);
+  const expanded  = expandedGoals.has(name);
+
+  card.innerHTML = `
+    <div class="goal-header">
+      <span class="goal-emoji">📜</span>
+      <span class="goal-skill-name">${link}</span>
+      <span class="goal-levels">${remaining} quest${remaining === 1 ? '' : 's'} to go</span>
+      ${delBtn}
+    </div>
+    <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div>
+    <div class="goal-xp-info">
+      <span>${doneCount} / ${total} quests done</span>
+      <span>${pct}% · <button class="quest-expand${expanded ? ' open' : ''}" onclick="toggleGoalTree('${escaped}')">${expanded ? '▾' : '▸'} requirements</button></span>
+    </div>
+    ${expanded ? requirementTreeHTML(name, completed) : ''}`;
+  return card;
+}
+
 function renderGoals() {
   const goals = getGoals();
+  const questGoals = getQuestGoals();
   const list = document.getElementById('goals-list');
-  if (!goals.length) {
-    list.innerHTML = '<div class="no-goals">No goals yet — add one above to track your progress.</div>';
+  if (!goals.length && !questGoals.length) {
+    list.innerHTML = '<div class="no-goals">No goals yet — add a skill or quest goal above to track your progress.</div>';
     return;
   }
   list.innerHTML = '';
@@ -1717,6 +1840,9 @@ function renderGoals() {
       </div>`;
     list.appendChild(card);
   });
+
+  const completed = getCompleted();
+  questGoals.forEach(name => list.appendChild(questGoalCard(name, completed)));
 }
 
 // ── CHAT ────────────────────────────────────────────────
@@ -1961,6 +2087,7 @@ renderQuests();
 renderGoals();
 renderDashboard();
 populateGoalSelect();
+populateQuestGoalDatalist();
 populateChartSelect();
 renderGains();
 loadSavedAI();

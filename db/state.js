@@ -7,8 +7,10 @@
 module.exports = function makeState(db) {
   const insQuest = db.prepare('INSERT OR REPLACE INTO quest_completions (account_id, quest) VALUES (?, ?)');
   const insGoal  = db.prepare('INSERT OR REPLACE INTO goals (account_id, skill, target) VALUES (?, ?, ?)');
+  const insQGoal = db.prepare('INSERT OR REPLACE INTO quest_goals (account_id, quest) VALUES (?, ?)');
   const delQuests = db.prepare('DELETE FROM quest_completions WHERE account_id = ?');
   const delGoals  = db.prepare('DELETE FROM goals WHERE account_id = ?');
+  const delQGoals = db.prepare('DELETE FROM quest_goals WHERE account_id = ?');
 
   function getState(accountId) {
     const completed = {};
@@ -16,14 +18,16 @@ module.exports = function makeState(db) {
       completed[r.quest] = true;
     }
     const goals = db.prepare('SELECT skill, target FROM goals WHERE account_id = ? ORDER BY skill').all(accountId);
-    return { completed, goals };
+    const questGoals = db.prepare('SELECT quest FROM quest_goals WHERE account_id = ? ORDER BY quest').all(accountId).map(r => r.quest);
+    return { completed, goals, questGoals };
   }
 
   // Replace this account's entire state in one transaction. Returns inserted counts.
-  const replaceTx = db.transaction((accountId, completed, goals) => {
+  const replaceTx = db.transaction((accountId, completed, goals, questGoals) => {
     delQuests.run(accountId);
     delGoals.run(accountId);
-    let quests = 0, goalCount = 0;
+    delQGoals.run(accountId);
+    let quests = 0, goalCount = 0, questGoalCount = 0;
     for (const quest in (completed || {})) {
       if (!completed[quest]) continue;            // only store truthy completions
       insQuest.run(accountId, quest);
@@ -36,18 +40,26 @@ module.exports = function makeState(db) {
       insGoal.run(accountId, g.skill, target);
       goalCount++;
     }
-    return { quests, goals: goalCount };
+    const seenQG = new Set();
+    for (const q of (Array.isArray(questGoals) ? questGoals : [])) {
+      if (typeof q !== 'string' || !q || seenQG.has(q)) continue;
+      seenQG.add(q);
+      insQGoal.run(accountId, q);
+      questGoalCount++;
+    }
+    return { quests, goals: goalCount, questGoals: questGoalCount };
   });
 
   function setState(accountId, payload) {
     const body = payload || {};
-    return replaceTx(accountId, body.completed || {}, body.goals || []);
+    return replaceTx(accountId, body.completed || {}, body.goals || [], body.questGoals || []);
   }
 
   function count(accountId) {
     const q = db.prepare('SELECT COUNT(*) AS c FROM quest_completions WHERE account_id = ?').get(accountId).c;
     const g = db.prepare('SELECT COUNT(*) AS c FROM goals WHERE account_id = ?').get(accountId).c;
-    return q + g;
+    const qg = db.prepare('SELECT COUNT(*) AS c FROM quest_goals WHERE account_id = ?').get(accountId).c;
+    return q + g + qg;
   }
 
   // One-time seed from the old vault state markdown (the ```json block).
@@ -56,7 +68,7 @@ module.exports = function makeState(db) {
     if (!m) return { quests: 0, goals: 0 };
     let data;
     try { data = JSON.parse(m[1]); } catch { return { quests: 0, goals: 0 }; }
-    return replaceTx(accountId, data.completed || {}, Array.isArray(data.goals) ? data.goals : []);
+    return replaceTx(accountId, data.completed || {}, Array.isArray(data.goals) ? data.goals : [], Array.isArray(data.questGoals) ? data.questGoals : []);
   }
 
   return { getState, setState, count, importFromVaultMarkdown };
