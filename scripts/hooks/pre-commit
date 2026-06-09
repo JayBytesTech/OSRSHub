@@ -1,0 +1,20 @@
+#!/bin/sh
+# Keep the Obsidian vault mirror of docs/ in sync with the repo (canonical) copy.
+#
+# Runs only when this commit touches docs/, and is intentionally NON-BLOCKING:
+# the vault lives outside the repo and may be absent on other machines, so a
+# failed sync must never stop a commit. Vault files are not staged (they're not
+# in this repo) — this just refreshes the external mirror.
+#
+# Installed via:  git config core.hooksPath scripts/hooks
+
+if [ -n "$(git diff --cached --name-only -- docs/)" ]; then
+  echo "[pre-commit] docs/ changed — syncing Obsidian vault mirror…"
+  if npm run --silent sync-docs; then
+    echo "[pre-commit] vault mirror updated."
+  else
+    echo "[pre-commit] sync-docs failed (vault unavailable?) — continuing without blocking the commit."
+  fi
+fi
+
+exit 0

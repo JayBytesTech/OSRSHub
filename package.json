@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "build:hub": "node scripts/port-hub.js"
+    "build:hub": "node scripts/port-hub.js",
+    "sync-docs": "node scripts/sync-docs.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
