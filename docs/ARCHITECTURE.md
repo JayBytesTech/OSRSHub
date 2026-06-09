@@ -32,6 +32,10 @@ server.js (Express, CommonJS, single file)
   with migrations), scoped by `account_id`. The **vault** is now read-only reference: money
   methods (`MONEY_REL`) + the chat tools. Legacy history/state notes were one-time-imported.
 - No build step, no tests yet.
+- **Static reference data** (the quest prerequisite dataset, F1.2) lives in `public/quest-data.json`,
+  served statically and fetched by the frontend at startup. It is *not* in SQLite by design: it is
+  non-account-scoped, read-only reference data that the client walks directly (and the future
+  server-side "what next?" ranker can read the same file). SQLite stays for account/time-series data.
 - `SKILL_NAMES` used to be duplicated in `server.js` and `index.html` with a positional coupling.
   As of Foundations Slice 1 that's retired: history is in SQLite keyed by skill name, and
   `server.js` no longer defines `SKILL_NAMES` (only `index.html` does, for render order).

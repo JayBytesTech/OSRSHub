@@ -220,6 +220,53 @@ body {
 .qtype-mini { background: #ead8f5; color: #5a2080; border: 1px solid #b080d0; }
 .quest-qp { font-size: 11px; color: #5a4010; font-weight: bold; min-width: 28px; text-align: right; flex-shrink: 0; }
 
+/* ── REQUIREMENT TREE (F1.2) ── */
+.quest-expand {
+  font-size: 10px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+  background: #efe4c4; color: #6a4a14; border: 1px solid #c8b070; border-radius: 10px;
+  padding: 1px 8px; line-height: 1.5;
+}
+.quest-expand:hover { background: #e2d2a8; }
+.quest-expand.open { background: #2e6614; color: #fff; border-color: #1d4d0c; }
+.quest-tree {
+  margin-top: 8px; padding: 9px 11px; border-radius: 6px;
+  background: #fbf6e8; border: 1px solid #cdb682; font-size: 11.5px; line-height: 1.5;
+}
+.rt-summary { font-weight: 700; color: #5a4010; margin-bottom: 6px; }
+.rt-summary.done { color: #1d6b10; }
+.rt-steps { margin: 0 0 8px 0; padding-left: 22px; }
+.rt-step { margin: 1px 0; }
+.rt-step a { color: inherit; text-decoration: none; }
+.rt-step a:hover { text-decoration: underline; }
+.rt-step.ready a, .rt-step.ready { color: #1d6b10; }
+.rt-step.locked a, .rt-step.locked { color: #9a4810; }
+.rt-step.unknown { color: #7a6830; }
+.rt-skills { margin-bottom: 8px; }
+.rt-skills-label { color: #6a4a14; font-weight: 600; margin-right: 4px; }
+.rt-skill {
+  display: inline-block; background: #e7f0d8; color: #2e6614; border: 1px solid #9ec27a;
+  border-radius: 9px; padding: 0 7px; margin: 2px 2px 0 0; font-size: 10.5px; font-weight: 600;
+}
+.rt-tree-label, .rt-skills-label { font-size: 10.5px; }
+.rt-tree-label { color: #8a6030; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; margin: 6px 0 3px; }
+.rt-node { padding: 1px 0; white-space: normal; }
+.rt-node a { color: inherit; text-decoration: none; }
+.rt-node a:hover { text-decoration: underline; }
+.rt-icon { display: inline-block; width: 14px; font-weight: 700; }
+.rt-done    { color: #2e6614; }
+.rt-ready   { color: #1d6b10; }
+.rt-locked  { color: #9a4810; }
+.rt-unknown { color: #7a6830; }
+.rt-untracked { color: #9a8a60; }
+.rt-need { color: #9a4810; font-size: 10.5px; }
+.rt-have { color: #8a6030; }
+.rt-tag {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  background: #ead8f5; color: #5a2080; border-radius: 3px; padding: 0 4px; vertical-align: middle;
+}
+.rt-ref { color: #a89868; font-style: italic; font-size: 10.5px; }
+.rt-legend { margin-top: 6px; color: #8a6030; font-size: 10px; }
+
 /* ── PROGRESS ── */
 .progress-section { max-width: 760px; }
 .chart-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
@@ -864,69 +911,28 @@ const QUESTS = [
 
 const TOTAL_QP = QUESTS.reduce((s,q) => s+q.qp, 0);
 
-// ── QUEST REQUIREMENTS (curated, best-effort) ───────────────────────────────────
-// s = skill levels (many boostable), q = prerequisite quests, qp = quest points,
-// r = reward highlight, note = caveat. Quests not listed render as "reqs not listed".
-const REQS = {
-  "Dragon Slayer I": {qp:32, r:"Rune platebody + anti-dragon shield; 18.65k Strength & Defence XP"},
-  "The Knight's Sword": {s:{Mining:10}, r:"~12.7k Smithing XP (great early boost)"},
-  "Demon Slayer": {r:"Silverlight sword"},
-  "Witch's House": {r:"6.3k Hitpoints XP"},
-  "Vampire Slayer": {r:"~4.8k Attack XP"},
-  "Waterfall Quest": {r:"13.75k Attack & Strength XP (no req — huge early boost)"},
-  "The Grand Tree": {s:{Agility:25}, r:"~18.4k Attack/Magic XP; gnome gliders + NMZ teleport"},
-  "Tree Gnome Village": {s:{}, r:"11.45k Attack XP; spirit tree network"},
-  "Fight Arena": {r:"12.18k Attack/Thieving XP; Khazard access"},
-  "The Golem": {s:{Runecrafting:25}, note:"Runecrafting is boostable", r:"Ruins of Uzer access; XP lamp"},
-  "The Ribbiting Tale of a Lily Pad Labour Dispute": {q:["Children of the Sun"], r:"XP lamp; Varlamore content"},
-  "The Lost City": {s:{Woodcutting:36, Crafting:31}, note:"Both stats boostable", r:"Dragon dagger/longsword; Zanaris + cosmic runes"},
-  "Fairy Tale I - Growing Pains": {q:["The Lost City","Nature Spirit"], r:"Magic secateurs; starts fairy ring chain"},
-  "Fairy Tale II - Cure a Queen": {q:["Fairy Tale I - Growing Pains"], s:{Thieving:40, Farming:49}, note:"Thieving/Farming boostable", r:"Full fairy ring network (huge travel QoL)"},
-  "The Dig Site": {s:{Agility:10, Herblore:10, Thieving:25}, r:"Digsite access; ~15k+ XP"},
-  "Druidic Ritual": {r:"Unlocks Herblore skill"},
-  "Jungle Potion": {q:["Druidic Ritual"], s:{Herblore:3}, r:"Herblore XP; Tai Bwo Wannai access"},
-  "Shilo Village": {q:["Jungle Potion"], s:{Crafting:20, Agility:32}, r:"Gem mine; bone access; Karamja teleport"},
-  "Heroes' Quest": {q:["Shield of Arrav","The Lost City","Merlin's Crystal","Dragon Slayer I"], s:{Cooking:53, Fishing:53, Herblore:25, Mining:50}, r:"Heroes' Guild; dragon weapons; combat XP"},
-  "Family Crest": {s:{Mining:40, Smithing:40, Magic:59, Crafting:40}, r:"Family gauntlets (cooking/chaos/goldsmith)"},
-  "Legends' Quest": {q:["Family Crest","Heroes' Quest","Shilo Village","Underground Pass","Waterfall Quest"], s:{Agility:50, Crafting:50, Herblore:45, Magic:56, Mining:52, Prayer:42, Smithing:50, Strength:50, Thieving:50, Woodcutting:50}, r:"Cape of Legends; dragon sq shield; Dragon halberd access"},
-  "Underground Pass": {q:["Biohazard"], s:{Ranged:25}, r:"West Ardougne + Tirannwn access"},
-  "Regicide": {q:["Underground Pass"], r:"Tirannwn + Tyras Camp access; Elf town"},
-  "Roving Elves": {q:["Regicide","Waterfall Quest"], r:"Crystal bow / crystal shield"},
-  "Mourning's End Part I": {q:["Roving Elves","Big Chompy Bird Hunting"], s:{Ranged:60, Thieving:50}, r:"Death altar access"},
-  "Monkey Madness I": {q:["The Grand Tree","Tree Gnome Village"], r:"Dragon scimitar; ~35k combat XP; Ape Atoll"},
-  "Monkey Madness II": {q:["Monkey Madness I"], s:{Slayer:69, Hunter:60, Agility:55, Thieving:55, Crafting:70, Firemaking:60}, note:"Several other quests also required — check wiki", r:"Heavy/light ballista; Maniacal monkey hunting"},
-  "Desert Treasure I": {q:["The Dig Site","Temple of Ikov","The Tourist Trap","Troll Stronghold","Priest in Peril","Waterfall Quest"], s:{Thieving:53, Firemaking:50, Slayer:10, Magic:50}, r:"Ancient Magicks spellbook; ancient staff"},
-  "Desert Treasure II - The Fallen Empire": {q:["Desert Treasure I","Secrets of the North","Beneath Cursed Sands"], s:{Firemaking:75, Magic:75, Thieving:70, Herblore:62, Runecrafting:60, Construction:60}, note:"More quests required — check wiki", r:"Ancient/vestige rings → BiS rings"},
-  "Dragon Slayer II": {q:["Legends' Quest","Dream Mentor","A Tail of Two Cats","Animal Magnetism","Ghosts Ahoy","Bone Voyage","Client of Kourend"], s:{Magic:75, Smithing:70, Mining:68, Crafting:62, Agility:60, Thieving:60, Construction:50}, r:"Ava's assembler; rune/adamant dragons; massive XP"},
-  "Recipe for Disaster": {s:{Cooking:70, Crafting:70, Thieving:53, Fishing:53, Magic:59, Mining:50, Firemaking:50, Smithing:40, Agility:48, Herblore:25, Ranged:40}, note:"Long sub-quest chain — many quests required; check wiki", r:"Barrows gloves (best-in-slot for most builds)"},
-  "Animal Magnetism": {q:["The Restless Ghost","Ernest the Chicken","Priest in Peril"], s:{Slayer:18, Crafting:19, Ranged:30, Woodcutting:35}, r:"Ava's accumulator (ranged ammo saver)"},
-  "Enlightened Journey": {s:{Firemaking:20, Farming:30, Crafting:36}, r:"Balloon transport network; Firemaking XP"},
-  "Fishing Contest": {s:{Fishing:10}, r:"White Wolf Mountain shortcut; Fishing XP"},
-  "Temple of Ikov": {s:{Thieving:42, Ranged:40}, r:"Boots of lightness; Armadyl pendant access"},
-  "Troll Stronghold": {q:["Death Plateau"], s:{Agility:15}, r:"Trollheim access; combat XP"},
-  "Eadgar's Ruse": {q:["Druidic Ritual","Troll Stronghold"], s:{Herblore:31}, r:"Trollheim herb patch; Herblore XP"},
-  "Eagle's Peak": {s:{Hunter:27}, r:"Falconry; box-trap hunting; eagle transport"},
-  "Bone Voyage": {q:["The Dig Site"], r:"Fossil Island access (Wintertodt/Herbiboar later)"},
-  "Client of Kourend": {r:"Great Kourend access; Kharedst's memoirs start"},
-  "Tale of the Righteous": {q:["Client of Kourend"], s:{Strength:16, Mining:10}, r:"Shayzien favour; Xeric's talisman charges"},
-  "The Depths of Despair": {q:["Client of Kourend"], s:{Agility:18}, r:"Hosidius favour; Kharedst's memoirs"},
-  "The Queen of Thieves": {q:["Client of Kourend"], s:{Thieving:20}, r:"Port Piscarilius favour"},
-  "The Forsaken Tower": {q:["Client of Kourend"], s:{}, r:"Lovakengj favour; lovakite access"},
-  "A Kingdom Divided": {q:["The Depths of Despair","The Queen of Thieves","Tale of the Righteous","The Forsaken Tower"], s:{Agility:54, Thieving:52, Woodcutting:52, Herblore:50, Mining:42, Crafting:38, Magic:35}, r:"Soul Wars / Arceuus library; Kourend favour cap"},
-  "Darkness of Hallowvale": {q:["In Aid of the Myreque"], s:{Construction:5, Mining:20, Thieving:22, Agility:26, Crafting:32, Magic:33, Strength:32}, r:"Theatre of Blood region progress; XP"},
-  "A Taste of Hope": {q:["Darkness of Hallowvale"], s:{Crafting:48, Agility:45, Attack:40, Herblore:40, Slayer:38}, r:"Vyrewatch slaying; Drakan's medallion"},
-  "Sins of the Father": {q:["A Taste of Hope","Vampire Slayer"], s:{Woodcutting:62, Fletching:60, Crafting:56, Agility:52, Slayer:50}, r:"Blisterwood flail (BiS vs vampyres); Slepe"},
-  "The Fremennik Trials": {s:{Fletching:25, Woodcutting:40, Crafting:40}, note:"Some stats boostable", r:"Fremennik helms; Rellekka; enchanted lyre"},
-  "Lunar Diplomacy": {q:["The Fremennik Trials","The Lost City","Rune Mysteries","Shilo Village"], s:{Crafting:61, Defence:40, Firemaking:49, Herblore:5, Magic:65, Mining:60, Woodcutting:55}, r:"Lunar spellbook"},
-  "Dream Mentor": {q:["Lunar Diplomacy","Eadgar's Ruse"], r:"+5 Hitpoints; The Inadequacy; combat XP"},
-  "Swan Song": {q:["One Small Favour","Garden of Tranquillity"], s:{Magic:66, Cooking:62, Fishing:62, Smithing:45, Firemaking:42, Crafting:40}, r:"Big Magic/Prayer XP; Piscatoris access"},
-  "Sea Slug": {s:{Firemaking:30}, r:"Fishing platform; Fishing XP"},
-  "Watchtower": {s:{Magic:14, Thieving:15, Agility:25, Herblore:14, Mining:40}, r:"Watchtower teleport; Magic XP"},
-  "Holy Grail": {q:["Merlin's Crystal"], r:"~15.3k Prayer XP; Magic whistle"},
-  "Nature Spirit": {q:["Priest in Peril","The Restless Ghost"], r:"Druid pouch; Mort Myre access; XP"},
-  "Ghosts Ahoy": {q:["Priest in Peril"], s:{Agility:25, Cooking:20}, r:"Ectophial (Port Phasmatys teleport)"},
-  "Priest in Peril": {r:"Morytania access (gateway to many quests)"},
-};
+// ── QUEST REQUIREMENTS ───────────────────────────────────────────────────────────
+// Loaded at startup from /quest-data.json (structured reference data). Entry shape:
+//   s = skill levels {Skill: level} (many boostable), q = prerequisite quest names,
+//   qp = quest-point gate, r = reward highlight, note = caveat.
+// Quests with no entry render an honest "reqs not listed — verify on wiki" fallback.
+// Populated by loadQuestData(); starts empty so the app works even if the fetch fails.
+let REQS = {};
+
+async function loadQuestData() {
+  try {
+    const r = await fetch('/quest-data.json', { cache: 'no-cache' });
+    if (!r.ok) throw new Error('quest-data ' + r.status);
+    const data = await r.json();
+    REQS = (data && data.quests) || {};
+  } catch (e) {
+    console.warn('Could not load quest-data.json — quests will show "reqs not listed".', e);
+    REQS = {};
+  }
+  // Re-render anything that depends on requirement data.
+  if (document.getElementById('quest-list')) renderQuests();
+  if (document.getElementById('dash-body')) renderDashboard();
+}
 
 // ── PERSISTENCE / SYNC ──────────────────────────────────────────────────────────
 
@@ -1274,6 +1280,76 @@ function questStatus(q, completed) {
   return { state: missing.length ? 'locked' : 'ready', missing };
 }
 
+// ── RECURSIVE REQUIREMENT ENGINE (F1.2) ─────────────────────────────────────────
+// questStatus() above answers "can I start this now?" (direct prereqs only). The
+// engine below answers "what is the FULL path to reach this?" — it expands the whole
+// transitive prerequisite tree with met/unmet state, dedupes shared ancestors, and
+// guards against cycles. Untracked prereqs (not in our quest list) become leaf nodes
+// and, like questStatus(), do not gate readiness.
+
+function earnedQP(completed) {
+  return QUESTS.filter(x => completed[x.name]).reduce((s, x) => s + x.qp, 0);
+}
+
+function buildRequirementTree(name, completed, memo, stack) {
+  memo  = memo  || new Map();   // name -> node, dedupes diamonds
+  stack = stack || new Set();   // in-progress names, cycle guard
+  if (memo.has(name)) return memo.get(name);
+
+  const req  = REQS[name];
+  const done = !!completed[name];
+  const node = { name, done, state: 'unknown', missingSkills: [], missingQP: 0, req: req || null, prereqs: [], tracked: TRACKED.has(name) };
+  memo.set(name, node);
+
+  if (!req) { node.state = done ? 'done' : 'unknown'; return node; }
+
+  if (req.s) {
+    for (const sk in req.s) {
+      const have = STATS[sk] ? STATS[sk][1] : 1;
+      if (have < req.s[sk]) node.missingSkills.push({ skill: sk, need: req.s[sk], have });
+    }
+  }
+  if (req.qp && earnedQP(completed) < req.qp) node.missingQP = req.qp;
+
+  if (req.q && !stack.has(name)) {
+    stack.add(name);
+    req.q.forEach(pre => {
+      if (TRACKED.has(pre)) {
+        node.prereqs.push(buildRequirementTree(pre, completed, memo, stack));
+      } else {
+        node.prereqs.push({ name: pre, done: !!completed[pre], state: completed[pre] ? 'done' : 'untracked', missingSkills: [], missingQP: 0, req: null, prereqs: [], tracked: false });
+      }
+    });
+    stack.delete(name);
+  }
+
+  if (done) { node.state = 'done'; return node; }
+  const ownOk      = node.missingSkills.length === 0 && node.missingQP === 0;
+  const prereqsDone = node.prereqs.every(p => p.state === 'done' || p.state === 'untracked');
+  node.state = (ownOk && prereqsDone) ? 'ready' : 'locked';
+  return node;
+}
+
+// Flatten a tree to an ordered to-do list (prereqs before dependents, via post-order)
+// plus an aggregated skill summary (max required level per skill across the whole tree).
+function outstandingFor(name, completed) {
+  const tree = buildRequirementTree(name, completed);
+  const seen = new Set();
+  const orderedQuests = [];
+  const skillGaps = {};
+  let unknowns = 0;
+  (function walk(node) {
+    node.prereqs.forEach(walk);                 // post-order → deepest prereqs first
+    if (seen.has(node.name)) return;
+    seen.add(node.name);
+    if (node.state === 'untracked' || node.done) return;
+    if (node.state === 'unknown') unknowns++;
+    node.missingSkills.forEach(m => { skillGaps[m.skill] = Math.max(skillGaps[m.skill] || 0, m.need); });
+    orderedQuests.push(node);
+  })(tree);
+  return { tree, orderedQuests, skillGaps, unknowns };
+}
+
 let questFilter = 'all';
 
 function setFilter(f) {
@@ -1285,6 +1361,56 @@ function setFilter(f) {
 
 function wikiUrl(name) {
   return 'https://oldschool.runescape.wiki/w/' + encodeURIComponent(name.replace(/ /g,'_'));
+}
+
+// Which quests have their full requirement tree expanded (persists across re-renders).
+let expandedQuests = new Set();
+function toggleQuestTree(name) {
+  if (expandedQuests.has(name)) expandedQuests.delete(name); else expandedQuests.add(name);
+  renderQuests();
+}
+
+// Renders the full transitive requirement tree + an ordered to-do list + a skill summary.
+function requirementTreeHTML(rootName, completed) {
+  const { tree, orderedQuests, skillGaps, unknowns } = outstandingFor(rootName, completed);
+
+  // Nested tree (deduped — a shared ancestor's subtree is only expanded once).
+  const rendered = new Set();
+  const ICON = { done: '✓', ready: '○', locked: '✗', unknown: '?', untracked: '·' };
+  const nodeHTML = (node, depth) => {
+    const seen = rendered.has(node.name);
+    rendered.add(node.name);
+    const label = node.tracked
+      ? `<a href="${wikiUrl(node.name)}" target="_blank" rel="noopener">${node.name}</a>`
+      : `${node.name} <span class="rt-tag">untracked</span>`;
+    const bits = [];
+    if (node.missingSkills.length) bits.push(node.missingSkills.map(m => `${m.need} ${m.skill} <span class="rt-have">(have ${m.have})</span>`).join(', '));
+    if (node.missingQP) bits.push(`${node.missingQP} QP`);
+    const need = bits.length ? `<span class="rt-need">needs ${bits.join(' · ')}</span>` : '';
+    let html = `<div class="rt-node rt-${node.state}" style="margin-left:${depth*16}px"><span class="rt-icon">${ICON[node.state] || '?'}</span> ${label} ${need}</div>`;
+    if (!seen) node.prereqs.forEach(p => { html += nodeHTML(p, depth + 1); });
+    else if (node.prereqs.length) html += `<div class="rt-ref" style="margin-left:${(depth+1)*16}px">↑ requirements shown above</div>`;
+    return html;
+  };
+
+  if (tree.state === 'done') return `<div class="quest-tree"><div class="rt-summary done">✓ Completed — every requirement met.</div></div>`;
+
+  // Ordered to-do (prereqs first, target last) — skip the target itself in the list head.
+  const steps = orderedQuests.map((n, i) =>
+    `<li class="rt-step rt-${n.state}">${n.tracked ? `<a href="${wikiUrl(n.name)}" target="_blank" rel="noopener">${n.name}</a>` : n.name}${n.name === rootName ? ' <span class="rt-tag">target</span>' : ''}</li>`
+  ).join('');
+
+  const skills = Object.keys(skillGaps).sort((a, b) => skillGaps[b] - skillGaps[a])
+    .map(s => `<span class="rt-skill">${skillGaps[s]} ${s}</span>`).join(' ');
+
+  return `<div class="quest-tree">
+    <div class="rt-summary">🧭 Path to <b>${rootName}</b> — ${orderedQuests.length} quest${orderedQuests.length === 1 ? '' : 's'} outstanding${unknowns ? ` · ${unknowns} with unlisted reqs` : ''}</div>
+    ${steps ? `<ol class="rt-steps">${steps}</ol>` : ''}
+    ${skills ? `<div class="rt-skills"><span class="rt-skills-label">Skills you'll ultimately need:</span> ${skills}</div>` : ''}
+    <div class="rt-tree-label">Full requirement tree</div>
+    ${nodeHTML(tree, 0)}
+    <div class="rt-legend">✓ done · ○ ready · ✗ locked · ? reqs not listed</div>
+  </div>`;
 }
 
 function renderQuests() {
@@ -1337,6 +1463,7 @@ function renderQuests() {
     if (req && req.r) detail += `${detail ? ' · ' : ''}<span class="quest-reward">🎁 ${req.r}</span>`;
     if (req && req.note) detail += `${detail ? ' · ' : ''}<span style="color:#8a6030">${req.note}</span>`;
 
+    const expanded = expandedQuests.has(q.name);
     const item = document.createElement('div');
     item.className = 'quest-item s-' + st.state + (done ? ' done' : '');
     item.innerHTML = `
@@ -1346,8 +1473,10 @@ function renderQuests() {
           <span class="quest-name"><a href="${wikiUrl(q.name)}" target="_blank" rel="noopener">${q.name}</a></span>
           <span class="qtype-badge qtype-${q.type}">${q.type==='mini'?'Mini':q.type.toUpperCase()}</span>
           ${chip}
+          <button class="quest-expand${expanded?' open':''}" onclick="toggleQuestTree('${escapedName}')" title="Show the full requirement tree">${expanded?'▾':'▸'} reqs</button>
         </div>
         ${detail ? `<div class="quest-detail">${detail}</div>` : ''}
+        ${expanded ? requirementTreeHTML(q.name, completed) : ''}
       </div>
       ${q.qp>0 ? `<span class="quest-qp">${q.qp} QP</span>` : '<span class="quest-qp" style="color:#bbb">—</span>'}
     `;
@@ -1836,6 +1965,7 @@ populateChartSelect();
 renderGains();
 loadSavedAI();
 commitSnapshot();            // record current levels for next-visit gain detection
+loadQuestData();             // async: pull structured quest requirement data, then re-render
 loadVaultState();            // async: pull durable state from the vault, then re-render
 loadStats();                 // async: pull live levels + progress history from OSRS Hiscores
 loadMoney();                 // async: pull money methods, auto-bucket vs live stats/quests
