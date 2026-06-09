@@ -27,9 +27,11 @@ server.js (Express, CommonJS, single file)
 ```
 
 **Properties today**
-- Single player. `RSN`, `VAULT_PATH`, and the three `*_REL` files are global env constants.
-- Source of truth = Obsidian markdown with a fenced ` ```json ` block, rewritten wholesale.
-- No auth, no database, no build step, no tests.
+- Single account, seeded from `RSN`, behind a `getCurrentAccount()` seam (no real auth yet).
+- Structured data (history, quest completions, goals) lives in **SQLite** (`db/`, better-sqlite3,
+  with migrations), scoped by `account_id`. The **vault** is now read-only reference: money
+  methods (`MONEY_REL`) + the chat tools. Legacy history/state notes were one-time-imported.
+- No build step, no tests yet.
 - `SKILL_NAMES` used to be duplicated in `server.js` and `index.html` with a positional coupling.
   As of Foundations Slice 1 that's retired: history is in SQLite keyed by skill name, and
   `server.js` no longer defines `SKILL_NAMES` (only `index.html` does, for render order).

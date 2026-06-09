@@ -51,14 +51,15 @@ Copy `.env.example` → `.env`. Key variables:
 ```
 browser (public/index.html)   ← vanilla JS/HTML/CSS, no framework, no build
         │
-        │  fetch /api/state    GET/PUT  → reads/writes vault markdown on disk
-        │  fetch /api/stats    GET      → OSRS Hiscores + vault history snapshot
+        │  fetch /api/state    GET/PUT  → quest completions + goals (SQLite)
+        │  fetch /api/stats    GET      → OSRS Hiscores + history snapshot (SQLite)
         │  fetch /api/money    GET      → vault money methods data
         │  fetch /api/gephr    GET      → OSRS Wiki real-time GE prices → GP/hr
         │  fetch /api/chat     POST     → Claude tool-use loop
         ▼
 server.js (Express, CommonJS)
-        ├─ filesystem (VAULT_PATH) — all access gated by safeVaultPath()
+        ├─ db/ (SQLite via better-sqlite3) — history + state, scoped by account_id
+        ├─ filesystem (VAULT_PATH) — money methods + chat vault tools, via safeVaultPath()
         └─ Anthropic SDK — tools: search_vault, read_note, append_note, web_search
 ```
 
@@ -72,9 +73,11 @@ Key frontend globals: `STATS` (fallback skill levels), `SKILL_NAMES` (ordered ar
 
 Single-file Express server. All routes are in this file.
 
-**Vault state format**: managed markdown files contain a fenced JSON block (` ```json ... ``` `). The server parses them with a regex and rewrites the entire file on save.
+**Data stores**: structured/account data — quest completions, goals, and daily Hiscores history — lives in **SQLite** (`db/`, file at `DB_PATH`, default `data/osrs-hub.db`), behind `/api/state` and `/api/stats`. The **vault** is still read for **money methods** (`/api/money`, `/api/gephr` parse a fenced ` ```json ` block from `MONEY_REL`) and by the **chat** vault tools. On first boot the server one-time-imports the legacy vault history + state notes into SQLite; those notes are no longer rewritten.
 
-**History storage**: daily Hiscores snapshots live in SQLite (`db/`), keyed by skill **name** and scoped by `account_id` — written/read behind `/api/stats` (same response shape as before). The old positional `SKILL_NAMES` coupling is retired; `server.js` no longer defines `SKILL_NAMES` (only `public/index.html` does, for render order). Quests/goals still live in the vault via `/api/state` (a later slice moves them too).
+**SQLite layer** (`db/`): `index.js` opens the DB, runs a forward-only migration runner over `db/migrations/*.sql`, and exposes `getCurrentAccount()` (the account-scoping seam). Repositories `db/snapshots.js` (history) and `db/state.js` (quests/goals) are factories `(db) => ({...})`. Add schema changes as a new numbered migration file — never edit an applied one.
+
+**Skill-name coupling**: the old positional `SKILL_NAMES` coupling is retired — history is keyed by skill **name** in SQLite, so `server.js` no longer defines `SKILL_NAMES` (only `public/index.html` does, for render order). Both `/api/stats` and `/api/state` keep their original response shapes; only the backing store changed, so the frontend is unaffected.
 
 **Chat loop** (`runChat`): up to 8 tool-use turns. If the `web_search` tool fails (account doesn't have it), `/api/chat` automatically retries without it.
 

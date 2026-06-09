@@ -19,7 +19,7 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const anthropic = API_KEY ? new Anthropic({ apiKey: API_KEY }) : null;
 
 // SQLite store (history/time-series + account scoping). Vault stays for human notes.
-const { getCurrentAccount, snapshots } = require('./db');
+const { getCurrentAccount, snapshots, state } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -34,47 +34,20 @@ function safeVaultPath(rel) {
   return abs;
 }
 
-const STATE_TEMPLATE = (payload) =>
-  `---
-note: Machine-managed state for the OSRS Hub app. The app reads and rewrites the JSON block below whenever you tick a quest or change a goal. Your human notes live in [[OSRS Progression Roadmap]] and [[OSRS Daily Log]].
----
-
-# OSRS Hub — Synced State
-
-This file is the durable store for the OSRS Hub app (quest completion + goals).
-It survives browser cache wipes and stays in your vault.
-
-\`\`\`json
-${JSON.stringify(payload, null, 2)}
-\`\`\`
-`;
-
-// ── State API ─────────────────────────────────────────────────────────────────
-app.get('/api/state', async (_req, res) => {
+// ── State API (quest completions + goals, backed by SQLite) ───────────────────
+app.get('/api/state', (_req, res) => {
   try {
-    let md = '';
-    try { md = await fs.readFile(safeVaultPath(STATE_REL), 'utf8'); }
-    catch (e) { if (e.code === 'ENOENT') return res.json({ completed: {}, goals: [] }); throw e; }
-    const m = md.match(/```json\s*([\s\S]*?)```/);
-    if (!m) return res.json({ completed: {}, goals: [] });
-    const data = JSON.parse(m[1]);
-    res.json({ completed: data.completed || {}, goals: Array.isArray(data.goals) ? data.goals : [] });
+    const account = getCurrentAccount();
+    res.json(state.getState(account.id));
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
 });
 
-app.put('/api/state', async (req, res) => {
+app.put('/api/state', (req, res) => {
   try {
-    const payload = {
-      version: 1,
-      updated: new Date().toISOString().slice(0, 10),
-      completed: req.body.completed || {},
-      goals: Array.isArray(req.body.goals) ? req.body.goals : [],
-    };
-    const abs = safeVaultPath(STATE_REL);
-    await fs.mkdir(path.dirname(abs), { recursive: true });
-    await fs.writeFile(abs, STATE_TEMPLATE(payload), 'utf8');
+    const account = getCurrentAccount();
+    state.setState(account.id, req.body || {});   // full replace of this account's state
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: String(e) });
@@ -357,6 +330,17 @@ app.post('/api/chat', async (req, res) => {
       if (imported) console.log(`Imported ${imported} history snapshots from vault → SQLite`);
     } catch (e) {
       if (e.code !== 'ENOENT') console.warn('History import skipped:', e.message);
+    }
+  }
+
+  // One-time seed: import legacy vault quest/goal state into SQLite if this account has none yet.
+  if (state.count(account.id) === 0) {
+    try {
+      const md = await fs.readFile(safeVaultPath(STATE_REL), 'utf8');
+      const r = state.importFromVaultMarkdown(account.id, md);
+      if (r.quests || r.goals) console.log(`Imported state from vault → SQLite (${r.quests} quests, ${r.goals} goals)`);
+    } catch (e) {
+      if (e.code !== 'ENOENT') console.warn('State import skipped:', e.message);
     }
   }
 
