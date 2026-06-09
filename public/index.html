@@ -334,6 +334,50 @@ body {
 }
 .goal-delete:hover { color: #cc1a00; }
 .no-goals { color: #8a6830; font-style: italic; font-size: 13px; padding: 8px 0; }
+
+/* ── DASHBOARD ── */
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 9px;
+  margin-bottom: 16px;
+}
+.dash-tile {
+  background: #ede0b8;
+  border: 1px solid #b09050;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.dash-clickable { cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.dash-clickable:hover { border-color: #8b6914; background: #e6d6a6; }
+.dash-tile-top { display: flex; align-items: center; gap: 6px; }
+.dash-emoji { font-size: 15px; }
+.dash-label { font-size: 11px; font-weight: 600; color: #6a4a10; text-transform: uppercase; letter-spacing: .03em; }
+.dash-value { font-size: 26px; font-weight: bold; color: #1a0a00; line-height: 1.15; margin-top: 3px; }
+.dash-frac { font-size: 15px; font-weight: 600; color: #8a6030; }
+.dash-sub { font-size: 11px; color: #8a6030; margin-top: 2px; }
+.dash-stub { background: #e9e2cf; border-style: dashed; opacity: .85; }
+.dash-stub .dash-value { color: #b09050; }
+.dash-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+.dash-panel {
+  background: #ede0b8;
+  border: 1px solid #b09050;
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+.dash-panel-title { font-size: 13px; font-weight: bold; color: #3a2010; margin-bottom: 10px; display: flex; align-items: baseline; gap: 8px; }
+.dash-link { margin-left: auto; font-size: 11px; color: #2a6aaa; text-decoration: none; font-weight: 600; }
+.dash-link:hover { text-decoration: underline; }
+.dash-momentum-big { font-size: 30px; font-weight: bold; color: #2e6614; line-height: 1.1; }
+.dash-momentum-flat, .dash-momentum-note { font-size: 12px; color: #8a6030; }
+.dash-goal { margin-bottom: 10px; }
+.dash-goal:last-child { margin-bottom: 0; }
+.dash-goal-top { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #3a2010; margin-bottom: 4px; }
+.dash-goal-lvl { color: #6a4a10; }
 .data-note { font-size: 11px; color: #8a6030; margin-top: 14px; font-style: italic; }
 .refresh-btn {
   margin-left: auto;
@@ -402,7 +446,8 @@ body {
 </div>
 
 <div class="tabs">
-  <div class="tab active"  onclick="switchTab('skills')">⚔️ Skills</div>
+  <div class="tab active"  onclick="switchTab('dashboard')">📊 Dashboard</div>
+  <div class="tab"         onclick="switchTab('skills')">⚔️ Skills</div>
   <div class="tab"         onclick="switchTab('quests')">📜 Quests</div>
   <div class="tab"         onclick="switchTab('progress')">📈 Progress</div>
   <div class="tab"         onclick="switchTab('money')">💰 Money</div>
@@ -411,8 +456,16 @@ body {
   <div class="tab"         onclick="switchTab('chat')">💬 Chat</div>
 </div>
 
+<!-- DASHBOARD -->
+<div id="tab-dashboard" class="tab-content active">
+  <div class="section-header">Account Overview <span class="section-sub">Your account at a glance · live from Hiscores + vault</span>
+    <button class="refresh-btn" onclick="loadStats(true)">⟳ Refresh stats</button>
+  </div>
+  <div id="dash-body"></div>
+</div>
+
 <!-- SKILLS -->
-<div id="tab-skills" class="tab-content active">
+<div id="tab-skills" class="tab-content">
   <div class="section-header">Skills <span class="section-sub">Green numbers = gained since your last refresh</span>
     <button class="refresh-btn" id="refresh-btn" onclick="loadStats(true)">⟳ Refresh stats</button>
   </div>
@@ -922,7 +975,7 @@ async function loadVaultState() {
     if (Array.isArray(data.goals)) saveGoalsLocal(data.goals);
     SYNC.available = true;
     setSyncBadge('ok', '\u2601 Synced to vault');
-    renderQuests(); renderGoals(); populateGoalSelect();
+    renderQuests(); renderGoals(); populateGoalSelect(); renderDashboard();
   } catch (e) {
     SYNC.available = false; SYNC.lastError = String(e);
     setSyncBadge('warn', '\u26a0 Local only');
@@ -956,6 +1009,87 @@ function switchTab(name) {
   document.querySelector(`.tab[onclick="switchTab('${name}')"]`).classList.add('active');
   document.getElementById('tab-'+name).classList.add('active');
   if (name === 'progress') renderChart();
+  if (name === 'dashboard') renderDashboard();
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+
+// Total-level change over the last `days` daily snapshots; null if history too short.
+function totalDelta(days) {
+  const t = HISTORY && HISTORY.skills && HISTORY.skills.Total;
+  if (!Array.isArray(t) || t.length < 2) return null;
+  const last = t.length - 1;
+  const prev = Math.max(0, last - days);
+  if (prev === last) return null;
+  return t[last] - t[prev];
+}
+
+function renderDashboard() {
+  const body = document.getElementById('dash-body');
+  if (!body) return;
+
+  const completed  = getCompleted();
+  const doneQuests = QUESTS.filter(q => completed[q.name]);
+  const earnedQP   = doneQuests.reduce((s, q) => s + q.qp, 0);
+  const readyCount = QUESTS.filter(q => questStatus(q, completed).state === 'ready').length;
+  const goals      = getGoals();
+  const delta      = totalDelta(7);
+
+  const tile = (emoji, label, value, sub, attrs) =>
+    `<div class="dash-tile${attrs ? ' ' + attrs.cls : ''}"${attrs && attrs.onclick ? ` onclick="${attrs.onclick}" title="${attrs.title || ''}"` : ''}>
+       <div class="dash-tile-top"><span class="dash-emoji">${emoji}</span><span class="dash-label">${label}</span></div>
+       <div class="dash-value">${value}</div>
+       <div class="dash-sub">${sub || ''}</div>
+     </div>`;
+  const stub = (emoji, label) =>
+    `<div class="dash-tile dash-stub">
+       <div class="dash-tile-top"><span class="dash-emoji">${emoji}</span><span class="dash-label">${label}</span></div>
+       <div class="dash-value">—</div>
+       <div class="dash-sub">needs a data source</div>
+     </div>`;
+
+  const tiles =
+    tile('⚔️', 'Combat', combatLevel(), 'combat level') +
+    tile('📊', 'Total Level', totalLevel(), `${SKILL_NAMES.length - 1} skills`) +
+    tile('📜', 'Quest Points', `${earnedQP} <span class="dash-frac">/ ${TOTAL_QP}</span>`, `${doneQuests.length} / ${QUESTS.length} quests done`) +
+    tile('✅', 'Ready Quests', readyCount, 'can start now →', { cls: 'dash-clickable', onclick: "switchTab('quests')", title: 'Go to Quests' }) +
+    stub('🏦', 'Bank Value') +
+    stub('🗺️', 'Diaries') +
+    stub('📒', 'Collection Log');
+
+  let momentum;
+  if (delta === null)   momentum = `<div class="dash-momentum-note">Not enough history yet — check back after a few daily snapshots.</div>`;
+  else if (delta > 0)   momentum = `<div class="dash-momentum-big">▲ +${delta}</div><div class="dash-sub">total levels gained in the last 7 days</div>`;
+  else                  momentum = `<div class="dash-momentum-flat">No total-level change in the last 7 days.</div>`;
+
+  let goalsHtml;
+  if (!goals.length) {
+    goalsHtml = `<div class="no-goals">No goals yet — <a class="dash-link" style="margin:0" href="#" onclick="switchTab('goals');return false;">add one</a> to track progress.</div>`;
+  } else {
+    goalsHtml = goals.map(g => {
+      const [, curLvl, curXP] = STATS[g.skill] || [0, 1, 0];
+      const targetXP = xpForLevel(g.target), curLvlXP = xpForLevel(curLvl);
+      const need = targetXP - curLvlXP, got = curXP - curLvlXP;
+      const pct  = need > 0 ? Math.min(100, (got / need) * 100).toFixed(0) : '100';
+      return `<div class="dash-goal">
+        <div class="dash-goal-top"><span>${SKILL_EMOJIS[g.skill]} ${g.skill}</span><span class="dash-goal-lvl">Lvl ${curLvl} → ${g.target} · ${pct}%</span></div>
+        <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  body.innerHTML = `
+    <div class="dash-grid">${tiles}</div>
+    <div class="dash-cols">
+      <div class="dash-panel">
+        <div class="dash-panel-title">📈 Momentum</div>
+        ${momentum}
+      </div>
+      <div class="dash-panel">
+        <div class="dash-panel-title">🎯 Active Goals <a class="dash-link" href="#" onclick="switchTab('goals');return false;">manage</a></div>
+        ${goalsHtml}
+      </div>
+    </div>`;
 }
 
 // ── SKILLS ────────────────────────────────────────────────────────────────────
@@ -1424,7 +1558,7 @@ async function loadStats(manual) {
     if (data.history && Array.isArray(data.history.dates) && data.history.dates.length) HISTORY = data.history;
     document.getElementById('cb-level').textContent = combatLevel();
     document.getElementById('total-level').textContent = totalLevel();
-    renderSkills(); renderGoals(); populateChartSelect(); renderGains(); renderMoney();
+    renderSkills(); renderGoals(); populateChartSelect(); renderGains(); renderMoney(); renderDashboard();
     if (document.getElementById('tab-progress').classList.contains('active')) renderChart();
     if (note) note.textContent = '✅ Live from OSRS Hiscores (' + (data.rsn || 'player') + ') · ' + new Date().toLocaleString();
   } catch (e) {
@@ -1596,6 +1730,7 @@ applySeed();
 renderSkills();
 renderQuests();
 renderGoals();
+renderDashboard();
 populateGoalSelect();
 populateChartSelect();
 renderGains();
