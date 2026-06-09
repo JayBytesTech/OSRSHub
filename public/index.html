@@ -378,6 +378,15 @@ body {
 .dash-goal:last-child { margin-bottom: 0; }
 .dash-goal-top { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #3a2010; margin-bottom: 4px; }
 .dash-goal-lvl { color: #6a4a10; }
+.dash-score-panel { margin-bottom: 12px; }
+.dash-score-body { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+.dash-score-num { font-size: 46px; font-weight: bold; color: #2e6614; line-height: 1; flex: 0 0 auto; }
+.dash-score-pctmark { font-size: 22px; margin-left: 2px; }
+.dash-score-bars { flex: 1 1 240px; min-width: 220px; display: flex; flex-direction: column; gap: 2px; }
+.dash-score-row { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #3a2010; }
+.dash-score-row.muted { color: #a88c50; font-weight: normal; font-style: italic; }
+.dash-score-row + .goal-progress-wrap { margin-bottom: 6px; }
+.dash-score-pct { color: #6a4a14; }
 .data-note { font-size: 11px; color: #8a6030; margin-top: 14px; font-style: italic; }
 .refresh-btn {
   margin-left: auto;
@@ -1034,6 +1043,28 @@ function totalDelta(targetDays) {
   return { delta: t[last] - t[baseIdx], days };
 }
 
+// Composite "account progress" score (0-100). Weighted across components that have a data
+// source; untracked ones (diaries/clog/CA) are listed but excluded, and the weights
+// re-normalize over what's available so the number stays honest.
+function accountValue() {
+  const skillCount = SKILL_NAMES.length - 1;                          // 24 trainable skills
+  const skillsPct  = Math.min(100, (totalLevel() / (skillCount * 99)) * 100);
+  const completed  = getCompleted();
+  const earnedQP   = QUESTS.filter(q => completed[q.name]).reduce((s, q) => s + q.qp, 0);
+  const questsPct  = TOTAL_QP ? (earnedQP / TOTAL_QP) * 100 : 0;
+  const components = [
+    { label: 'Skills',              pct: skillsPct, weight: 45, available: true },
+    { label: 'Quest Points',        pct: questsPct, weight: 20, available: true },
+    { label: 'Diaries',             pct: null,      weight: 15, available: false },
+    { label: 'Collection Log',      pct: null,      weight: 10, available: false },
+    { label: 'Combat Achievements', pct: null,      weight: 10, available: false },
+  ];
+  const avail = components.filter(c => c.available);
+  const wsum  = avail.reduce((s, c) => s + c.weight, 0);
+  const score = wsum ? avail.reduce((s, c) => s + c.weight * c.pct, 0) / wsum : 0;
+  return { score: Math.round(score), components };
+}
+
 function renderDashboard() {
   const body = document.getElementById('dash-body');
   if (!body) return;
@@ -1044,6 +1075,7 @@ function renderDashboard() {
   const readyCount = QUESTS.filter(q => questStatus(q, completed).state === 'ready').length;
   const goals      = getGoals();
   const mo         = totalDelta(7);
+  const av         = accountValue();
 
   const tile = (emoji, label, value, sub, attrs) =>
     `<div class="dash-tile${attrs ? ' ' + attrs.cls : ''}"${attrs && attrs.onclick ? ` onclick="${attrs.onclick}" title="${attrs.title || ''}"` : ''}>
@@ -1089,8 +1121,23 @@ function renderDashboard() {
     }).join('');
   }
 
+  const scoreRows = av.components.map(c => c.available
+    ? `<div class="dash-score-row"><span>${c.label}</span><span class="dash-score-pct">${c.pct.toFixed(0)}%</span></div>
+       <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${c.pct.toFixed(0)}%"></div></div>`
+    : `<div class="dash-score-row muted"><span>${c.label}</span><span>not tracked yet</span></div>`
+  ).join('');
+  const scorePanel = `
+    <div class="dash-panel dash-score-panel">
+      <div class="dash-panel-title">🏆 Account Value <span class="dash-sub" style="margin-left:auto;font-weight:normal">overall progress to max</span></div>
+      <div class="dash-score-body">
+        <div class="dash-score-num">${av.score}<span class="dash-score-pctmark">%</span></div>
+        <div class="dash-score-bars">${scoreRows}</div>
+      </div>
+    </div>`;
+
   body.innerHTML = `
     <div class="dash-grid">${tiles}</div>
+    ${scorePanel}
     <div class="dash-cols">
       <div class="dash-panel">
         <div class="dash-panel-title">📈 Momentum</div>
