@@ -46,5 +46,6 @@ function getCurrentAccount() {
 
 const snapshots = require('./snapshots')(db);
 const state = require('./state')(db);
+const accountValue = require('./accountValue')(db);
 
-module.exports = { db, getCurrentAccount, snapshots, state };
+module.exports = { db, getCurrentAccount, snapshots, state, accountValue };

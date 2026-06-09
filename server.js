@@ -19,7 +19,7 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const anthropic = API_KEY ? new Anthropic({ apiKey: API_KEY }) : null;
 
 // SQLite store (history/time-series + account scoping). Vault stays for human notes.
-const { getCurrentAccount, snapshots, state } = require('./db');
+const { getCurrentAccount, snapshots, state, accountValue } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -49,6 +49,34 @@ app.put('/api/state', (req, res) => {
     const account = getCurrentAccount();
     state.setState(account.id, req.body || {});   // full replace of this account's state
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ── Account Value trend (composite score computed client-side, persisted daily) ──
+const clampPct = (v) => (v == null ? null : Math.max(0, Math.min(100, Number(v))));
+
+app.get('/api/account-value', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json(accountValue.getTrend(account.id));
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.post('/api/account-value', (req, res) => {
+  try {
+    const score = Number((req.body || {}).score);
+    if (!Number.isFinite(score)) return res.status(400).json({ error: 'score must be a number' });
+    const account = getCurrentAccount();
+    accountValue.record(account.id, todayLabel(), {
+      score: Math.max(0, Math.min(100, score)),
+      skillsPct: clampPct((req.body || {}).skillsPct),
+      questsPct: clampPct((req.body || {}).questsPct),
+    });
+    res.json({ ok: true, trend: accountValue.getTrend(account.id) });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }

@@ -387,6 +387,9 @@ body {
 .dash-score-row.muted { color: #a88c50; font-weight: normal; font-style: italic; }
 .dash-score-row + .goal-progress-wrap { margin-bottom: 6px; }
 .dash-score-pct { color: #6a4a14; }
+.dash-spark-wrap { margin-top: 10px; }
+.dash-spark { width: 100%; height: 40px; display: block; }
+.dash-spark-ends { display: flex; justify-content: space-between; font-size: 11px; color: #6a4a14; margin-top: 2px; }
 .data-note { font-size: 11px; color: #8a6030; margin-top: 14px; font-style: italic; }
 .refresh-btn {
   margin-left: auto;
@@ -984,7 +987,7 @@ async function loadVaultState() {
     if (Array.isArray(data.goals)) saveGoalsLocal(data.goals);
     SYNC.available = true;
     setSyncBadge('ok', '\u2601 Synced to vault');
-    renderQuests(); renderGoals(); populateGoalSelect(); renderDashboard();
+    renderQuests(); renderGoals(); populateGoalSelect(); renderDashboard(); recordAccountValue();
   } catch (e) {
     SYNC.available = false; SYNC.lastError = String(e);
     setSyncBadge('warn', '\u26a0 Local only');
@@ -1041,6 +1044,37 @@ function totalDelta(targetDays) {
   }
   const days = Math.round((asDate(dates[last]) - asDate(dates[baseIdx])) / 86400000);
   return { delta: t[last] - t[baseIdx], days };
+}
+
+// Account Value trend points (score per day), filled from /api/account-value.
+let AV_TREND = { dates: [], score: [] };
+
+// Tiny inline SVG sparkline for a numeric series. Returns '' for fewer than 2 points.
+function sparklineSVG(vals, opts) {
+  const w = (opts && opts.w) || 240, h = (opts && opts.h) || 40, pad = 3;
+  if (!Array.isArray(vals) || vals.length < 2) return '';
+  const min = Math.min(...vals), max = Math.max(...vals), span = (max - min) || 1;
+  const x = (i) => pad + (i * (w - 2 * pad)) / (vals.length - 1);
+  const y = (v) => h - pad - ((v - min) / span) * (h - 2 * pad);
+  const pts  = vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const area = `${pad},${h - pad} ${pts} ${(w - pad)},${h - pad}`;
+  return `<svg class="dash-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Account value trend">
+            <polygon points="${area}" fill="rgba(46,102,20,0.12)"></polygon>
+            <polyline points="${pts}" fill="none" stroke="#2e6614" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+          </svg>`;
+}
+
+// Compute the current score, persist today's point, then refresh the trend + dashboard.
+async function recordAccountValue() {
+  try {
+    const av = accountValue();
+    const byLabel = Object.fromEntries(av.components.map(c => [c.label, c.pct]));
+    const r = await fetch('/api/account-value', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ score: av.score, skillsPct: byLabel['Skills'], questsPct: byLabel['Quest Points'] }),
+    });
+    if (r.ok) { const d = await r.json(); if (d.trend) AV_TREND = d.trend; renderDashboard(); }
+  } catch (e) { /* offline / server down — keep the live number, skip persistence */ }
 }
 
 // Composite "account progress" score (0-100). Weighted across components that have a data
@@ -1126,6 +1160,13 @@ function renderDashboard() {
        <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${c.pct.toFixed(0)}%"></div></div>`
     : `<div class="dash-score-row muted"><span>${c.label}</span><span>not tracked yet</span></div>`
   ).join('');
+  const trend = AV_TREND.score || [];
+  const trendHtml = trend.length >= 2
+    ? `<div class="dash-spark-wrap">
+         ${sparklineSVG(trend)}
+         <div class="dash-spark-ends"><span>${Math.round(trend[0])}% · ${String(AV_TREND.dates[0]).slice(5)}</span><span>${Math.round(trend[trend.length - 1])}% · ${String(AV_TREND.dates[AV_TREND.dates.length - 1]).slice(5)}</span></div>
+       </div>`
+    : `<div class="dash-sub" style="margin-top:8px">📈 Trend starts building today — check in daily to watch it climb.</div>`;
   const scorePanel = `
     <div class="dash-panel dash-score-panel">
       <div class="dash-panel-title">🏆 Account Value <span class="dash-sub" style="margin-left:auto;font-weight:normal">overall progress to max</span></div>
@@ -1133,6 +1174,7 @@ function renderDashboard() {
         <div class="dash-score-num">${av.score}<span class="dash-score-pctmark">%</span></div>
         <div class="dash-score-bars">${scoreRows}</div>
       </div>
+      ${trendHtml}
     </div>`;
 
   body.innerHTML = `
@@ -1616,7 +1658,7 @@ async function loadStats(manual) {
     if (data.history && Array.isArray(data.history.dates) && data.history.dates.length) HISTORY = data.history;
     document.getElementById('cb-level').textContent = combatLevel();
     document.getElementById('total-level').textContent = totalLevel();
-    renderSkills(); renderGoals(); populateChartSelect(); renderGains(); renderMoney(); renderDashboard();
+    renderSkills(); renderGoals(); populateChartSelect(); renderGains(); renderMoney(); renderDashboard(); recordAccountValue();
     if (document.getElementById('tab-progress').classList.contains('active')) renderChart();
     if (note) note.textContent = '✅ Live from OSRS Hiscores (' + (data.rsn || 'player') + ') · ' + new Date().toLocaleString();
   } catch (e) {
