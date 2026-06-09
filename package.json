@@ -1,0 +1,16 @@
+{
+  "name": "osrs-hub-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local OSRS hub for Nullyn Voyd — Obsidian vault as source of truth + Claude chat",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "build:hub": "node scripts/port-hub.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}

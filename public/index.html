@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<script type="application/json" id="cowork-artifact-meta">
+{
+  "name": "Osrs Hub Nullyn Voyd",
+  "schemaVersion": 1,
+  "description": "OSRS personal hub for Nullyn Voyd. Skills (24, incl. Sailing), a quest log with requirement gating + reward XP + 'Can start now' filter, a Progress tab charting total/skill levels over time, an AI journey guide, and a goals tracker. Quest completion + goals sync to the Obsidian vault (OSRS Hub State.md) so they survive cache wipes."
+}
+</script>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSRS Hub – Nullyn Voyd</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  background: #f5edd8;
+  color: #2c1a08;
+  font-size: 14px;
+  min-height: 100vh;
+}
+
+.header {
+  background: linear-gradient(180deg, #4a3220 0%, #2c1a08 100%);
+  color: #f5e6b8;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 3px solid #8b6914;
+  flex-wrap: wrap;
+}
+.header-rsn {
+  font-size: 18px;
+  font-weight: bold;
+  color: #ffd700;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+}
+.header-meta {
+  font-size: 13px;
+  color: #e8c870;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.header-right { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.header-note {
+  font-size: 11px;
+  color: #a08050;
+  font-style: italic;
+}
+.sync-badge {
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 11px;
+  font-weight: 600;
+  background: #3a2410;
+  color: #c8a060;
+  border: 1px solid #6a4a14;
+  white-space: nowrap;
+}
+.sync-badge.ok   { background: #1d4d12; color: #b8f0a0; border-color: #2e6614; }
+.sync-badge.warn { background: #5a3010; color: #f0c080; border-color: #8a5010; }
+
+.tabs {
+  display: flex;
+  background: #2c1a08;
+  overflow-x: auto;
+}
+.tab {
+  padding: 9px 18px;
+  cursor: pointer;
+  color: #c8a060;
+  font-size: 13px;
+  white-space: nowrap;
+  border-right: 1px solid #3a2410;
+  transition: background 0.15s;
+  user-select: none;
+}
+.tab.active {
+  background: #f5edd8;
+  color: #2c1a08;
+  font-weight: 600;
+  border-top: 3px solid #8b6914;
+  padding-top: 6px;
+}
+.tab:hover:not(.active) { background: #3a2410; color: #e8c870; }
+
+.tab-content { display: none; padding: 16px; }
+.tab-content.active { display: block; }
+
+.section-header {
+  font-size: 15px;
+  font-weight: bold;
+  color: #3a2010;
+  border-bottom: 2px solid #8b6914;
+  padding-bottom: 6px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.section-sub {
+  font-size: 11px;
+  font-weight: normal;
+  color: #8a6030;
+}
+
+/* ── SKILLS ── */
+.skills-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  gap: 7px;
+}
+.skill-card {
+  background: #ede0b8;
+  border: 1px solid #b09050;
+  border-radius: 5px;
+  padding: 9px 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.skill-card.overall-card {
+  background: #ddd098;
+  border-color: #7a5c10;
+  grid-column: 1 / -1;
+  max-width: 340px;
+}
+.skill-emoji { font-size: 20px; line-height: 1; flex-shrink: 0; }
+.skill-info { flex: 1; min-width: 0; }
+.skill-name { font-size: 10px; color: #6a4a14; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+.skill-level { font-size: 24px; font-weight: bold; color: #1a0a00; line-height: 1.1; }
+.skill-xp { font-size: 10px; color: #7a5a20; margin-top: 1px; }
+.skill-gain { font-size: 10px; color: #1d6b10; font-weight: 700; margin-top: 1px; }
+.xp-bar-wrap { height: 4px; background: #c8b070; border-radius: 2px; margin-top: 5px; }
+.xp-bar { height: 100%; background: linear-gradient(90deg, #2a7a14, #4aaa24); border-radius: 2px; transition: width 0.4s; }
+.xp-to-next { font-size: 9px; color: #8a6030; margin-top: 2px; }
+
+/* ── QUESTS ── */
+.quest-controls {
+  display: flex;
+  gap: 7px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.quest-search {
+  flex: 1; min-width: 160px;
+  padding: 6px 10px;
+  border: 1px solid #a08040;
+  border-radius: 4px;
+  background: #faf4e4;
+  color: #2c1a08;
+  font-size: 13px;
+}
+.filter-btn {
+  padding: 5px 11px;
+  border: 1px solid #a08040;
+  border-radius: 4px;
+  background: #ede0b8;
+  color: #4a2c08;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s;
+}
+.filter-btn.active { background: #8b6914; color: #faf4e4; border-color: #5c3c08; }
+.filter-btn:hover:not(.active) { background: #d4c080; }
+.qp-badge {
+  background: #2e6614;
+  color: white;
+  border-radius: 12px;
+  padding: 3px 11px;
+  font-size: 12px;
+  font-weight: bold;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.quest-disclaimer { font-size: 11px; color: #8a6030; margin-bottom: 10px; font-style: italic; }
+.quest-list { display: flex; flex-direction: column; gap: 4px; }
+.quest-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 10px;
+  background: #f0e4c8;
+  border: 1px solid #c8a860;
+  border-radius: 4px;
+  border-left-width: 4px;
+  transition: background 0.1s;
+}
+.quest-item.s-ready   { border-left-color: #3a9a1a; }
+.quest-item.s-locked  { border-left-color: #c06010; }
+.quest-item.s-unknown { border-left-color: #b0a060; }
+.quest-item.done { background: #d8ecc8; border-color: #6aaa3a; border-left-color: #2e6614; }
+.quest-item.done .quest-name { text-decoration: line-through; color: #2e6614; opacity: 0.85; }
+.quest-item input[type=checkbox] { cursor: pointer; accent-color: #3a7a14; flex-shrink: 0; margin-top: 2px; }
+.quest-main { flex: 1; min-width: 0; }
+.quest-row1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.quest-name { font-size: 13px; font-weight: 600; }
+.quest-name a { color: inherit; text-decoration: none; }
+.quest-name a:hover { text-decoration: underline; color: #1a5070; }
+.quest-detail { font-size: 11px; color: #6a4a14; margin-top: 2px; line-height: 1.45; }
+.quest-reward { color: #2e6614; }
+.status-chip {
+  font-size: 10px; padding: 1px 7px; border-radius: 10px; font-weight: 700; white-space: nowrap;
+}
+.status-chip.ready   { background: #d4f0c4; color: #1d6b10; border: 1px solid #5aa83a; }
+.status-chip.locked  { background: #f5dcc0; color: #9a4810; border: 1px solid #d08840; }
+.status-chip.unknown { background: #eae2c8; color: #7a6830; border: 1px solid #b8a860; }
+.status-chip.done    { background: #2e6614; color: #fff; border: 1px solid #1d4d0c; }
+.qtype-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; flex-shrink: 0; }
+.qtype-f2p  { background: #d4e8f0; color: #1a5070; border: 1px solid #80b8d0; }
+.qtype-p2p  { background: #f5e8c8; color: #6a4010; border: 1px solid #c8a040; }
+.qtype-mini { background: #ead8f5; color: #5a2080; border: 1px solid #b080d0; }
+.quest-qp { font-size: 11px; color: #5a4010; font-weight: bold; min-width: 28px; text-align: right; flex-shrink: 0; }
+
+/* ── PROGRESS ── */
+.progress-section { max-width: 760px; }
+.chart-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.chart-wrap { background: #faf4e4; border: 1px solid #b09050; border-radius: 6px; padding: 12px; margin-bottom: 18px; }
+.gains-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.gain-card { background: #ede0b8; border: 1px solid #b09050; border-radius: 5px; padding: 9px 11px; }
+.gain-skill { font-size: 11px; color: #6a4a14; font-weight: 600; }
+.gain-val { font-size: 16px; font-weight: bold; color: #1d6b10; }
+.gain-val.flat { color: #8a7030; }
+.gain-sub { font-size: 10px; color: #8a6030; }
+
+/* ── AI ── */
+.ai-section { max-width: 680px; }
+.ai-intro {
+  background: #ede0b8;
+  border: 1px solid #b09050;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: #3a2010;
+  line-height: 1.55;
+}
+.ai-btn {
+  display: inline-block;
+  padding: 10px 22px;
+  background: #2e6614;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.15s;
+  margin-bottom: 14px;
+}
+.ai-btn:hover { background: #215010; }
+.ai-btn:disabled { background: #88aa78; cursor: not-allowed; }
+.ai-meta { font-size: 11px; color: #8a6030; margin-bottom: 8px; font-style: italic; }
+.ai-output {
+  background: #faf4e4;
+  border: 1px solid #b09050;
+  border-radius: 6px;
+  padding: 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #2c1a08;
+  white-space: pre-wrap;
+  min-height: 80px;
+}
+.ai-output.loading { color: #8a6830; font-style: italic; }
+
+/* ── GOALS ── */
+.goals-section { max-width: 580px; }
+.add-goal-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  background: #ede0b8;
+  border: 1px solid #b09050;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.add-goal-form label { font-size: 12px; color: #5a3a10; font-weight: 600; }
+.goal-select, .goal-input {
+  padding: 6px 10px;
+  border: 1px solid #a08040;
+  border-radius: 4px;
+  background: #faf4e4;
+  color: #2c1a08;
+  font-size: 13px;
+}
+.goal-select { flex: 1; min-width: 130px; }
+.goal-input { width: 85px; }
+.add-goal-btn {
+  padding: 7px 14px;
+  background: #4a3220;
+  color: #f5e6b8;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.add-goal-btn:hover { background: #5c4030; }
+.goals-list { display: flex; flex-direction: column; gap: 10px; }
+.goal-card {
+  background: #f0e4c8;
+  border: 1px solid #c8a860;
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+.goal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.goal-emoji { font-size: 18px; }
+.goal-skill-name { font-weight: bold; font-size: 14px; flex: 1; }
+.goal-levels { font-size: 12px; color: #6a4a14; white-space: nowrap; }
+.goal-progress-wrap { height: 10px; background: #d4c080; border-radius: 5px; overflow: hidden; }
+.goal-progress-bar { height: 100%; background: linear-gradient(90deg, #1a6aaa, #44aaee); border-radius: 5px; transition: width 0.4s; }
+.goal-xp-info { display: flex; justify-content: space-between; font-size: 11px; color: #6a4a14; margin-top: 5px; flex-wrap: wrap; gap: 4px; }
+.goal-delete {
+  background: none; border: none;
+  color: #aa3010; cursor: pointer;
+  font-size: 16px; padding: 0 4px; line-height: 1;
+}
+.goal-delete:hover { color: #cc1a00; }
+.no-goals { color: #8a6830; font-style: italic; font-size: 13px; padding: 8px 0; }
+.data-note { font-size: 11px; color: #8a6030; margin-top: 14px; font-style: italic; }
+.refresh-btn {
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #3a2410;
+  color: #e8c870;
+  border: 1px solid #6a4a14;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.refresh-btn:hover:not(:disabled) { background: #4a3220; }
+.refresh-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* ── MONEY ── */
+.money-group-head { font-size: 13px; font-weight: bold; color: #3a2010; margin: 16px 0 8px; display: flex; align-items: center; gap: 8px; }
+.money-group-head .count { font-size: 11px; font-weight: normal; color: #8a6030; }
+.money-card { display: flex; align-items: center; gap: 10px; padding: 8px 11px; border: 1px solid #d8c590; border-left-width: 4px; border-radius: 5px; background: #fffdf5; margin-bottom: 5px; flex-wrap: wrap; }
+.money-card.ready { border-left-color: #2e6614; }
+.money-card.next  { border-left-color: #b88020; }
+.money-card.locked { border-left-color: #9a9a9a; opacity: 0.85; }
+.money-name { font-weight: 600; color: #2c1a08; flex: 1 1 240px; }
+.money-gp { font-weight: bold; color: #1d6e0c; white-space: nowrap; }
+.money-gp.varies { color: #8a6030; font-weight: 600; font-style: italic; }
+.money-gp.live { color: #145c0a; background: #e6f3df; border: 1px solid #b8e0a8; padding: 1px 7px; border-radius: 9px; cursor: help; }
+.money-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+.money-badge { font-size: 11px; padding: 1px 7px; border-radius: 9px; background: #efe4c4; color: #5a3a10; border: 1px solid #d8c590; white-space: nowrap; }
+.money-reqs { flex-basis: 100%; font-size: 11px; color: #6a4a14; }
+.money-gap { color: #b06010; font-weight: 600; }
+.money-gap.ok { color: #2e6614; }
+.money-note { flex-basis: 100%; font-size: 11px; color: #8a6030; font-style: italic; }
+.endgame-card { padding: 8px 11px; border: 1px solid #d8c590; border-left: 4px solid #6a4a14; border-radius: 5px; background: #f7efd8; margin-bottom: 5px; }
+.endgame-card .en-name { font-weight: 600; color: #2c1a08; }
+.endgame-card .en-why { font-size: 12px; color: #5a3a10; }
+.endgame-card .en-gap { font-size: 11px; color: #8a5010; margin-top: 2px; }
+
+.chat-wrap { display:flex; flex-direction:column; height:60vh; min-height:360px; border:2px solid #8b6914; border-radius:6px; background:#fffdf5; overflow:hidden; }
+.chat-log { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px; }
+.chat-msg { max-width:85%; padding:9px 12px; border-radius:10px; font-size:13px; line-height:1.5; white-space:pre-wrap; word-wrap:break-word; }
+.chat-msg.user { align-self:flex-end; background:#4a3220; color:#f5e6b8; }
+.chat-msg.bot { align-self:flex-start; background:#efe4c4; color:#2c1a08; border:1px solid #d8c590; }
+.chat-msg.sys { align-self:center; color:#8a6030; font-style:italic; font-size:12px; }
+.chat-input-row { display:flex; gap:8px; padding:10px; border-top:2px solid #8b6914; background:#f5edd8; }
+.chat-input { flex:1; padding:9px 11px; border:1px solid #b89850; border-radius:5px; font-size:13px; font-family:inherit; resize:none; }
+.chat-send { padding:9px 18px; background:#6a4a14; color:#ffd700; border:none; border-radius:5px; font-weight:600; cursor:pointer; }
+.chat-send:disabled { opacity:.6; cursor:default; }
+.chat-hint { font-size:11px; color:#8a6030; margin-bottom:10px; font-style:italic; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-rsn">⚔️ Nullyn Voyd</div>
+  </div>
+  <div class="header-meta">
+    <span>Combat: <strong id="cb-level">—</strong></span>
+    <span>Total Level: <strong id="total-level">—</strong></span>
+  </div>
+  <div class="header-right">
+    <span class="sync-badge" id="sync-badge">⏳ Connecting to vault…</span>
+    <span class="header-note">Stats from June 8, 2026 · Ask Claude to refresh</span>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active"  onclick="switchTab('skills')">⚔️ Skills</div>
+  <div class="tab"         onclick="switchTab('quests')">📜 Quests</div>
+  <div class="tab"         onclick="switchTab('progress')">📈 Progress</div>
+  <div class="tab"         onclick="switchTab('money')">💰 Money</div>
+  <div class="tab"         onclick="switchTab('ai')">🧙 AI Journey</div>
+  <div class="tab"         onclick="switchTab('goals')">🎯 Goals</div>
+  <div class="tab"         onclick="switchTab('chat')">💬 Chat</div>
+</div>
+
+<!-- SKILLS -->
+<div id="tab-skills" class="tab-content active">
+  <div class="section-header">Skills <span class="section-sub">Green numbers = gained since your last refresh</span>
+    <button class="refresh-btn" id="refresh-btn" onclick="loadStats(true)">⟳ Refresh stats</button>
+  </div>
+  <div class="skills-grid" id="skills-grid"></div>
+  <div class="data-note">📅 Stats are embedded from the last Hiscores fetch (June 8, 2026). To update, ask Claude: "Refresh my OSRS hub stats."</div>
+</div>
+
+<!-- QUESTS -->
+<div id="tab-quests" class="tab-content">
+  <div class="section-header">Quest Log <span class="section-sub">Tick to complete · syncs to your vault</span></div>
+  <div class="quest-controls">
+    <input class="quest-search" id="quest-search" type="text" placeholder="Search quests…" oninput="renderQuests()">
+    <button class="filter-btn active" id="filter-all"        onclick="setFilter('all')">All</button>
+    <button class="filter-btn"        id="filter-ready"      onclick="setFilter('ready')">Can start now</button>
+    <button class="filter-btn"        id="filter-incomplete" onclick="setFilter('incomplete')">To Do</button>
+    <button class="filter-btn"        id="filter-complete"   onclick="setFilter('complete')">Done</button>
+    <button class="filter-btn"        id="filter-f2p"        onclick="setFilter('f2p')">F2P</button>
+    <button class="filter-btn"        id="filter-p2p"        onclick="setFilter('p2p')">P2P</button>
+    <button class="filter-btn"        id="filter-mini"       onclick="setFilter('mini')">Mini</button>
+    <span class="qp-badge" id="qp-counter">0 QP</span>
+  </div>
+  <div class="quest-disclaimer">🟢 Ready · 🟠 Locked (missing reqs shown) · ⚪ Reqs not listed — verify on the wiki (quest names link out). Many skill reqs are <b>boostable</b>, so you may start earlier than shown.</div>
+  <div class="quest-list" id="quest-list"></div>
+</div>
+
+<!-- PROGRESS -->
+<div id="tab-progress" class="tab-content">
+  <div class="section-header">Progress Over Time <span class="section-sub">From your Daily Log · ask Claude to refresh to add today</span></div>
+  <div class="progress-section">
+    <div class="chart-controls">
+      <label style="font-size:12px;color:#5a3a10;font-weight:600;">Chart:</label>
+      <select class="goal-select" id="chart-skill" style="flex:0 0 auto;min-width:160px" onchange="renderChart()"></select>
+    </div>
+    <div class="chart-wrap"><canvas id="progress-chart" height="240"></canvas></div>
+    <div class="section-header" style="font-size:14px;">Recent gains <span class="section-sub" id="gains-window"></span></div>
+    <div class="gains-grid" id="gains-grid"></div>
+  </div>
+</div>
+
+<!-- MONEY -->
+<div id="tab-money" class="tab-content">
+  <div class="section-header">Money Methods <span class="section-sub">Auto-filtered against your live stats + completed quests</span>
+    <button class="refresh-btn" id="gephr-btn" onclick="loadGephr(true)">↻ Refresh GP/hr</button>
+  </div>
+  <div class="quest-controls">
+    <button class="filter-btn active" id="mfilter-all"     onclick="setMoneyFilter('all')">All</button>
+    <button class="filter-btn"        id="mfilter-ready"   onclick="setMoneyFilter('ready')">Available now</button>
+    <button class="filter-btn"        id="mfilter-next"    onclick="setMoneyFilter('next')">Next unlocks</button>
+    <button class="filter-btn"        id="mfilter-gp"      onclick="setMoneyFilter('gp')">💰 Raw GP</button>
+    <button class="filter-btn"        id="mfilter-skill"   onclick="setMoneyFilter('skill')">📈 Skilling</button>
+    <button class="filter-btn"        id="mfilter-afk"     onclick="setMoneyFilter('afk')">🔵 AFK</button>
+  </div>
+  <div class="quest-disclaimer">🟢 active · 🔵 AFK/passive · 💰 raw GP · 📈 skilling · 🏦 needs GE startup capital. <b>GP/hr with a 🟢 LIVE tag</b> is computed from current GE prices × a modeled throughput; the rest are dated estimates. Methods graduate automatically as your stats/quests change.</div>
+  <div id="money-list"></div>
+  <div class="data-note" id="money-note"></div>
+</div>
+
+<!-- AI JOURNEY -->
+<div id="tab-ai" class="tab-content">
+  <div class="section-header">AI Journey Guide</div>
+  <div class="ai-section">
+    <div class="ai-intro">
+      Claude analyzes your current stats, quest completion, ready-to-start quests, and goals to give personalized recommendations — what to train, which quests to tackle next, and where to take your account.
+    </div>
+    <button class="ai-btn" id="ai-btn" onclick="getAISuggestions()">✨ Get Journey Recommendations</button>
+    <div class="ai-meta" id="ai-meta" style="display:none"></div>
+    <div class="ai-output" id="ai-output" style="display:none"></div>
+  </div>
+</div>
+
+<!-- GOALS -->
+<div id="tab-goals" class="tab-content">
+  <div class="section-header">Goals Tracker <span class="section-sub">Synced to your vault</span></div>
+  <div class="goals-section">
+    <div class="add-goal-form">
+      <label>Skill</label>
+      <select class="goal-select" id="goal-skill"><option value="">Select…</option></select>
+      <label>Target</label>
+      <input class="goal-input" id="goal-target" type="number" min="2" max="99" placeholder="e.g. 70">
+      <button class="add-goal-btn" onclick="addGoal()">+ Add Goal</button>
+    </div>
+    <div class="goals-list" id="goals-list"></div>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div id="tab-chat" class="tab-content">
+  <div class="section-header">Chat <span class="section-sub">Claude with live access to your vault + OSRS wiki</span></div>
+  <div class="chat-hint">Ask about your account, ramble about goals, or say "log today's session to my Daily Log." Claude can read/search your vault and look things up on the wiki.</div>
+  <div class="chat-wrap">
+    <div class="chat-log" id="chat-log"></div>
+    <div class="chat-input-row">
+      <textarea class="chat-input" id="chat-input" rows="2" placeholder="Ask anything… (Enter to send, Shift+Enter for newline)"></textarea>
+      <button class="chat-send" id="chat-send" onclick="sendChat()">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+
+const SKILL_NAMES = [
+  "Overall","Attack","Defence","Strength","Hitpoints","Ranged","Prayer","Magic",
+  "Cooking","Woodcutting","Fletching","Fishing","Firemaking","Crafting","Smithing",
+  "Mining","Herblore","Agility","Thieving","Slayer","Farming","Runecrafting","Hunter","Construction","Sailing"
+];
+
+const SKILL_EMOJIS = {
+  "Overall":"📊","Attack":"⚔️","Defence":"🛡️","Strength":"💪","Hitpoints":"❤️",
+  "Ranged":"🏹","Prayer":"🙏","Magic":"🔮","Cooking":"🍳","Woodcutting":"🪓",
+  "Fletching":"🎯","Fishing":"🎣","Firemaking":"🔥","Crafting":"🪡","Smithing":"⚒️",
+  "Mining":"⛏️","Herblore":"🌿","Agility":"🏃","Thieving":"🗝️","Slayer":"💀",
+  "Farming":"🌱","Runecrafting":"🔯","Hunter":"🦊","Construction":"🏠","Sailing":"⛵"
+};
+
+// [rank, level, xp] — embedded fallback; overwritten live from /api/stats on load
+const STATS = {
+  "Overall":      [-1,  658, 864965],
+  "Attack":       [-1,   52, 135490],
+  "Defence":      [-1,   43,  55642],
+  "Strength":     [-1,   46,  74580],
+  "Hitpoints":    [-1,   46,  73543],
+  "Ranged":       [-1,   14,   2336],
+  "Prayer":       [-1,   37,  28130],
+  "Magic":        [-1,   37,  29083],
+  "Cooking":      [-1,   34,  21909],
+  "Woodcutting":  [-1,   29,  13100],
+  "Fletching":    [-1,   39,  35610],
+  "Fishing":      [-1,   37,  27480],
+  "Firemaking":   [-1,    2,    120],
+  "Crafting":     [-1,   29,  12675],
+  "Smithing":     [-1,   35,  24567],
+  "Mining":       [-1,   25,   8087],
+  "Herblore":     [-1,   10,   1353],
+  "Agility":      [-1,   52, 126344],
+  "Thieving":     [1679597, 56, 190603],
+  "Slayer":       [-1,    9,   1090],
+  "Farming":      [-1,    1,      0],
+  "Runecrafting": [-1,    1,      0],
+  "Hunter":       [-1,    9,   1000],
+  "Construction": [-1,   14,   2223],
+  "Sailing":      [-1,    1,      0],
+};
+
+// OSRS XP table — index i = XP required to reach level (i+1)
+const XP_TABLE = [0,83,174,276,388,512,650,801,969,1154,1358,1584,1833,2107,2411,2746,3115,3523,3973,4470,5018,5624,6291,7028,7842,8740,9730,10824,12031,13363,14833,16456,18247,20224,22406,24815,27473,30408,33648,37224,41171,45529,50339,55589,61512,67983,75127,83014,91721,101333,111945,123660,136594,150872,166636,184040,203254,224466,247886,273742,302288,333804,368599,407015,449428,496254,547953,605032,667181,737627,814445,899257,992895,1096278,1210421,1336443,1475581,1629200,1798808,1986068,2192818,2421087,2673114,2951373,3258594,3597792,3972294,4385776,4842295,5346332,5902831,6517253,7195629,7944614,8771558,9684577,10692629,11805606,13034431,200000000];
+
+function xpForLevel(lvl)     { return XP_TABLE[Math.min(lvl - 1, 98)]; }
+function xpForNextLevel(lvl) { return XP_TABLE[Math.min(lvl, 98)]; }
+function xpProgress(xp, lvl) {
+  if (lvl >= 99) return 1;
+  return Math.min((xp - xpForLevel(lvl)) / (xpForNextLevel(lvl) - xpForLevel(lvl)), 1);
+}
+function xpToNext(xp, lvl) { return lvl >= 99 ? 0 : Math.max(0, xpForNextLevel(lvl) - xp); }
+function fmt(n) {
+  if (n >= 1e6) return (n/1e6).toFixed(2)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1)+'k';
+  return n.toLocaleString();
+}
+function combatLevel() {
+  const s = STATS;
+  const base = 0.25*(s.Defence[1] + s.Hitpoints[1] + Math.floor(s.Prayer[1]/2));
+  const melee = 0.325*(s.Attack[1] + s.Strength[1]);
+  const range = 0.325*Math.floor(s.Ranged[1]*3/2);
+  const mage  = 0.325*Math.floor(s.Magic[1]*3/2);
+  return Math.floor(base + Math.max(melee, range, mage));
+}
+function totalLevel() {
+  return SKILL_NAMES.slice(1).reduce((s,n) => s + (STATS[n] ? STATS[n][1] : 0), 0);
+}
+
+// ── HISTORY (from OSRS Daily Log skill-by-day matrix; 06-08 = current Hiscores) ──
+
+let HISTORY = {
+  dates: ["2026-06-01","2026-06-02","2026-06-03","2026-06-04","2026-06-05","2026-06-07","2026-06-08"],
+  skills: {
+    "Attack":       [50,51,52,52,52,52,52],
+    "Strength":     [46,46,46,46,46,46,46],
+    "Defence":      [40,40,43,43,43,43,43],
+    "Hitpoints":    [46,46,46,46,46,46,46],
+    "Ranged":       [4,4,4,14,14,14,14],
+    "Prayer":       [13,16,33,37,37,37,37],
+    "Magic":        [35,35,37,37,37,37,37],
+    "Runecrafting": [1,1,1,1,1,1,1],
+    "Crafting":     [11,14,23,29,29,29,29],
+    "Mining":       [15,21,21,25,25,25,25],
+    "Smithing":     [29,33,33,35,35,35,35],
+    "Fishing":      [37,37,37,37,37,37,37],
+    "Cooking":      [34,34,34,34,34,34,34],
+    "Firemaking":   [1,1,2,2,2,2,2],
+    "Woodcutting":  [24,26,26,26,29,29,29],
+    "Herblore":     [1,10,10,10,10,10,10],
+    "Agility":      [27,28,35,35,36,51,52],
+    "Thieving":     [31,41,41,42,43,56,56],
+    "Fletching":    [34,36,36,36,38,39,39],
+    "Slayer":       [9,9,9,9,9,9,9],
+    "Hunter":       [9,9,9,9,9,9,9],
+    "Farming":      [1,1,1,1,1,1,1],
+    "Construction": [8,14,14,14,14,14,14],
+    "Sailing":      [1,1,1,1,1,1,1],
+    "Total":        [507,554,594,621,628,657,658],
+  }
+};
+
+// ── QUESTS ────────────────────────────────────────────────────────────────────
+
+const QUESTS = [
+  // F2P
+  {name:"Black Knights' Fortress",qp:3,type:"f2p"},
+  {name:"Cook's Assistant",qp:1,type:"f2p"},
+  {name:"Demon Slayer",qp:3,type:"f2p"},
+  {name:"Doric's Quest",qp:1,type:"f2p"},
+  {name:"Dragon Slayer I",qp:2,type:"f2p"},
+  {name:"Ernest the Chicken",qp:4,type:"f2p"},
+  {name:"Goblin Diplomacy",qp:5,type:"f2p"},
+  {name:"Imp Catcher",qp:1,type:"f2p"},
+  {name:"The Knight's Sword",qp:1,type:"f2p"},
+  {name:"Misthalin Mystery",qp:1,type:"f2p"},
+  {name:"Pirate's Treasure",qp:2,type:"f2p"},
+  {name:"Prince Ali Rescue",qp:3,type:"f2p"},
+  {name:"The Restless Ghost",qp:1,type:"f2p"},
+  {name:"Romeo & Juliet",qp:5,type:"f2p"},
+  {name:"Rune Mysteries",qp:1,type:"f2p"},
+  {name:"Sheep Shearer",qp:1,type:"f2p"},
+  {name:"Shield of Arrav",qp:1,type:"f2p"},
+  {name:"Vampire Slayer",qp:3,type:"f2p"},
+  {name:"Witch's Potion",qp:1,type:"f2p"},
+  // P2P
+  {name:"A Fairy Tale III - Battle at Ork's Rift",qp:2,type:"p2p"},
+  {name:"A Kingdom Divided",qp:1,type:"p2p"},
+  {name:"A Porcine of Interest",qp:1,type:"p2p"},
+  {name:"A Tail of Two Cats",qp:2,type:"p2p"},
+  {name:"A Taste of Hope",qp:1,type:"p2p"},
+  {name:"Animal Magnetism",qp:1,type:"p2p"},
+  {name:"Another Slice of H.A.M.",qp:1,type:"p2p"},
+  {name:"At First Light",qp:1,type:"p2p"},
+  {name:"Beneath Cursed Sands",qp:2,type:"p2p"},
+  {name:"Below Ice Mountain",qp:1,type:"p2p"},
+  {name:"Between a Rock...",qp:2,type:"p2p"},
+  {name:"Biohazard",qp:3,type:"p2p"},
+  {name:"Bone Voyage",qp:1,type:"p2p"},
+  {name:"Cabin Fever",qp:2,type:"p2p"},
+  {name:"Children of the Sun",qp:1,type:"p2p"},
+  {name:"Client of Kourend",qp:1,type:"p2p"},
+  {name:"Clock Tower",qp:1,type:"p2p"},
+  {name:"Cold War",qp:1,type:"p2p"},
+  {name:"Contact!",qp:1,type:"p2p"},
+  {name:"Creature of Fenkenstrain",qp:2,type:"p2p"},
+  {name:"Current Affairs",qp:1,type:"p2p"},
+  {name:"Darkness of Hallowvale",qp:2,type:"p2p"},
+  {name:"Death Plateau",qp:1,type:"p2p"},
+  {name:"Death to the Dorgeshuun",qp:1,type:"p2p"},
+  {name:"Defender of Varrock",qp:1,type:"p2p"},
+  {name:"The Depths of Despair",qp:1,type:"p2p"},
+  {name:"Desert Treasure I",qp:3,type:"p2p"},
+  {name:"Desert Treasure II - The Fallen Empire",qp:5,type:"p2p"},
+  {name:"Dragon Slayer II",qp:5,type:"p2p"},
+  {name:"Dream Mentor",qp:2,type:"p2p"},
+  {name:"Druidic Ritual",qp:4,type:"p2p"},
+  {name:"Dwarf Cannon",qp:1,type:"p2p"},
+  {name:"Eagle's Peak",qp:2,type:"p2p"},
+  {name:"Eadgar's Ruse",qp:1,type:"p2p"},
+  {name:"Elemental Workshop I",qp:1,type:"p2p"},
+  {name:"Elemental Workshop II",qp:1,type:"p2p"},
+  {name:"Enakhra's Lament",qp:1,type:"p2p"},
+  {name:"Enlightened Journey",qp:1,type:"p2p"},
+  {name:"The Eyes of Glouphrie",qp:1,type:"p2p"},
+  {name:"Fairy Tale I - Growing Pains",qp:2,type:"p2p"},
+  {name:"Fairy Tale II - Cure a Queen",qp:2,type:"p2p"},
+  {name:"Family Crest",qp:1,type:"p2p"},
+  {name:"Fight Arena",qp:2,type:"p2p"},
+  {name:"Fishing Contest",qp:1,type:"p2p"},
+  {name:"Forgettable Tale of a Drunken Dwarf",qp:2,type:"p2p"},
+  {name:"The Forsaken Tower",qp:1,type:"p2p"},
+  {name:"The Fremennik Exiles",qp:1,type:"p2p"},
+  {name:"The Fremennik Isles",qp:1,type:"p2p"},
+  {name:"The Fremennik Trials",qp:3,type:"p2p"},
+  {name:"Gertrude's Cat",qp:1,type:"p2p"},
+  {name:"Getting Ahead",qp:1,type:"p2p"},
+  {name:"Ghosts Ahoy",qp:2,type:"p2p"},
+  {name:"The Golem",qp:1,type:"p2p"},
+  {name:"The Grand Tree",qp:5,type:"p2p"},
+  {name:"The Great Brain Robbery",qp:2,type:"p2p"},
+  {name:"Grim Tales",qp:1,type:"p2p"},
+  {name:"Hand in the Sand",qp:1,type:"p2p"},
+  {name:"Haunted Mine",qp:2,type:"p2p"},
+  {name:"Hazeel Cult",qp:3,type:"p2p"},
+  {name:"The Heart of Darkness",qp:2,type:"p2p"},
+  {name:"Heroes' Quest",qp:1,type:"p2p"},
+  {name:"Holy Grail",qp:2,type:"p2p"},
+  {name:"Horror from the Deep",qp:2,type:"p2p"},
+  {name:"Icthlarin's Little Helper",qp:4,type:"p2p"},
+  {name:"The Ides of Milk",qp:1,type:"p2p"},
+  {name:"In Aid of the Myreque",qp:2,type:"p2p"},
+  {name:"In Search of the Myreque",qp:2,type:"p2p"},
+  {name:"Jungle Potion",qp:1,type:"p2p"},
+  {name:"King's Ransom",qp:1,type:"p2p"},
+  {name:"Legends' Quest",qp:4,type:"p2p"},
+  {name:"The Lost City",qp:3,type:"p2p"},
+  {name:"The Lost Tribe",qp:1,type:"p2p"},
+  {name:"Lunar Diplomacy",qp:2,type:"p2p"},
+  {name:"Making Friends with My Arm",qp:1,type:"p2p"},
+  {name:"Making History",qp:3,type:"p2p"},
+  {name:"Merlin's Crystal",qp:6,type:"p2p"},
+  {name:"Monk's Friend",qp:1,type:"p2p"},
+  {name:"Monkey Madness I",qp:3,type:"p2p"},
+  {name:"Monkey Madness II",qp:1,type:"p2p"},
+  {name:"Mountain Daughter",qp:2,type:"p2p"},
+  {name:"Mourning's End Part I",qp:2,type:"p2p"},
+  {name:"Mourning's End Part II",qp:2,type:"p2p"},
+  {name:"Murder Mystery",qp:3,type:"p2p"},
+  {name:"My Arm's Big Adventure",qp:1,type:"p2p"},
+  {name:"Nature Spirit",qp:2,type:"p2p"},
+  {name:"Observatory Quest",qp:2,type:"p2p"},
+  {name:"Olaf's Quest",qp:1,type:"p2p"},
+  {name:"One Small Favour",qp:2,type:"p2p"},
+  {name:"Pandemonium",qp:1,type:"p2p"},
+  {name:"Perilous Moons",qp:2,type:"p2p"},
+  {name:"Plague City",qp:1,type:"p2p"},
+  {name:"Priest in Peril",qp:1,type:"p2p"},
+  {name:"Prying Times",qp:1,type:"p2p"},
+  {name:"The Queen of Thieves",qp:1,type:"p2p"},
+  {name:"Rag and Bone Man I",qp:1,type:"p2p"},
+  {name:"Rag and Bone Man II",qp:1,type:"p2p"},
+  {name:"Ratcatchers",qp:2,type:"p2p"},
+  {name:"Recipe for Disaster",qp:10,type:"p2p"},
+  {name:"Recruitment Drive",qp:1,type:"p2p"},
+  {name:"Regicide",qp:3,type:"p2p"},
+  {name:"The Ribbiting Tale of a Lily Pad Labour Dispute",qp:1,type:"p2p"},
+  {name:"Roving Elves",qp:1,type:"p2p"},
+  {name:"Royal Trouble",qp:1,type:"p2p"},
+  {name:"Rum Deal",qp:2,type:"p2p"},
+  {name:"Scorpion Catcher",qp:1,type:"p2p"},
+  {name:"Sea Slug",qp:1,type:"p2p"},
+  {name:"Secrets of the North",qp:1,type:"p2p"},
+  {name:"Shadow of the Storm",qp:1,type:"p2p"},
+  {name:"Shades of Mort'ton",qp:3,type:"p2p"},
+  {name:"Shadows of Custodia",qp:1,type:"p2p"},
+  {name:"Sheep Herder",qp:4,type:"p2p"},
+  {name:"Shilo Village",qp:2,type:"p2p"},
+  {name:"Sins of the Father",qp:2,type:"p2p"},
+  {name:"Sleeping Giants",qp:1,type:"p2p"},
+  {name:"The Slug Menace",qp:1,type:"p2p"},
+  {name:"Swan Song",qp:2,type:"p2p"},
+  {name:"Tai Bwo Wannai Trio",qp:2,type:"p2p"},
+  {name:"Tale of the Righteous",qp:1,type:"p2p"},
+  {name:"Tears of Guthix",qp:1,type:"p2p"},
+  {name:"Temple of Ikov",qp:1,type:"p2p"},
+  {name:"The Ascent of Arceuus",qp:1,type:"p2p"},
+  {name:"The Dig Site",qp:1,type:"p2p"},
+  {name:"The Final Dawn",qp:1,type:"p2p"},
+  {name:"Throne of Miscellania",qp:1,type:"p2p"},
+  {name:"The Tourist Trap",qp:2,type:"p2p"},
+  {name:"Tower of Life",qp:2,type:"p2p"},
+  {name:"Tree Gnome Village",qp:2,type:"p2p"},
+  {name:"Tribal Totem",qp:1,type:"p2p"},
+  {name:"Troll Romance",qp:2,type:"p2p"},
+  {name:"Troll Stronghold",qp:1,type:"p2p"},
+  {name:"Troubled Tortugans",qp:1,type:"p2p"},
+  {name:"Twilight's Promise",qp:1,type:"p2p"},
+  {name:"Underground Pass",qp:5,type:"p2p"},
+  {name:"Wanted!",qp:1,type:"p2p"},
+  {name:"Watchtower",qp:4,type:"p2p"},
+  {name:"Waterfall Quest",qp:1,type:"p2p"},
+  {name:"What Lies Below",qp:1,type:"p2p"},
+  {name:"Witch's House",qp:4,type:"p2p"},
+  {name:"Zogre Flesh Eaters",qp:1,type:"p2p"},
+  // Miniquests
+  {name:"Alfred Grimhand's Barcrawl",qp:0,type:"mini"},
+  {name:"Architectural Alliance",qp:0,type:"mini"},
+  {name:"Bear Your Soul",qp:0,type:"mini"},
+  {name:"Curse of the Empty Lord",qp:0,type:"mini"},
+  {name:"Daddy's Home",qp:0,type:"mini"},
+  {name:"Enter the Abyss",qp:1,type:"mini"},
+  {name:"Family Pest",qp:0,type:"mini"},
+  {name:"Hopespear's Will",qp:0,type:"mini"},
+  {name:"Learning the Ropes",qp:0,type:"mini"},
+  {name:"The Mage Arena",qp:3,type:"mini"},
+  {name:"The Mage Arena II",qp:0,type:"mini"},
+  {name:"Natural History Quiz",qp:0,type:"mini"},
+  {name:"Skippy and the Mogres",qp:0,type:"mini"},
+  {name:"X Marks the Spot",qp:1,type:"mini"},
+].sort((a,b) => a.name.localeCompare(b.name));
+
+const TOTAL_QP = QUESTS.reduce((s,q) => s+q.qp, 0);
+
+// ── QUEST REQUIREMENTS (curated, best-effort) ───────────────────────────────────
+// s = skill levels (many boostable), q = prerequisite quests, qp = quest points,
+// r = reward highlight, note = caveat. Quests not listed render as "reqs not listed".
+const REQS = {
+  "Dragon Slayer I": {qp:32, r:"Rune platebody + anti-dragon shield; 18.65k Strength & Defence XP"},
+  "The Knight's Sword": {s:{Mining:10}, r:"~12.7k Smithing XP (great early boost)"},
+  "Demon Slayer": {r:"Silverlight sword"},
+  "Witch's House": {r:"6.3k Hitpoints XP"},
+  "Vampire Slayer": {r:"~4.8k Attack XP"},
+  "Waterfall Quest": {r:"13.75k Attack & Strength XP (no req — huge early boost)"},
+  "The Grand Tree": {s:{Agility:25}, r:"~18.4k Attack/Magic XP; gnome gliders + NMZ teleport"},
+  "Tree Gnome Village": {s:{}, r:"11.45k Attack XP; spirit tree network"},
+  "Fight Arena": {r:"12.18k Attack/Thieving XP; Khazard access"},
+  "The Golem": {s:{Runecrafting:25}, note:"Runecrafting is boostable", r:"Ruins of Uzer access; XP lamp"},
+  "The Ribbiting Tale of a Lily Pad Labour Dispute": {q:["Children of the Sun"], r:"XP lamp; Varlamore content"},
+  "The Lost City": {s:{Woodcutting:36, Crafting:31}, note:"Both stats boostable", r:"Dragon dagger/longsword; Zanaris + cosmic runes"},
+  "Fairy Tale I - Growing Pains": {q:["The Lost City","Nature Spirit"], r:"Magic secateurs; starts fairy ring chain"},
+  "Fairy Tale II - Cure a Queen": {q:["Fairy Tale I - Growing Pains"], s:{Thieving:40, Farming:49}, note:"Thieving/Farming boostable", r:"Full fairy ring network (huge travel QoL)"},
+  "The Dig Site": {s:{Agility:10, Herblore:10, Thieving:25}, r:"Digsite access; ~15k+ XP"},
+  "Druidic Ritual": {r:"Unlocks Herblore skill"},
+  "Jungle Potion": {q:["Druidic Ritual"], s:{Herblore:3}, r:"Herblore XP; Tai Bwo Wannai access"},
+  "Shilo Village": {q:["Jungle Potion"], s:{Crafting:20, Agility:32}, r:"Gem mine; bone access; Karamja teleport"},
+  "Heroes' Quest": {q:["Shield of Arrav","The Lost City","Merlin's Crystal","Dragon Slayer I"], s:{Cooking:53, Fishing:53, Herblore:25, Mining:50}, r:"Heroes' Guild; dragon weapons; combat XP"},
+  "Family Crest": {s:{Mining:40, Smithing:40, Magic:59, Crafting:40}, r:"Family gauntlets (cooking/chaos/goldsmith)"},
+  "Legends' Quest": {q:["Family Crest","Heroes' Quest","Shilo Village","Underground Pass","Waterfall Quest"], s:{Agility:50, Crafting:50, Herblore:45, Magic:56, Mining:52, Prayer:42, Smithing:50, Strength:50, Thieving:50, Woodcutting:50}, r:"Cape of Legends; dragon sq shield; Dragon halberd access"},
+  "Underground Pass": {q:["Biohazard"], s:{Ranged:25}, r:"West Ardougne + Tirannwn access"},
+  "Regicide": {q:["Underground Pass"], r:"Tirannwn + Tyras Camp access; Elf town"},
+  "Roving Elves": {q:["Regicide","Waterfall Quest"], r:"Crystal bow / crystal shield"},
+  "Mourning's End Part I": {q:["Roving Elves","Big Chompy Bird Hunting"], s:{Ranged:60, Thieving:50}, r:"Death altar access"},
+  "Monkey Madness I": {q:["The Grand Tree","Tree Gnome Village"], r:"Dragon scimitar; ~35k combat XP; Ape Atoll"},
+  "Monkey Madness II": {q:["Monkey Madness I"], s:{Slayer:69, Hunter:60, Agility:55, Thieving:55, Crafting:70, Firemaking:60}, note:"Several other quests also required — check wiki", r:"Heavy/light ballista; Maniacal monkey hunting"},
+  "Desert Treasure I": {q:["The Dig Site","Temple of Ikov","The Tourist Trap","Troll Stronghold","Priest in Peril","Waterfall Quest"], s:{Thieving:53, Firemaking:50, Slayer:10, Magic:50}, r:"Ancient Magicks spellbook; ancient staff"},
+  "Desert Treasure II - The Fallen Empire": {q:["Desert Treasure I","Secrets of the North","Beneath Cursed Sands"], s:{Firemaking:75, Magic:75, Thieving:70, Herblore:62, Runecrafting:60, Construction:60}, note:"More quests required — check wiki", r:"Ancient/vestige rings → BiS rings"},
+  "Dragon Slayer II": {q:["Legends' Quest","Dream Mentor","A Tail of Two Cats","Animal Magnetism","Ghosts Ahoy","Bone Voyage","Client of Kourend"], s:{Magic:75, Smithing:70, Mining:68, Crafting:62, Agility:60, Thieving:60, Construction:50}, r:"Ava's assembler; rune/adamant dragons; massive XP"},
+  "Recipe for Disaster": {s:{Cooking:70, Crafting:70, Thieving:53, Fishing:53, Magic:59, Mining:50, Firemaking:50, Smithing:40, Agility:48, Herblore:25, Ranged:40}, note:"Long sub-quest chain — many quests required; check wiki", r:"Barrows gloves (best-in-slot for most builds)"},
+  "Animal Magnetism": {q:["The Restless Ghost","Ernest the Chicken","Priest in Peril"], s:{Slayer:18, Crafting:19, Ranged:30, Woodcutting:35}, r:"Ava's accumulator (ranged ammo saver)"},
+  "Enlightened Journey": {s:{Firemaking:20, Farming:30, Crafting:36}, r:"Balloon transport network; Firemaking XP"},
+  "Fishing Contest": {s:{Fishing:10}, r:"White Wolf Mountain shortcut; Fishing XP"},
+  "Temple of Ikov": {s:{Thieving:42, Ranged:40}, r:"Boots of lightness; Armadyl pendant access"},
+  "Troll Stronghold": {q:["Death Plateau"], s:{Agility:15}, r:"Trollheim access; combat XP"},
+  "Eadgar's Ruse": {q:["Druidic Ritual","Troll Stronghold"], s:{Herblore:31}, r:"Trollheim herb patch; Herblore XP"},
+  "Eagle's Peak": {s:{Hunter:27}, r:"Falconry; box-trap hunting; eagle transport"},
+  "Bone Voyage": {q:["The Dig Site"], r:"Fossil Island access (Wintertodt/Herbiboar later)"},
+  "Client of Kourend": {r:"Great Kourend access; Kharedst's memoirs start"},
+  "Tale of the Righteous": {q:["Client of Kourend"], s:{Strength:16, Mining:10}, r:"Shayzien favour; Xeric's talisman charges"},
+  "The Depths of Despair": {q:["Client of Kourend"], s:{Agility:18}, r:"Hosidius favour; Kharedst's memoirs"},
+  "The Queen of Thieves": {q:["Client of Kourend"], s:{Thieving:20}, r:"Port Piscarilius favour"},
+  "The Forsaken Tower": {q:["Client of Kourend"], s:{}, r:"Lovakengj favour; lovakite access"},
+  "A Kingdom Divided": {q:["The Depths of Despair","The Queen of Thieves","Tale of the Righteous","The Forsaken Tower"], s:{Agility:54, Thieving:52, Woodcutting:52, Herblore:50, Mining:42, Crafting:38, Magic:35}, r:"Soul Wars / Arceuus library; Kourend favour cap"},
+  "Darkness of Hallowvale": {q:["In Aid of the Myreque"], s:{Construction:5, Mining:20, Thieving:22, Agility:26, Crafting:32, Magic:33, Strength:32}, r:"Theatre of Blood region progress; XP"},
+  "A Taste of Hope": {q:["Darkness of Hallowvale"], s:{Crafting:48, Agility:45, Attack:40, Herblore:40, Slayer:38}, r:"Vyrewatch slaying; Drakan's medallion"},
+  "Sins of the Father": {q:["A Taste of Hope","Vampire Slayer"], s:{Woodcutting:62, Fletching:60, Crafting:56, Agility:52, Slayer:50}, r:"Blisterwood flail (BiS vs vampyres); Slepe"},
+  "The Fremennik Trials": {s:{Fletching:25, Woodcutting:40, Crafting:40}, note:"Some stats boostable", r:"Fremennik helms; Rellekka; enchanted lyre"},
+  "Lunar Diplomacy": {q:["The Fremennik Trials","The Lost City","Rune Mysteries","Shilo Village"], s:{Crafting:61, Defence:40, Firemaking:49, Herblore:5, Magic:65, Mining:60, Woodcutting:55}, r:"Lunar spellbook"},
+  "Dream Mentor": {q:["Lunar Diplomacy","Eadgar's Ruse"], r:"+5 Hitpoints; The Inadequacy; combat XP"},
+  "Swan Song": {q:["One Small Favour","Garden of Tranquillity"], s:{Magic:66, Cooking:62, Fishing:62, Smithing:45, Firemaking:42, Crafting:40}, r:"Big Magic/Prayer XP; Piscatoris access"},
+  "Sea Slug": {s:{Firemaking:30}, r:"Fishing platform; Fishing XP"},
+  "Watchtower": {s:{Magic:14, Thieving:15, Agility:25, Herblore:14, Mining:40}, r:"Watchtower teleport; Magic XP"},
+  "Holy Grail": {q:["Merlin's Crystal"], r:"~15.3k Prayer XP; Magic whistle"},
+  "Nature Spirit": {q:["Priest in Peril","The Restless Ghost"], r:"Druid pouch; Mort Myre access; XP"},
+  "Ghosts Ahoy": {q:["Priest in Peril"], s:{Agility:25, Cooking:20}, r:"Ectophial (Port Phasmatys teleport)"},
+  "Priest in Peril": {r:"Morytania access (gateway to many quests)"},
+};
+
+// ── PERSISTENCE / SYNC ──────────────────────────────────────────────────────────
+
+const VAULT_STATE_PATH = 'Gaming/OSRS/OSRS Hub State.md';
+let SYNC = { available: false, lastError: null };
+
+function getCompleted() {
+  try { return JSON.parse(localStorage.getItem('osrs_nullyn_completed') || '{}'); } catch { return {}; }
+}
+function saveCompletedLocal(c) {
+  try { localStorage.setItem('osrs_nullyn_completed', JSON.stringify(c)); } catch {}
+}
+function getGoals() {
+  try { return JSON.parse(localStorage.getItem('osrs_nullyn_goals') || '[]'); } catch { return []; }
+}
+function saveGoalsLocal(g) {
+  try { localStorage.setItem('osrs_nullyn_goals', JSON.stringify(g)); } catch {}
+}
+
+// First-run offline seed (matches vault as of 2026-06-08)
+const SEED_VERSION = 'v2';
+const SEED_COMPLETED = [
+  "Learning the Ropes","Cook's Assistant","Sheep Shearer","Misthalin Mystery",
+  "Prince Ali Rescue","The Restless Ghost","Rune Mysteries",
+  "Imp Catcher","Witch's Potion","Gertrude's Cat","Children of the Sun",
+  "Natural History Quiz","Daddy's Home","X Marks the Spot",
+  "Dwarf Cannon","Waterfall Quest","Tree Gnome Village","Doric's Quest",
+  "Witch's House","The Knight's Sword","The Tourist Trap",
+  "Black Knights' Fortress","Druidic Ritual",
+  "Recruitment Drive","Goblin Diplomacy","Sleeping Giants","Fight Arena",
+  "Plague City","Monk's Friend","Hazeel Cult","Sheep Herder","Biohazard",
+  "Tower of Life","Tribal Totem","Death Plateau",
+  "Merlin's Crystal","Holy Grail","Murder Mystery","The Grand Tree",
+  "Rag and Bone Man I","Priest in Peril","Nature Spirit","Ghosts Ahoy",
+  "Making History","The Ides of Milk","The Lost Tribe",
+  "Death to the Dorgeshuun","Elemental Workshop I","Icthlarin's Little Helper",
+];
+function applySeed() {
+  if (localStorage.getItem('osrs_nullyn_seed') === SEED_VERSION) return;
+  const c = getCompleted();
+  SEED_COMPLETED.forEach(name => { c[name] = true; });
+  saveCompletedLocal(c);
+  localStorage.setItem('osrs_nullyn_seed', SEED_VERSION);
+}
+
+function setSyncBadge(state, text) {
+  const b = document.getElementById('sync-badge');
+  b.className = 'sync-badge' + (state ? ' ' + state : '');
+  b.textContent = text;
+}
+
+async function loadVaultState() {
+  try {
+    const r = await fetch('/api/state');
+    if (!r.ok) throw new Error('state ' + r.status);
+    const data = await r.json();
+    if (data.completed) saveCompletedLocal(data.completed);
+    if (Array.isArray(data.goals)) saveGoalsLocal(data.goals);
+    SYNC.available = true;
+    setSyncBadge('ok', '\u2601 Synced to vault');
+    renderQuests(); renderGoals(); populateGoalSelect();
+  } catch (e) {
+    SYNC.available = false; SYNC.lastError = String(e);
+    setSyncBadge('warn', '\u26a0 Local only');
+  }
+}
+
+let saveTimer = null;
+function scheduleVaultSave() {
+  clearTimeout(saveTimer);
+  setSyncBadge('', '\u23f3 Saving\u2026');
+  saveTimer = setTimeout(saveVaultState, 700);
+}
+async function saveVaultState() {
+  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals() };
+  try {
+    const r = await fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!r.ok) throw new Error('save ' + r.status);
+    SYNC.available = true;
+    setSyncBadge('ok', '\u2601 Synced to vault');
+  } catch (e) {
+    SYNC.available = false;
+    setSyncBadge('warn', '\u26a0 Save failed (local only)');
+  }
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector(`.tab[onclick="switchTab('${name}')"]`).classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'progress') renderChart();
+}
+
+// ── SKILLS ────────────────────────────────────────────────────────────────────
+
+function getLastSnapshot() {
+  try { return JSON.parse(localStorage.getItem('osrs_nullyn_lastsnap') || 'null'); } catch { return null; }
+}
+function currentSnapshot() {
+  const s = {};
+  SKILL_NAMES.slice(1).forEach(n => { s[n] = STATS[n][1]; });
+  return s;
+}
+// Saves the snapshot AFTER we've used the previous one to compute gains.
+function commitSnapshot() {
+  try { localStorage.setItem('osrs_nullyn_lastsnap', JSON.stringify(currentSnapshot())); } catch {}
+}
+
+function renderSkills() {
+  document.getElementById('cb-level').textContent = combatLevel();
+  document.getElementById('total-level').textContent = totalLevel();
+  const grid = document.getElementById('skills-grid');
+  grid.innerHTML = '';
+  const last = getLastSnapshot();
+
+  SKILL_NAMES.forEach(name => {
+    const [rank, level, xp] = STATS[name];
+    const isOverall = name === 'Overall';
+    const prog = isOverall ? 1 : xpProgress(xp, level);
+    const toNext = isOverall ? 0 : xpToNext(xp, level);
+    const ranked = rank > 0;
+    const gain = (!isOverall && last && typeof last[name] === 'number') ? level - last[name] : 0;
+
+    const card = document.createElement('div');
+    card.className = 'skill-card' + (isOverall ? ' overall-card' : '');
+
+    let subText;
+    if (isOverall) {
+      subText = `Total ${totalLevel()}` + (ranked ? ` · Rank #${rank.toLocaleString()}` : '');
+    } else {
+      subText = fmt(xp) + ' xp' + (ranked ? ` · #${rank.toLocaleString()}` : '');
+    }
+
+    card.innerHTML = `
+      <div class="skill-emoji">${SKILL_EMOJIS[name]}</div>
+      <div class="skill-info">
+        <div class="skill-name">${name}</div>
+        <div class="skill-level">${isOverall ? totalLevel() : level}</div>
+        <div class="skill-xp">${subText}</div>
+        ${gain > 0 ? `<div class="skill-gain">▲ +${gain} since last refresh</div>` : ''}
+        ${!isOverall ? `<div class="xp-bar-wrap"><div class="xp-bar" style="width:${(prog*100).toFixed(1)}%"></div></div>` : ''}
+        ${!isOverall && level < 99 ? `<div class="xp-to-next">${fmt(toNext)} to lvl ${level+1}</div>` : ''}
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+// ── QUEST GATING ────────────────────────────────────────────────────────────────
+
+const TRACKED = new Set(QUESTS.map(q => q.name));
+
+function questStatus(q, completed) {
+  if (completed[q.name]) return { state: 'done', missing: [] };
+  const req = REQS[q.name];
+  if (!req) return { state: 'unknown', missing: [] };
+  const missing = [];
+  if (req.s) {
+    for (const sk in req.s) {
+      const have = STATS[sk] ? STATS[sk][1] : 1;
+      if (have < req.s[sk]) missing.push(`${req.s[sk]} ${sk}`);
+    }
+  }
+  if (req.q) {
+    // Only gate on prerequisites we actually track; skip untracked ones (can't verify).
+    req.q.forEach(pre => {
+      if (TRACKED.has(pre) && !completed[pre]) missing.push(`Quest: ${pre}`);
+    });
+  }
+  if (req.qp) {
+    const earned = QUESTS.filter(x => completed[x.name]).reduce((s,x)=>s+x.qp,0);
+    if (earned < req.qp) missing.push(`${req.qp} QP (have ${earned})`);
+  }
+  return { state: missing.length ? 'locked' : 'ready', missing };
+}
+
+let questFilter = 'all';
+
+function setFilter(f) {
+  questFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('filter-'+f).classList.add('active');
+  renderQuests();
+}
+
+function wikiUrl(name) {
+  return 'https://oldschool.runescape.wiki/w/' + encodeURIComponent(name.replace(/ /g,'_'));
+}
+
+function renderQuests() {
+  const completed = getCompleted();
+  const search = document.getElementById('quest-search').value.toLowerCase();
+
+  const filtered = QUESTS.filter(q => {
+    if (search && !q.name.toLowerCase().includes(search)) return false;
+    if (questFilter === 'complete'   && !completed[q.name]) return false;
+    if (questFilter === 'incomplete' &&  completed[q.name]) return false;
+    if (questFilter === 'f2p'        && q.type !== 'f2p')   return false;
+    if (questFilter === 'p2p'        && q.type !== 'p2p')   return false;
+    if (questFilter === 'mini'       && q.type !== 'mini')  return false;
+    if (questFilter === 'ready') {
+      const st = questStatus(q, completed);
+      if (st.state !== 'ready') return false;
+    }
+    return true;
+  });
+
+  const earnedQP = QUESTS.filter(q => completed[q.name]).reduce((s,q) => s+q.qp, 0);
+  document.getElementById('qp-counter').textContent = `${earnedQP} / ${TOTAL_QP} QP`;
+
+  const list = document.getElementById('quest-list');
+  list.innerHTML = '';
+
+  if (!filtered.length) {
+    list.innerHTML = '<div style="color:#8a6830;font-style:italic;padding:8px;">No quests match your filter.</div>';
+    return;
+  }
+
+  filtered.forEach(q => {
+    const st = questStatus(q, completed);
+    const done = st.state === 'done';
+    const escapedName = q.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const req = REQS[q.name];
+
+    let chip = '';
+    if (done) chip = '<span class="status-chip done">✓ Done</span>';
+    else if (st.state === 'ready') chip = '<span class="status-chip ready">Ready</span>';
+    else if (st.state === 'locked') chip = '<span class="status-chip locked">Locked</span>';
+    else chip = '<span class="status-chip unknown">Reqs ?</span>';
+
+    let detail = '';
+    if (!done) {
+      if (st.state === 'locked') detail += `<span style="color:#9a4810">Needs: ${st.missing.join(', ')}</span>`;
+      else if (st.state === 'unknown') detail += `<span style="color:#7a6830">Requirements not listed — check wiki</span>`;
+      else if (st.state === 'ready') detail += `<span style="color:#1d6b10">All requirements met</span>`;
+    }
+    if (req && req.r) detail += `${detail ? ' · ' : ''}<span class="quest-reward">🎁 ${req.r}</span>`;
+    if (req && req.note) detail += `${detail ? ' · ' : ''}<span style="color:#8a6030">${req.note}</span>`;
+
+    const item = document.createElement('div');
+    item.className = 'quest-item s-' + st.state + (done ? ' done' : '');
+    item.innerHTML = `
+      <input type="checkbox" ${done?'checked':''} onchange="toggleQuest('${escapedName}',this.checked)">
+      <div class="quest-main">
+        <div class="quest-row1">
+          <span class="quest-name"><a href="${wikiUrl(q.name)}" target="_blank" rel="noopener">${q.name}</a></span>
+          <span class="qtype-badge qtype-${q.type}">${q.type==='mini'?'Mini':q.type.toUpperCase()}</span>
+          ${chip}
+        </div>
+        ${detail ? `<div class="quest-detail">${detail}</div>` : ''}
+      </div>
+      ${q.qp>0 ? `<span class="quest-qp">${q.qp} QP</span>` : '<span class="quest-qp" style="color:#bbb">—</span>'}
+    `;
+    list.appendChild(item);
+  });
+}
+
+function toggleQuest(name, checked) {
+  const c = getCompleted();
+  if (checked) c[name] = true; else delete c[name];
+  saveCompletedLocal(c);
+  renderQuests();
+  renderMoney();   // methods may graduate when a quest req is completed
+  scheduleVaultSave();
+}
+
+// ── PROGRESS CHART ────────────────────────────────────────────────────────────
+
+let chartInst = null;
+
+function populateChartSelect() {
+  const sel = document.getElementById('chart-skill');
+  sel.innerHTML = '';
+  const optTotal = document.createElement('option');
+  optTotal.value = 'Total'; optTotal.textContent = '📊 Total Level';
+  sel.appendChild(optTotal);
+  SKILL_NAMES.slice(1).forEach(n => {
+    if (!HISTORY.skills[n]) return;
+    const o = document.createElement('option');
+    o.value = n; o.textContent = `${SKILL_EMOJIS[n]} ${n}`;
+    sel.appendChild(o);
+  });
+}
+
+function renderChart() {
+  if (typeof Chart === 'undefined') return;
+  const sel = document.getElementById('chart-skill');
+  const skill = sel.value || 'Total';
+  const data = HISTORY.skills[skill] || HISTORY.skills['Total'];
+  const ctx = document.getElementById('progress-chart').getContext('2d');
+  if (chartInst) chartInst.destroy();
+  chartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: HISTORY.dates,
+      datasets: [{
+        label: skill === 'Total' ? 'Total Level' : skill + ' Level',
+        data: data,
+        borderColor: '#2e6614',
+        backgroundColor: 'rgba(46,102,20,0.12)',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointBackgroundColor: '#8b6914',
+        tension: 0.25,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#3a2010' } } },
+      scales: {
+        x: { ticks: { color: '#6a4a14', callback: function(v){ return String(this.getLabelForValue(v)).slice(5); } }, grid: { color: '#e0d4a8' } },
+        y: { ticks: { color: '#6a4a14' }, grid: { color: '#e0d4a8' }, beginAtZero: false }
+      }
+    }
+  });
+}
+
+function renderGains() {
+  // Compare the last two logged columns in the history.
+  const n = HISTORY.dates.length;
+  const from = HISTORY.dates[n-2], to = HISTORY.dates[n-1];
+  document.getElementById('gains-window').textContent = `${String(from).slice(5)} → ${String(to).slice(5)}`;
+  const grid = document.getElementById('gains-grid');
+  grid.innerHTML = '';
+  // Total card first
+  [['Total','Total']].concat(SKILL_NAMES.slice(1).map(s=>[s,s])).forEach(([key,label]) => {
+    const arr = HISTORY.skills[key];
+    if (!arr) return;
+    const delta = arr[n-1] - arr[n-2];
+    if (key !== 'Total' && delta === 0) return; // only show movers (+ always show total)
+    const card = document.createElement('div');
+    card.className = 'gain-card';
+    card.innerHTML = `
+      <div class="gain-skill">${key==='Total'?'📊':(SKILL_EMOJIS[key]||'')} ${label}</div>
+      <div class="gain-val ${delta>0?'':'flat'}">${delta>0?'+'+delta:'+0'}</div>
+      <div class="gain-sub">${arr[n-2]} → ${arr[n-1]}</div>`;
+    grid.appendChild(card);
+  });
+  if (grid.children.length === 1) {
+    const note = document.createElement('div');
+    note.className = 'gain-sub';
+    note.style.gridColumn = '1 / -1';
+    note.textContent = 'No per-skill changes in this window. Refresh stats to add a new data point.';
+    grid.appendChild(note);
+  }
+}
+
+// ── AI SUGGESTIONS ────────────────────────────────────────────────────────────
+
+function loadSavedAI() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('osrs_nullyn_ai') || 'null');
+    if (saved && saved.text) {
+      const out = document.getElementById('ai-output');
+      const meta = document.getElementById('ai-meta');
+      out.style.display = 'block'; out.className = 'ai-output'; out.textContent = saved.text;
+      meta.style.display = 'block'; meta.textContent = `Last generated ${saved.when}`;
+      document.getElementById('ai-btn').textContent = '✨ Refresh Recommendations';
+    }
+  } catch {}
+}
+
+async function getAISuggestions() {
+  const btn = document.getElementById('ai-btn');
+  const out = document.getElementById('ai-output');
+  const meta = document.getElementById('ai-meta');
+  btn.disabled = true;
+  btn.textContent = '⏳ Thinking…';
+  out.style.display = 'block';
+  out.className = 'ai-output loading';
+  out.textContent = 'Analyzing your stats, quest log, and goals…';
+  meta.style.display = 'none';
+
+  const completed = getCompleted();
+  const doneQuests = Object.keys(completed).filter(k => completed[k]);
+  const goals = getGoals();
+  const ready = QUESTS.filter(q => questStatus(q, completed).state === 'ready').map(q => q.name);
+
+  const statsText = SKILL_NAMES.slice(1).map(n => `${n} ${STATS[n][1]}`).join(', ');
+  const questText = doneQuests.length ? doneQuests.join(', ') : 'None recorded yet';
+  const goalsText = goals.length ? goals.map(g=>`${g.skill}→${g.target}`).join(', ') : 'None set';
+  const readyText = ready.length ? ready.join(', ') : 'None flagged';
+
+  const prompt = `You are an expert Old School RuneScape (OSRS) guide for the player "Nullyn Voyd".
+
+Current skill levels: ${statsText}
+Combat level: ${combatLevel()}, Total level: ${totalLevel()}
+Completed quests (${doneQuests.length}): ${questText}
+Quests currently startable (requirements met): ${readyText}
+Active goals: ${goalsText}
+
+Give a focused, personalized journey guide. Cover:
+1. Top 3-4 most impactful skills to train right now, with specific methods for this level range
+2. 2-3 quests to prioritize from the startable list (note their rewards/unlocks)
+3. One medium-term milestone to aim for (boss, achievement, build direction)
+4. Any glaring gaps or quick wins (e.g. Firemaking 2, Runecrafting 1, Farming 1 are unusually low)
+
+Be specific to this level range. No filler. Use plain text.`;
+
+  try {
+    const _r = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ message: prompt, context: chatStateContext() }) });
+    if (!_r.ok) throw new Error('chat ' + _r.status);
+    const result = (await _r.json()).reply;
+    out.className = 'ai-output';
+    out.textContent = result;
+    const when = new Date().toLocaleString();
+    meta.style.display = 'block'; meta.textContent = `Last generated ${when}`;
+    try { localStorage.setItem('osrs_nullyn_ai', JSON.stringify({ text: result, when })); } catch {}
+  } catch (e) {
+    out.className = 'ai-output';
+    out.textContent = 'Could not reach Claude. Please try again in a moment.';
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✨ Refresh Recommendations';
+}
+
+// ── GOALS ─────────────────────────────────────────────────────────────────────
+
+function populateGoalSelect() {
+  const sel = document.getElementById('goal-skill');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Select…</option>';
+  SKILL_NAMES.slice(1).forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    sel.appendChild(opt);
+  });
+  if (cur) sel.value = cur;
+}
+
+function addGoal() {
+  const skill  = document.getElementById('goal-skill').value;
+  const target = parseInt(document.getElementById('goal-target').value, 10);
+  if (!skill)                   { alert('Select a skill.'); return; }
+  if (!target||target<2||target>99) { alert('Target must be 2-99.'); return; }
+  const cur = STATS[skill][1];
+  if (target <= cur)            { alert(`You're already level ${cur} in ${skill}!`); return; }
+
+  const goals = getGoals();
+  const idx = goals.findIndex(g => g.skill === skill);
+  if (idx >= 0) goals[idx].target = target; else goals.push({skill, target});
+  saveGoalsLocal(goals);
+  renderGoals();
+  scheduleVaultSave();
+  document.getElementById('goal-target').value = '';
+}
+
+function deleteGoal(skill) {
+  saveGoalsLocal(getGoals().filter(g => g.skill !== skill));
+  renderGoals();
+  scheduleVaultSave();
+}
+
+function renderGoals() {
+  const goals = getGoals();
+  const list = document.getElementById('goals-list');
+  if (!goals.length) {
+    list.innerHTML = '<div class="no-goals">No goals yet — add one above to track your progress.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  goals.forEach(g => {
+    const [, curLvl, curXP] = STATS[g.skill] || [0, 1, 0];
+    const targetXP  = xpForLevel(g.target);
+    const curLvlXP  = xpForLevel(curLvl);
+    const totalNeed = targetXP - curLvlXP;
+    const gained    = curXP - curLvlXP;
+    const xpLeft    = Math.max(0, targetXP - curXP);
+    const pct       = totalNeed > 0 ? Math.min(100, (gained/totalNeed)*100).toFixed(1) : '100';
+
+    const card = document.createElement('div');
+    card.className = 'goal-card';
+    card.innerHTML = `
+      <div class="goal-header">
+        <span class="goal-emoji">${SKILL_EMOJIS[g.skill]}</span>
+        <span class="goal-skill-name">${g.skill}</span>
+        <span class="goal-levels">Lvl ${curLvl} → ${g.target}</span>
+        <button class="goal-delete" onclick="deleteGoal('${g.skill}')" title="Remove">✕</button>
+      </div>
+      <div class="goal-progress-wrap">
+        <div class="goal-progress-bar" style="width:${pct}%"></div>
+      </div>
+      <div class="goal-xp-info">
+        <span>${fmt(curXP)} / ${fmt(targetXP)} XP</span>
+        <span>${pct}% · ${fmt(xpLeft)} XP to go</span>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+// ── CHAT ────────────────────────────────────────────────
+let CHAT_HISTORY = [];
+function chatStateContext() {
+  const completed = getCompleted();
+  const done = Object.keys(completed).filter(k => completed[k]);
+  const goals = getGoals();
+  const statsText = SKILL_NAMES.slice(1).map(n => n + ' ' + STATS[n][1]).join(', ');
+  return 'RSN: Nullyn Voyd. Combat ' + combatLevel() + ', Total ' + totalLevel() + '.\n' +
+         'Levels: ' + statsText + '\n' +
+         'Completed quests (' + done.length + '): ' + (done.join(', ') || 'none') + '\n' +
+         'Goals: ' + (goals.map(g => g.skill + '\u2192' + g.target).join(', ') || 'none');
+}
+function appendChat(role, text) {
+  const log = document.getElementById('chat-log');
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + role;
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const btn = document.getElementById('chat-send');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  appendChat('user', msg);
+  btn.disabled = true;
+  const thinking = appendChat('sys', '\uD83E\uDDD9 Thinking\u2026');
+  try {
+    const r = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ message: msg, history: CHAT_HISTORY, context: chatStateContext() }) });
+    if (!r.ok) throw new Error('chat ' + r.status);
+    const data = await r.json();
+    thinking.remove();
+    appendChat('bot', data.reply);
+    CHAT_HISTORY.push({ role:'user', content: msg });
+    CHAT_HISTORY.push({ role:'assistant', content: data.reply });
+    if (CHAT_HISTORY.length > 20) CHAT_HISTORY = CHAT_HISTORY.slice(-20);
+  } catch (e) {
+    thinking.textContent = '\u26a0 Could not reach Claude. Check the server and your API key.';
+  } finally {
+    btn.disabled = false;
+    input.focus();
+  }
+}
+document.addEventListener('DOMContentLoaded', function () {
+  const ci = document.getElementById('chat-input');
+  if (ci) ci.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
+});
+
+// ── LIVE STATS ──────────────────────────────────────────
+async function loadStats(manual) {
+  const btn = document.getElementById('refresh-btn');
+  const note = document.querySelector('#tab-skills .data-note');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Refreshing…'; }
+  if (manual && note) note.textContent = '⏳ Fetching live stats from the OSRS Hiscores…';
+  try {
+    const r = await fetch('/api/stats');
+    if (!r.ok) throw new Error('stats ' + r.status);
+    const data = await r.json();
+    if (data.stats) { for (const k in data.stats) STATS[k] = data.stats[k]; }
+    if (data.history && Array.isArray(data.history.dates) && data.history.dates.length) HISTORY = data.history;
+    document.getElementById('cb-level').textContent = combatLevel();
+    document.getElementById('total-level').textContent = totalLevel();
+    renderSkills(); renderGoals(); populateChartSelect(); renderGains(); renderMoney();
+    if (document.getElementById('tab-progress').classList.contains('active')) renderChart();
+    if (note) note.textContent = '✅ Live from OSRS Hiscores (' + (data.rsn || 'player') + ') · ' + new Date().toLocaleString();
+  } catch (e) {
+    if (note) note.textContent = '⚠ Hiscores unavailable — showing last embedded stats (June 8, 2026).';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⟳ Refresh stats'; }
+  }
+}
+
+// ── MONEY METHODS ───────────────────────────────────────
+let MONEY = { methods: [], endgame: [], reviewed: null };
+let moneyFilter = 'all';
+let LIVE_GP = {};          // method name → { gphr, breakdown }
+let GEPHR_UPDATED = null;
+
+async function loadGephr(manual) {
+  const btn = document.getElementById('gephr-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Pricing…'; }
+  try {
+    const r = await fetch('/api/gephr');
+    if (!r.ok) throw new Error('gephr ' + r.status);
+    const d = await r.json();
+    LIVE_GP = d.methods || {};
+    GEPHR_UPDATED = d.updated || null;
+    renderMoney();
+  } catch (e) {
+    if (manual) { const n = document.getElementById('money-note'); if (n) n.textContent = '⚠ Could not reach the GE price API — keeping estimates.'; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh GP/hr'; }
+  }
+}
+
+async function loadMoney() {
+  try {
+    const r = await fetch('/api/money');
+    if (!r.ok) throw new Error('money ' + r.status);
+    MONEY = await r.json();
+  } catch (e) { /* keep whatever we have */ }
+  renderMoney();
+}
+
+// Compute availability of a method against live STATS + completed quests.
+function methodStatus(m) {
+  const completed = getCompleted();
+  const gaps = [];
+  for (const sk in (m.reqSkills || {})) {
+    const have = STATS[sk] ? STATS[sk][1] : 1;
+    if (have < m.reqSkills[sk]) gaps.push(`${sk} +${m.reqSkills[sk] - have}`);
+  }
+  if (m.reqCombat) {
+    const cb = combatLevel();
+    if (cb < m.reqCombat) gaps.push(`Combat +${m.reqCombat - cb}`);
+  }
+  (m.reqQuests || []).forEach(q => { if (!completed[q]) gaps.push(`Quest: ${q}`); });
+  return { ready: gaps.length === 0 && !m.other, gaps, other: m.other || null };
+}
+
+function moneyBadges(m) {
+  const badges = [m.style === 'afk' ? '🔵 AFK' : '🟢 active'];
+  (m.types || []).forEach(t => badges.push(t === 'gp' ? '💰 GP' : t === 'skill' ? '📈 XP' : '🏦 capital'));
+  if (m.capital) badges.push('🏦 ' + m.capital);
+  return badges.map(b => `<span class="money-badge">${b}</span>`).join('');
+}
+
+function moneyCard(x, cls) {
+  const m = x.m, st = x.st;
+  const card = document.createElement('div');
+  card.className = 'money-card ' + cls;
+  const gpTxt = m.gphr === 'varies' ? 'varies' : '~' + m.gphr;
+  const gpCls = m.gphr === 'varies' ? 'money-gp varies' : 'money-gp';
+  const live = LIVE_GP[m.name];
+  let gpEl;
+  if (live && live.gphr != null) {
+    const tip = live.breakdown.map(b => `${b.item}: ${b.qtyPerHr}/hr × ${fmt(b.price)} = ${b.subtotal < 0 ? '-' : ''}${fmt(Math.abs(b.subtotal))}`).join('  |  ');
+    gpEl = `<div class="money-gp live" title="${tip}">${fmt(live.gphr)}/hr 🟢 LIVE</div>`;
+  } else {
+    gpEl = `<div class="${gpCls}">${gpTxt}</div>`;
+  }
+  let reqLine;
+  if (st.ready) {
+    reqLine = `<span class="money-gap ok">✓ all reqs met</span> · ${m.reqsText || ''}`;
+  } else {
+    const parts = st.gaps.slice();
+    if (st.other) parts.push(st.other);
+    reqLine = `<span class="money-gap">needs: ${parts.join(', ')}</span> · ${m.reqsText || ''}`;
+  }
+  card.innerHTML =
+    `<div class="money-name">${m.name}</div>` +
+    gpEl +
+    `<div class="money-badges">${moneyBadges(m)}</div>` +
+    `<div class="money-reqs">${reqLine}</div>` +
+    (m.note ? `<div class="money-note">${m.note}</div>` : '');
+  return card;
+}
+
+function moneyGroupHead(label, count) {
+  const d = document.createElement('div');
+  d.className = 'money-group-head';
+  d.innerHTML = `${label} <span class="count">(${count})</span>`;
+  return d;
+}
+function moneyEmpty(txt) {
+  const d = document.createElement('div');
+  d.className = 'money-note';
+  d.textContent = txt;
+  return d;
+}
+function endgameCard(e) {
+  const d = document.createElement('div');
+  d.className = 'endgame-card';
+  d.innerHTML = `<div class="en-name">🔒 ${e.name}</div><div class="en-why">${e.why}</div><div class="en-gap">Gap: ${e.gap}</div>`;
+  return d;
+}
+
+function setMoneyFilter(f) {
+  moneyFilter = f;
+  document.querySelectorAll('#tab-money .filter-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('mfilter-' + f);
+  if (btn) btn.classList.add('active');
+  renderMoney();
+}
+
+function renderMoney() {
+  const list = document.getElementById('money-list');
+  if (!list) return;
+  const note = document.getElementById('money-note');
+  const withStatus = (MONEY.methods || []).map(m => ({ m, st: methodStatus(m) }));
+  const sortVal = m => { const l = LIVE_GP[m.name]; return (l && l.gphr != null) ? l.gphr / 1000 : (m.gpSort || 0); };
+  const bySort = (a, b) => sortVal(b.m) - sortVal(a.m);
+  const ready = withStatus.filter(x => x.st.ready).sort(bySort);
+  const notReady = withStatus.filter(x => !x.st.ready).sort(bySort);
+
+  const typeFilter = ['gp', 'skill', 'afk'].includes(moneyFilter);
+  const passType = m =>
+    moneyFilter === 'gp' ? (m.types || []).includes('gp') :
+    moneyFilter === 'skill' ? (m.types || []).includes('skill') :
+    moneyFilter === 'afk' ? m.style === 'afk' : true;
+
+  const showReady = moneyFilter === 'all' || moneyFilter === 'ready' || typeFilter;
+  const showNext = moneyFilter === 'all' || moneyFilter === 'next' || typeFilter;
+
+  list.innerHTML = '';
+  if (showReady) {
+    const items = ready.filter(x => passType(x.m));
+    list.appendChild(moneyGroupHead('✅ Available now', items.length));
+    if (items.length) items.forEach(x => list.appendChild(moneyCard(x, 'ready')));
+    else list.appendChild(moneyEmpty('Nothing here with this filter.'));
+  }
+  if (showNext) {
+    const items = notReady.filter(x => passType(x.m));
+    list.appendChild(moneyGroupHead('🔜 Next unlocks', items.length));
+    if (items.length) items.forEach(x => list.appendChild(moneyCard(x, 'next')));
+    else list.appendChild(moneyEmpty('Nothing here with this filter.'));
+  }
+  if (moneyFilter === 'all' && (MONEY.endgame || []).length) {
+    list.appendChild(moneyGroupHead('🔒 Big targets — your money endgame', MONEY.endgame.length));
+    MONEY.endgame.forEach(e => list.appendChild(endgameCard(e)));
+  }
+  if (note) {
+    let txt = MONEY.reviewed ? `Method list reviewed ${MONEY.reviewed} · buckets computed live from your current stats.` : '';
+    if (GEPHR_UPDATED) txt += ` · 🟢 GE prices as of ${new Date(GEPHR_UPDATED).toLocaleTimeString()}`;
+    note.textContent = txt;
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+
+applySeed();
+renderSkills();
+renderQuests();
+renderGoals();
+populateGoalSelect();
+populateChartSelect();
+renderGains();
+loadSavedAI();
+commitSnapshot();            // record current levels for next-visit gain detection
+loadVaultState();            // async: pull durable state from the vault, then re-render
+loadStats();                 // async: pull live levels + progress history from OSRS Hiscores
+loadMoney();                 // async: pull money methods, auto-bucket vs live stats/quests
+loadGephr();                 // async: compute live GP/hr from current GE prices
+</script>
+</body>
+</html>
