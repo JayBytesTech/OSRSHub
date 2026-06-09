@@ -30,7 +30,9 @@ server.js (Express, CommonJS, single file)
 - Single player. `RSN`, `VAULT_PATH`, and the three `*_REL` files are global env constants.
 - Source of truth = Obsidian markdown with a fenced ` ```json ` block, rewritten wholesale.
 - No auth, no database, no build step, no tests.
-- `SKILL_NAMES` is duplicated in `server.js` and `index.html` and must stay positionally in sync.
+- `SKILL_NAMES` used to be duplicated in `server.js` and `index.html` with a positional coupling.
+  As of Foundations Slice 1 that's retired: history is in SQLite keyed by skill name, and
+  `server.js` no longer defines `SKILL_NAMES` (only `index.html` does, for render order).
 
 **What's good and worth preserving**
 - Zero-build frontend is fast to iterate.
@@ -113,7 +115,7 @@ login" from ingested rows. **Passive only** — the plugin reads game state, nev
 
 ## 5. Cross-cutting constraints
 - `safeVaultPath()`-style confinement for **all** filesystem access.
-- `SKILL_NAMES` ordering contract must hold until snapshots are keyed by skill name in SQLite
-  (which retires the positional coupling — a goal of Phase 1).
+- ~~`SKILL_NAMES` ordering contract~~ — **retired** (Foundations Slice 1): snapshots are keyed
+  by skill name in SQLite, so there is no positional coupling between server and frontend.
 - External API politeness: keep caches (prices 60s TTL, mapping once/process) and User-Agents.
 - Secrets only in `.env`; never commit keys; never log the Anthropic key.

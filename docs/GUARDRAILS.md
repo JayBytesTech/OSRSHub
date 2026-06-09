@@ -45,8 +45,9 @@ from the [PRD](./PRD.md) and [ARCHITECTURE](./ARCHITECTURE.md). When in doubt, t
 
 ## 4. Code quality guardrails
 
-- **Keep the `SKILL_NAMES` contract intact** until Phase 1 retires it: the array in `server.js`
-  and `public/index.html` must stay positionally in sync (Hiscores history columns depend on it).
+- **`SKILL_NAMES` positional coupling is retired** (Foundations Slice 1): history is keyed by
+  skill name in SQLite. `public/index.html` still defines `SKILL_NAMES` for render order; just
+  don't reintroduce a server-side positional dependency on it.
 - **`public/index.html` is hand-edited source of truth** — edit it directly; don't regenerate from
   the retired `scripts/port-hub.js` (it's destructive and one-off).
 - **Endpoints keep stable response shapes** across the SQLite migration; change storage, not contracts.

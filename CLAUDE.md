@@ -66,7 +66,7 @@ server.js (Express, CommonJS)
 
 This is the **hand-edited source of truth** — edit directly and refresh the browser; no restart or build needed. It is a single self-contained HTML file with inline CSS and JS.
 
-Key frontend globals: `STATS` (fallback skill levels), `SKILL_NAMES` (ordered array of 25 skills including Sailing), `QUESTS`, `COMPLETED`, `GOALS`. The `switchTab()` function drives the tab UI (Skills / Quests / Progress / AI Journey / Goals / Chat).
+Key frontend globals: `STATS` (fallback skill levels), `SKILL_NAMES` (ordered array of 25 skills including Sailing), `QUESTS`, `COMPLETED`, `GOALS`. The `switchTab()` function drives the tab UI (Dashboard / Skills / Quests / Progress / Money / AI Journey / Goals / Chat); Dashboard is the default landing tab and `renderDashboard()` composes existing globals/helpers into the at-a-glance view.
 
 ### Backend (`server.js`)
 
@@ -74,7 +74,7 @@ Single-file Express server. All routes are in this file.
 
 **Vault state format**: managed markdown files contain a fenced JSON block (` ```json ... ``` `). The server parses them with a regex and rewrites the entire file on save.
 
-**Critical ordering constraint**: `SKILL_NAMES` in `server.js` must stay in sync with `SKILL_NAMES` in `public/index.html` — the Hiscores history columns are positional.
+**History storage**: daily Hiscores snapshots live in SQLite (`db/`), keyed by skill **name** and scoped by `account_id` — written/read behind `/api/stats` (same response shape as before). The old positional `SKILL_NAMES` coupling is retired; `server.js` no longer defines `SKILL_NAMES` (only `public/index.html` does, for render order). Quests/goals still live in the vault via `/api/state` (a later slice moves them too).
 
 **Chat loop** (`runChat`): up to 8 tool-use turns. If the `web_search` tool fails (account doesn't have it), `/api/chat` automatically retries without it.
 

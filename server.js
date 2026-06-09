@@ -18,6 +18,9 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 
 const anthropic = API_KEY ? new Anthropic({ apiKey: API_KEY }) : null;
 
+// SQLite store (history/time-series + account scoping). Vault stays for human notes.
+const { getCurrentAccount, snapshots } = require('./db');
+
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -79,12 +82,8 @@ app.put('/api/state', async (req, res) => {
 });
 
 // ── Live stats from the OSRS Hiscores ─────────────────────────────────────────
-// Must mirror SKILL_NAMES in public/index.html (order matters for Total).
-const SKILL_NAMES = ['Overall', 'Attack', 'Defence', 'Strength', 'Hitpoints', 'Ranged',
-  'Prayer', 'Magic', 'Cooking', 'Woodcutting', 'Fletching', 'Fishing', 'Firemaking',
-  'Crafting', 'Smithing', 'Mining', 'Herblore', 'Agility', 'Thieving', 'Slayer',
-  'Farming', 'Runecrafting', 'Hunter', 'Construction', 'Sailing'];
-// Hiscores skill name → hub name (only where they differ).
+// Hiscores skill name → hub name (only where they differ). Snapshots are stored by
+// skill name in SQLite, so there is no longer a positional skill-order coupling.
 const HISCORE_NAME_MAP = { Runecraft: 'Runecrafting' };
 
 async function fetchHiscores() {
@@ -109,53 +108,13 @@ function todayLabel() {
     String(d.getDate()).padStart(2, '0');
 }
 
-const HISTORY_TEMPLATE = (hist) =>
-  `---
-note: Machine-managed progress history for the OSRS Hub. The app appends one snapshot per day from the OSRS Hiscores. Charts in the hub read the JSON block below.
----
-
-# OSRS Hiscores History
-
-\`\`\`json
-${JSON.stringify(hist, null, 2)}
-\`\`\`
-`;
-
-async function readHistory() {
-  try {
-    const md = await fs.readFile(safeVaultPath(HISTORY_REL), 'utf8');
-    const m = md.match(/```json\s*([\s\S]*?)```/);
-    if (m) { const h = JSON.parse(m[1]); h.dates = h.dates || []; h.skills = h.skills || {}; return h; }
-  } catch (e) { if (e.code !== 'ENOENT') throw e; }
-  return { dates: [], skills: {} };
-}
-
-// Once-per-day: append a new column on a new day, else refresh today's values in place.
-function recordSnapshot(hist, stats) {
-  const label = todayLabel();
-  const tracked = SKILL_NAMES.slice(1).concat(['Total']);
-  const isNewDay = hist.dates[hist.dates.length - 1] !== label;
-  if (isNewDay) hist.dates.push(label);
-  const col = hist.dates.length - 1;
-  for (const name of tracked) {
-    const arr = hist.skills[name] || (hist.skills[name] = []);
-    while (arr.length < col) arr.push(arr.length ? arr[arr.length - 1] : null);
-    const val = name === 'Total'
-      ? SKILL_NAMES.slice(1).reduce((s, n) => s + (stats[n] ? stats[n][1] : 0), 0)
-      : (stats[name] ? stats[name][1] : (arr.length ? arr[arr.length - 1] : 1));
-    arr[col] = val;
-  }
-  return hist;
-}
-
 app.get('/api/stats', async (_req, res) => {
   try {
     const stats = await fetchHiscores();
-    const hist = recordSnapshot(await readHistory(), stats);
-    const abs = safeVaultPath(HISTORY_REL);
-    await fs.mkdir(path.dirname(abs), { recursive: true });
-    await fs.writeFile(abs, HISTORY_TEMPLATE(hist), 'utf8');
-    res.json({ stats, history: hist, rsn: RSN });
+    const account = getCurrentAccount();
+    snapshots.recordSnapshot(account.id, todayLabel(), stats);   // upsert today's per-skill rows
+    const history = snapshots.getHistory(account.id);            // legacy { dates, skills } shape
+    res.json({ stats, history, rsn: RSN });
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -388,10 +347,25 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`OSRS Hub running → http://localhost:${PORT}`);
-  console.log(`Vault: ${VAULT_PATH}`);
-  console.log(`State file: ${STATE_REL}`);
-  console.log(`Hiscores RSN: ${RSN}`);
-  console.log(`Chat: ${anthropic ? MODEL : 'DISABLED (no ANTHROPIC_API_KEY)'}${anthropic && ENABLE_WEB_SEARCH ? ' + web search' : ''}`);
-});
+(async () => {
+  // One-time seed: import legacy vault history into SQLite if this account has none yet.
+  const account = getCurrentAccount();
+  if (snapshots.count(account.id) === 0) {
+    try {
+      const md = await fs.readFile(safeVaultPath(HISTORY_REL), 'utf8');
+      const imported = snapshots.importFromVaultMarkdown(account.id, md);
+      if (imported) console.log(`Imported ${imported} history snapshots from vault → SQLite`);
+    } catch (e) {
+      if (e.code !== 'ENOENT') console.warn('History import skipped:', e.message);
+    }
+  }
+
+  app.listen(PORT, () => {
+    console.log(`OSRS Hub running → http://localhost:${PORT}`);
+    console.log(`Vault: ${VAULT_PATH}`);
+    console.log(`State file: ${STATE_REL}`);
+    console.log(`Hiscores RSN: ${RSN}`);
+    console.log(`DB: ${process.env.DB_PATH || 'data/osrs-hub.db'}`);
+    console.log(`Chat: ${anthropic ? MODEL : 'DISABLED (no ANTHROPIC_API_KEY)'}${anthropic && ENABLE_WEB_SEARCH ? ' + web search' : ''}`);
+  });
+})();
