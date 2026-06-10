@@ -267,6 +267,38 @@ body {
 .rt-ref { color: #a89868; font-style: italic; font-size: 10.5px; }
 .rt-legend { margin-top: 6px; color: #8a6030; font-size: 10px; }
 
+/* ── DIARIES (F2.3) ── */
+.diary-filters { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.diary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+.diary-region {
+  background: #fbf6e8; border: 1px solid #cdb682; border-radius: 8px; padding: 10px 12px;
+}
+.diary-region-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px solid #e3d4a8; padding-bottom: 5px; }
+.diary-region-name { font-weight: 800; color: #5a4010; text-decoration: none; font-size: 13px; }
+.diary-region-name:hover { text-decoration: underline; }
+.diary-region-count { font-size: 10.5px; color: #8a6030; font-weight: 600; }
+.diary-tier { padding: 5px 0; border-bottom: 1px dashed #e7dab2; }
+.diary-tier:last-child { border-bottom: none; }
+.diary-tier-head { display: flex; align-items: center; gap: 7px; }
+.diary-tier-icon { width: 13px; font-weight: 800; text-align: center; }
+.diary-tier-name { font-weight: 700; width: 56px; flex: none; }
+.diary-reward { color: #6a5326; font-size: 10.5px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diary-ready  .diary-tier-icon, .diary-ready  .diary-tier-name { color: #1d6b10; }
+.diary-locked .diary-tier-icon { color: #9a4810; }
+.diary-done   .diary-tier-icon, .diary-done .diary-tier-name { color: #2e6614; }
+.diary-toggle {
+  flex: none; font-size: 10px; font-weight: 700; cursor: pointer; border-radius: 4px;
+  border: 1px solid #c0a85c; background: #efe4bf; color: #5a4010; padding: 2px 7px;
+}
+.diary-toggle:hover { background: #e6d59f; }
+.diary-toggle.on { background: #d9ecc6; border-color: #8ab86a; color: #1d6b10; }
+.diary-gaps { margin: 4px 0 0 20px; }
+.diary-need-quests { margin: 3px 0 0 20px; font-size: 10.5px; color: #6a4a14; }
+.diary-need-quests a { color: #8a4a14; text-decoration: none; }
+.diary-need-quests a:hover { text-decoration: underline; }
+.diary-note { margin: 3px 0 0 20px; font-size: 10px; color: #9a7a30; font-style: italic; }
+.diary-empty { color: #8a6030; padding: 16px; background: #fbf6e8; border: 1px solid #cdb682; border-radius: 8px; }
+
 /* ── PROGRESS ── */
 .progress-section { max-width: 760px; }
 .chart-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
@@ -599,6 +631,7 @@ body {
   <div class="tab active"  onclick="switchTab('dashboard')">📊 Dashboard</div>
   <div class="tab"         onclick="switchTab('skills')">⚔️ Skills</div>
   <div class="tab"         onclick="switchTab('quests')">📜 Quests</div>
+  <div class="tab"         onclick="switchTab('diaries')">📖 Diaries</div>
   <div class="tab"         onclick="switchTab('progress')">📈 Progress</div>
   <div class="tab"         onclick="switchTab('money')">💰 Money</div>
   <div class="tab"         onclick="switchTab('ai')">🧙 AI Journey</div>
@@ -721,6 +754,18 @@ body {
     </div>
     <div class="goals-list" id="goals-list"></div>
   </div>
+</div>
+
+<!-- DIARIES -->
+<div id="tab-diaries" class="tab-content">
+  <div class="section-header">Achievement Diaries <span class="section-sub" id="diary-sub">Can-I-do-it-now planner · tick a tier when you claim it in-game</span></div>
+  <div class="diary-filters">
+    <button class="filter-btn active" id="diaryfilter-all"    onclick="setDiaryFilter('all')">All</button>
+    <button class="filter-btn"        id="diaryfilter-ready"  onclick="setDiaryFilter('ready')">Ready now</button>
+    <button class="filter-btn"        id="diaryfilter-locked" onclick="setDiaryFilter('locked')">Locked</button>
+    <button class="filter-btn"        id="diaryfilter-done"   onclick="setDiaryFilter('done')">Done</button>
+  </div>
+  <div id="diary-body"></div>
 </div>
 
 <!-- CHECKLIST -->
@@ -1071,6 +1116,26 @@ async function loadQuestData() {
   if (document.getElementById('dash-body')) renderDashboard();
 }
 
+// ── ACHIEVEMENT DIARIES (F2.3) ──────────────────────────────────────────────────
+// Tier-level aggregate requirements loaded from /diary-data.json (reference data, like
+// quest-data). Shape: { Region: { Easy|Medium|Hard|Elite: {s:{Skill:lvl}, cb?, q:[quest], reward, note?} } }.
+// Starts empty so the app works if the fetch fails (the tab then shows an honest notice).
+let DIARY_DATA = {};
+
+async function loadDiaryData() {
+  try {
+    const r = await fetch('/diary-data.json', { cache: 'no-cache' });
+    if (!r.ok) throw new Error('diary-data ' + r.status);
+    const data = await r.json();
+    DIARY_DATA = (data && data.diaries) || {};
+  } catch (e) {
+    console.warn('Could not load diary-data.json — Diary planner unavailable.', e);
+    DIARY_DATA = {};
+  }
+  if (document.getElementById('diary-body')) renderDiaries();
+  if (document.getElementById('dash-body')) renderDashboard();
+}
+
 // ── XP PLANNING (F2.2) ──────────────────────────────────────────────────────────
 // Loaded at startup from /xp-methods.json (structured reference data, like quest-data).
 // Shape: { Skill: [ { name, xphr, req?{Skill:level}, note? } ] }. Used to turn
@@ -1175,6 +1240,16 @@ function getPresetGoals() {
 }
 function savePresetGoalsLocal(g) {
   try { localStorage.setItem('osrs_nullyn_presetgoals', JSON.stringify(g)); } catch {}
+}
+// Diary completions: array of { region, tier } the player has claimed (F2.3).
+function getCompletedDiaries() {
+  try { const v = JSON.parse(localStorage.getItem('osrs_nullyn_diaries') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function saveCompletedDiariesLocal(d) {
+  try { localStorage.setItem('osrs_nullyn_diaries', JSON.stringify(Array.isArray(d) ? d : [])); } catch {}
+}
+function diaryDone(region, tier) {
+  return getCompletedDiaries().some(d => d && d.region === region && d.tier === tier);
 }
 
 // ── CHECKLIST ─────────────────────────────────────────────────────────────────
@@ -1593,9 +1668,10 @@ async function loadVaultState() {
     if (Array.isArray(data.goals)) saveGoalsLocal(data.goals);
     if (Array.isArray(data.questGoals)) saveQuestGoalsLocal(data.questGoals);
     if (Array.isArray(data.presetGoals)) savePresetGoalsLocal(data.presetGoals);
+    if (Array.isArray(data.diaries)) saveCompletedDiariesLocal(data.diaries);
     SYNC.available = true;
     setSyncBadge('ok', '\u2601 Synced to vault');
-    renderQuests(); renderGoals(); populateGoalSelect(); populateQuestGoalDatalist(); renderDashboard(); recordAccountValue();
+    renderQuests(); renderGoals(); populateGoalSelect(); populateQuestGoalDatalist(); renderDiaries(); renderDashboard(); recordAccountValue();
   } catch (e) {
     SYNC.available = false; SYNC.lastError = String(e);
     setSyncBadge('warn', '\u26a0 Local only');
@@ -1609,7 +1685,7 @@ function scheduleVaultSave() {
   saveTimer = setTimeout(saveVaultState, 700);
 }
 async function saveVaultState() {
-  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals() };
+  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals(), diaries: getCompletedDiaries() };
   try {
     const r = await fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!r.ok) throw new Error('save ' + r.status);
@@ -1634,6 +1710,7 @@ function switchTab(name) {
   if (name === 'timeline')  { loadTimeline(); startTimelinePolling(); }
   else stopTimelinePolling();
   if (name === 'loot')      loadLoot();
+  if (name === 'diaries')   renderDiaries();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
@@ -1863,7 +1940,9 @@ function renderDashboard() {
       ? tile('🪙', 'Loot Logged', fmt(LOOT_SUMMARY.totalValue), `${LOOT_SUMMARY.dropCount} drop${LOOT_SUMMARY.dropCount === 1 ? '' : 's'} →`, { cls: 'dash-clickable', onclick: "switchTab('loot')", title: 'Go to Loot' })
       : stub('🪙', 'Loot Logged')) +
     stub('🏦', 'Bank Value') +
-    stub('🗺️', 'Diaries') +
+    (() => { const ds = diarySummary(); return ds.total > 0
+      ? tile('📖', 'Diaries', `${ds.done} <span class="dash-frac">/ ${ds.total}</span>`, `${ds.pct}% · ${ds.ready} ready now →`, { cls: 'dash-clickable', onclick: "switchTab('diaries')", title: 'Go to Diaries' })
+      : stub('📖', 'Diaries'); })() +
     stub('📒', 'Collection Log');
 
   let momentum;
@@ -2230,6 +2309,144 @@ function requirementTreeHTML(rootName, completed) {
     ${nodeHTML(tree, 0)}
     <div class="rt-legend">✓ done · ○ ready · ✗ locked · ? reqs not listed</div>
   </div>`;
+}
+
+// ── ACHIEVEMENT DIARY ENGINE + UI (F2.3) ────────────────────────────────────────
+// A diary tier is just a requirement node: skill gates (+ a combat gate for Western
+// Provinces) + quests that must be complete. We reuse the same level/quest checks the
+// quest engine uses (STATS[skill][1], the completed map) — no new requirement logic.
+const DIARY_TIERS = ['Easy', 'Medium', 'Hard', 'Elite'];
+const DIARY_ICON  = { done: '✓', ready: '○', locked: '✗' };
+let diaryFilter = 'all';
+
+// Live status of one tier against current stats + quest completions.
+// Returns { state:'done'|'ready'|'locked', missingSkills:[{skill,need,have}],
+//           missingQuests:[name], missingCombat:{need,have}|null, entry }.
+function diaryTierStatus(region, tier) {
+  const entry = (DIARY_DATA[region] || {})[tier] || null;
+  const out = { state: 'locked', missingSkills: [], missingQuests: [], missingCombat: null, entry };
+  if (!entry) { out.state = 'locked'; return out; }
+  if (diaryDone(region, tier)) { out.state = 'done'; return out; }
+
+  const completed = getCompleted();
+  if (entry.s) {
+    for (const sk in entry.s) {
+      const have = STATS[sk] ? STATS[sk][1] : 1;
+      if (have < entry.s[sk]) out.missingSkills.push({ skill: sk, need: entry.s[sk], have });
+    }
+  }
+  if (entry.cb) {
+    const have = combatLevel();
+    if (have < entry.cb) out.missingCombat = { need: entry.cb, have };
+  }
+  for (const q of (entry.q || [])) {
+    if (!completed[q]) out.missingQuests.push(q);
+  }
+  const ready = out.missingSkills.length === 0 && out.missingQuests.length === 0 && !out.missingCombat;
+  out.state = ready ? 'ready' : 'locked';
+  return out;
+}
+
+// Aggregate progress across all 48 tiers (for the dashboard tile + ranker).
+function diarySummary() {
+  let total = 0, done = 0, ready = 0;
+  for (const region in DIARY_DATA) {
+    for (const tier of DIARY_TIERS) {
+      if (!(DIARY_DATA[region] || {})[tier]) continue;
+      total++;
+      const st = diaryTierStatus(region, tier);
+      if (st.state === 'done') done++;
+      else if (st.state === 'ready') ready++;
+    }
+  }
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  return { total, done, ready, pct };
+}
+
+function setDiaryFilter(f) {
+  diaryFilter = f;
+  document.querySelectorAll('.diary-filters .filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('diaryfilter-' + f).classList.add('active');
+  renderDiaries();
+}
+
+function toggleDiary(region, tier) {
+  const list = getCompletedDiaries();
+  const i = list.findIndex(d => d && d.region === region && d.tier === tier);
+  if (i >= 0) list.splice(i, 1); else list.push({ region, tier });
+  saveCompletedDiariesLocal(list);
+  scheduleVaultSave();
+  renderDiaries();
+  renderDashboard();
+}
+
+// The requirement-gap line for a locked tier (reuses the quest tree's chip styling).
+function diaryGapsHTML(st) {
+  const bits = [];
+  st.missingSkills
+    .sort((a, b) => (b.need - b.have) - (a.need - a.have))
+    .forEach(m => bits.push(`<span class="rt-skill">${m.need} ${m.skill} <span class="rt-have">(have ${m.have})</span></span>`));
+  if (st.missingCombat) bits.push(`<span class="rt-skill">${st.missingCombat.need} Combat <span class="rt-have">(have ${st.missingCombat.have})</span></span>`);
+  let html = bits.length ? `<div class="diary-gaps">${bits.join(' ')}</div>` : '';
+  if (st.missingQuests.length) {
+    const qs = st.missingQuests.map(q => `<a href="${wikiUrl(q)}" target="_blank" rel="noopener">${q}</a>`).join(', ');
+    html += `<div class="diary-need-quests">📜 quests needed: ${qs}</div>`;
+  }
+  return html;
+}
+
+function renderDiaries() {
+  const body = document.getElementById('diary-body');
+  if (!body) return;
+  const sub = document.getElementById('diary-sub');
+
+  if (!DIARY_DATA || Object.keys(DIARY_DATA).length === 0) {
+    body.innerHTML = `<div class="diary-empty">Diary data unavailable — could not load <code>/diary-data.json</code>.</div>`;
+    return;
+  }
+
+  const sum = diarySummary();
+  if (sub) sub.textContent = `${sum.done}/${sum.total} tiers done (${sum.pct}%) · ${sum.ready} ready to do now`;
+
+  const cards = [];
+  for (const region in DIARY_DATA) {
+    const tiers = [];
+    let regionDone = 0, shown = 0;
+    for (const tier of DIARY_TIERS) {
+      const entry = (DIARY_DATA[region] || {})[tier];
+      if (!entry) continue;
+      const st = diaryTierStatus(region, tier);
+      if (st.state === 'done') regionDone++;
+      if (diaryFilter !== 'all' && st.state !== diaryFilter) continue;
+      shown++;
+      const isDone = st.state === 'done';
+      const gaps = (st.state === 'locked') ? diaryGapsHTML(st) : '';
+      const note = entry.note ? `<div class="diary-note">⚠ ${entry.note}</div>` : '';
+      tiers.push(`
+        <div class="diary-tier diary-${st.state}">
+          <div class="diary-tier-head">
+            <span class="diary-tier-icon">${DIARY_ICON[st.state]}</span>
+            <span class="diary-tier-name">${tier}</span>
+            <span class="diary-reward">${entry.reward || ''}</span>
+            <button class="diary-toggle${isDone ? ' on' : ''}" onclick="toggleDiary('${region.replace(/'/g, "\\'")}','${tier}')">${isDone ? '✓ Done' : 'Mark done'}</button>
+          </div>
+          ${gaps}${note}
+        </div>`);
+    }
+    if (shown === 0) continue;  // hidden by the active filter
+    cards.push(`
+      <div class="diary-region">
+        <div class="diary-region-head">
+          <a href="${wikiUrl(region + ' Diary')}" target="_blank" rel="noopener" class="diary-region-name">${region}</a>
+          <span class="diary-region-count">${regionDone}/4 done</span>
+        </div>
+        ${tiers.join('')}
+      </div>`);
+  }
+
+  body.innerHTML = cards.length
+    ? `<div class="diary-grid">${cards.join('')}</div>`
+    : `<div class="diary-empty">No tiers match this filter.</div>`;
 }
 
 function renderQuests() {
@@ -2964,6 +3181,7 @@ loadSavedAI();
 commitSnapshot();            // record current levels for next-visit gain detection
 loadQuestData();             // async: pull structured quest requirement data, then re-render
 loadXpMethods();             // async: pull XP/hr-per-method data for time-to-goal estimates
+loadDiaryData();             // async: pull achievement-diary requirement data (Diary tab + tile)
 loadVaultState();            // async: pull durable state from the vault, then re-render
 loadStats();                 // async: pull live levels + progress history from OSRS Hiscores
 loadChecklist();             // async: pull daily/weekly checklist from SQLite, then re-render

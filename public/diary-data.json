@@ -1,0 +1,81 @@
+{
+  "_meta": {
+    "about": "Tier-level aggregate Achievement Diary requirements (Phase 4 / F2.3). Static, non-account-scoped reference data served from /public like quest-data.json. Entry shape per tier: s = aggregate skill levels (the highest level any task in that tier needs, per skill), cb = combat-level gate (Western Provinces only), q = quests that must be COMPLETED (verifiable against your ticked quest completions), reward = the unlock, note = extra caveats. The engine marks a tier 'ready' when every s/cb gate is met and every q quest is complete; 'locked' otherwise; 'done' when you've toggled it complete.",
+    "caveats": "Skill levels are best-effort aggregates from oldschool.runescape.wiki and many are boostable. The q list only contains standard quests the hub can verify; miniquests (e.g. Enter the Abyss, Mage Arena I, Alfred Grimhand's Barcrawl) and quests that only need to be STARTED are listed in `note` instead of `q`, so they never falsely lock a tier. Completion itself is all-or-nothing per tier and tracked by you ticking it — the hub answers 'can I do this now?', not 'which individual tasks have I done?'.",
+    "source": "Curated from oldschool.runescape.wiki diary pages (per-region requirement summaries)."
+  },
+  "diaries": {
+    "Ardougne": {
+      "Easy":   { "s": { "Thieving": 5 }, "q": ["Biohazard", "Rune Mysteries"], "reward": "Ardougne cloak 1 — Monastery teleport; Ardougne Farm patch perks" },
+      "Medium": { "s": { "Magic": 51, "Agility": 39, "Farming": 31, "Thieving": 38, "Firemaking": 50 }, "q": ["Enlightened Journey", "The Hand in the Sand", "Rune Mysteries", "Tower of Life", "Underground Pass"], "note": "Also needs Fairy Tale II, Sea Slug, and Watchtower at least started.", "reward": "Ardougne cloak 2" },
+      "Hard":   { "s": { "Thieving": 72, "Magic": 66, "Farming": 70, "Smithing": 68, "Runecraft": 65, "Hunter": 59, "Fishing": 53, "Cooking": 53, "Construction": 50 }, "q": ["Enlightened Journey", "The Hand in the Sand", "Legends' Quest", "Monkey Madness I", "Mourning's End Part II", "Rune Mysteries", "Tower of Life", "Watchtower"], "note": "Also needs Fairy Tale II and Sea Slug at least started.", "reward": "Ardougne cloak 3" },
+      "Elite":  { "s": { "Magic": 94, "Fishing": 81, "Cooking": 91, "Thieving": 82, "Smithing": 91, "Fletching": 69, "Farming": 85, "Agility": 90 }, "q": ["Desert Treasure I", "Enlightened Journey", "The Hand in the Sand", "Haunted Mine", "Legends' Quest", "Monkey Madness I", "Mourning's End Part II", "Rune Mysteries", "Tower of Life", "Watchtower"], "note": "Also needs Fairy Tale II and Sea Slug at least started.", "reward": "Ardougne cloak 4" }
+    },
+    "Desert": {
+      "Easy":   { "s": { "Hunter": 5, "Thieving": 21 }, "q": [], "note": "One task starts Icthlarin's Little Helper.", "reward": "Desert amulet 1" },
+      "Medium": { "s": { "Agility": 30, "Herblore": 36, "Hunter": 47, "Thieving": 25, "Woodcutting": 35 }, "q": ["The Golem", "Eagle's Peak", "Spirits of the Elid", "Enakhra's Lament"], "reward": "Desert amulet 2" },
+      "Hard":   { "s": { "Attack": 50, "Mining": 45, "Thieving": 65, "Firemaking": 60, "Smithing": 68, "Magic": 68, "Agility": 70, "Slayer": 65 }, "q": ["The Feud", "Desert Treasure I", "Dream Mentor", "Contact!"], "reward": "Desert amulet 3" },
+      "Elite":  { "s": { "Cooking": 85, "Magic": 94, "Fletching": 95, "Thieving": 91, "Prayer": 85, "Construction": 78 }, "q": ["Contact!", "Desert Treasure I", "Dream Mentor", "Eagle's Peak", "Enakhra's Lament", "The Feud", "The Golem", "Spirits of the Elid"], "reward": "Desert amulet 4" }
+    },
+    "Falador": {
+      "Easy":   { "s": { "Mining": 10, "Agility": 5, "Smithing": 13, "Construction": 16 }, "q": ["Doric's Quest", "The Knight's Sword"], "reward": "Falador shield 1" },
+      "Medium": { "s": { "Firemaking": 49, "Magic": 37, "Farming": 23, "Agility": 42, "Thieving": 40, "Crafting": 40, "Woodcutting": 30, "Mining": 40, "Slayer": 32 }, "q": ["Doric's Quest", "The Knight's Sword", "Recruitment Drive"], "note": "Also needs Skippy and the Mogres (miniquest) and Ratcatchers partially.", "reward": "Falador shield 2" },
+      "Hard":   { "s": { "Runecraft": 56, "Agility": 59, "Mining": 60, "Slayer": 72, "Woodcutting": 71, "Thieving": 58, "Fishing": 53, "Cooking": 53, "Herblore": 52 }, "q": ["Doric's Quest", "Grim Tales", "Heroes' Quest", "The Knight's Sword", "The Slug Menace"], "note": "Also needs Skippy and the Mogres (miniquest) and Ratcatchers partially.", "reward": "Falador shield 3" },
+      "Elite":  { "s": { "Runecraft": 88, "Farming": 91, "Agility": 80, "Herblore": 81, "Woodcutting": 75, "Mining": 60 }, "q": ["Doric's Quest", "Grim Tales", "Heroes' Quest", "The Knight's Sword", "The Slug Menace", "Wanted!"], "note": "Also needs Skippy and the Mogres (miniquest) and Ratcatchers partially.", "reward": "Falador shield 4" }
+    },
+    "Fremennik": {
+      "Easy":   { "s": { "Attack": 20, "Hitpoints": 20, "Mining": 20, "Strength": 20, "Agility": 20, "Smithing": 20, "Defence": 20, "Herblore": 20, "Fishing": 20, "Ranged": 20, "Thieving": 5, "Cooking": 20, "Prayer": 20, "Crafting": 23, "Firemaking": 15, "Magic": 20, "Fletching": 20, "Woodcutting": 15, "Runecraft": 20, "Slayer": 20, "Farming": 20, "Construction": 20, "Hunter": 11 }, "q": ["The Fremennik Trials"], "reward": "Fremennik sea boots 1" },
+      "Medium": { "s": { "Attack": 40, "Mining": 40, "Agility": 35, "Smithing": 50, "Defence": 30, "Thieving": 42, "Cooking": 40, "Crafting": 31, "Firemaking": 40, "Woodcutting": 50, "Slayer": 47, "Hunter": 35, "Construction": 37 }, "q": ["Between a Rock...", "Eagle's Peak", "Horror from the Deep"], "reward": "Fremennik sea boots 2" },
+      "Hard":   { "s": { "Attack": 70, "Mining": 70, "Agility": 35, "Smithing": 60, "Defence": 40, "Herblore": 66, "Fishing": 53, "Thieving": 75, "Cooking": 53, "Crafting": 61, "Firemaking": 49, "Magic": 72, "Woodcutting": 56, "Slayer": 47, "Hunter": 55, "Construction": 37 }, "q": ["Between a Rock...", "Eagle's Peak", "Horror from the Deep", "Eadgar's Ruse", "Lunar Diplomacy", "Throne of Miscellania"], "reward": "Fremennik sea boots 3" },
+      "Elite":  { "s": { "Attack": 70, "Hitpoints": 70, "Mining": 70, "Strength": 70, "Agility": 80, "Smithing": 60, "Defence": 40, "Herblore": 66, "Fishing": 53, "Ranged": 70, "Thieving": 75, "Cooking": 53, "Crafting": 80, "Firemaking": 49, "Magic": 72, "Woodcutting": 56, "Runecraft": 82, "Slayer": 83, "Hunter": 55 }, "q": ["Between a Rock...", "Eagle's Peak", "Horror from the Deep", "Eadgar's Ruse", "Lunar Diplomacy", "Throne of Miscellania"], "reward": "Fremennik sea boots 4" }
+    },
+    "Kandarin": {
+      "Easy":   { "s": { "Agility": 20, "Farming": 13, "Fishing": 16 }, "q": ["Elemental Workshop I"], "reward": "Kandarin headgear 1" },
+      "Medium": { "s": { "Agility": 36, "Farming": 26, "Fishing": 46, "Herblore": 48, "Magic": 45, "Ranged": 40, "Thieving": 47, "Fletching": 50, "Mining": 30, "Cooking": 43 }, "q": ["Waterfall Quest", "Fairy Tale II - Cure a Queen", "Elemental Workshop II"], "note": "Also needs Alfred Grimhand's Barcrawl (miniquest).", "reward": "Kandarin headgear 2" },
+      "Hard":   { "s": { "Agility": 60, "Firemaking": 65, "Fishing": 70, "Fletching": 70, "Magic": 56, "Smithing": 75, "Thieving": 53, "Woodcutting": 60 }, "q": ["Desert Treasure I", "Elemental Workshop II", "Fairy Tale II - Cure a Queen"], "reward": "Kandarin headgear 3" },
+      "Elite":  { "s": { "Cooking": 80, "Crafting": 85, "Farming": 79, "Firemaking": 85, "Fishing": 76, "Herblore": 86, "Magic": 87, "Smithing": 90 }, "q": ["Family Crest", "Lunar Diplomacy"], "reward": "Kandarin headgear 4" }
+    },
+    "Karamja": {
+      "Easy":   { "s": { "Mining": 40, "Agility": 15 }, "q": [], "reward": "Karamja gloves 1" },
+      "Medium": { "s": { "Woodcutting": 50, "Fishing": 65, "Agility": 40, "Cooking": 16, "Crafting": 20, "Farming": 27, "Hunter": 41 }, "q": ["The Grand Tree", "Shilo Village", "Jungle Potion"], "reward": "Karamja gloves 2" },
+      "Hard":   { "s": { "Mining": 52, "Strength": 50, "Agility": 53, "Smithing": 40, "Herblore": 25, "Fishing": 65, "Ranged": 42, "Thieving": 50, "Cooking": 53, "Crafting": 50, "Magic": 59, "Woodcutting": 50, "Runecraft": 44, "Slayer": 50, "Farming": 27, "Hunter": 41 }, "q": ["The Grand Tree", "Tai Bwo Wannai Trio"], "reward": "Karamja gloves 3 (free Fairy ring teleports on Karamja)" },
+      "Elite":  { "s": { "Mining": 52, "Strength": 50, "Agility": 53, "Smithing": 40, "Herblore": 87, "Fishing": 65, "Ranged": 42, "Thieving": 50, "Cooking": 53, "Crafting": 50, "Magic": 59, "Woodcutting": 50, "Runecraft": 91, "Slayer": 50, "Farming": 72, "Hunter": 41 }, "q": ["The Grand Tree", "Tai Bwo Wannai Trio"], "reward": "Karamja gloves 4" }
+    },
+    "Kourend & Kebos": {
+      "Easy":   { "s": { "Mining": 15, "Thieving": 25, "Construction": 25, "Herblore": 12, "Fishing": 20 }, "q": ["Druidic Ritual"], "reward": "Rada's blessing 1" },
+      "Medium": { "s": { "Mining": 42, "Agility": 49, "Fishing": 43, "Thieving": 25, "Crafting": 31, "Firemaking": 50, "Woodcutting": 50, "Farming": 45, "Hunter": 53 }, "q": ["The Depths of Despair", "The Queen of Thieves", "Tale of the Righteous", "The Forsaken Tower", "The Ascent of Arceuus"], "note": "Also needs Fairy Tale II and Eagle's Peak at least started.", "reward": "Rada's blessing 2" },
+      "Hard":   { "s": { "Mining": 65, "Woodcutting": 60, "Smithing": 70, "Fishing": 43, "Magic": 66, "Thieving": 49, "Slayer": 62, "Farming": 74 }, "q": ["Dream Mentor", "The Forsaken Tower", "The Depths of Despair", "The Queen of Thieves", "Tale of the Righteous", "The Ascent of Arceuus"], "note": "Also needs Fairy Tale II and Eagle's Peak at least started.", "reward": "Rada's blessing 3" },
+      "Elite":  { "s": { "Runecraft": 77, "Woodcutting": 90, "Fishing": 82, "Cooking": 84, "Magic": 90, "Slayer": 95, "Farming": 85, "Fletching": 40, "Mining": 38, "Crafting": 38 }, "q": ["Dream Mentor", "The Forsaken Tower", "The Depths of Despair", "The Queen of Thieves", "Tale of the Righteous", "The Ascent of Arceuus"], "note": "Also needs Fairy Tale II and Eagle's Peak at least started.", "reward": "Rada's blessing 4" }
+    },
+    "Lumbridge & Draynor": {
+      "Easy":   { "s": { "Runecraft": 5, "Slayer": 7, "Fishing": 15, "Woodcutting": 15, "Firemaking": 15, "Mining": 15 }, "q": ["Cook's Assistant", "Rune Mysteries"], "reward": "Explorer's ring 1" },
+      "Medium": { "s": { "Agility": 20, "Magic": 31, "Fishing": 30, "Crafting": 38, "Thieving": 38, "Woodcutting": 30, "Runecraft": 23, "Hunter": 42 }, "q": ["Animal Magnetism", "Cook's Assistant", "The Lost City", "Rune Mysteries"], "note": "Also needs Fairy Tale II at least started.", "reward": "Explorer's ring 2" },
+      "Hard":   { "s": { "Magic": 60, "Agility": 46, "Woodcutting": 57, "Runecraft": 59, "Cooking": 70, "Crafting": 70, "Firemaking": 65, "Farming": 63 }, "q": ["Animal Magnetism", "Another Slice of H.A.M.", "Recipe for Disaster", "Rune Mysteries", "Tears of Guthix"], "note": "Also needs Fairy Tale II at least started.", "reward": "Explorer's ring 3" },
+      "Elite":  { "s": { "Thieving": 78, "Woodcutting": 75, "Smithing": 88, "Runecraft": 76, "Ranged": 70, "Strength": 70, "Agility": 70 }, "q": ["Animal Magnetism", "Another Slice of H.A.M.", "Cook's Assistant", "The Lost City", "Recipe for Disaster", "Rune Mysteries", "Tears of Guthix"], "reward": "Explorer's ring 4" }
+    },
+    "Morytania": {
+      "Easy":   { "s": { "Crafting": 15, "Cooking": 12, "Slayer": 15, "Farming": 23 }, "q": ["Nature Spirit"], "reward": "Morytania legs 1" },
+      "Medium": { "s": { "Hunter": 29, "Agility": 40, "Woodcutting": 45, "Slayer": 42, "Cooking": 40, "Smithing": 35, "Herblore": 22 }, "q": ["Cabin Fever", "Dwarf Cannon", "Ghosts Ahoy"], "note": "Also needs Lair of Tarn Razorlor (miniquest) and In Aid of the Myreque at least started.", "reward": "Morytania legs 2" },
+      "Hard":   { "s": { "Magic": 66, "Construction": 50, "Agility": 71, "Woodcutting": 50, "Firemaking": 50, "Farming": 53, "Mining": 55, "Slayer": 58 }, "q": ["Desert Treasure I", "Dwarf Cannon", "Ghosts Ahoy", "In Aid of the Myreque"], "note": "Also needs Lair of Tarn Razorlor (miniquest), Knight Waves (needs King's Ransom), and The Great Brain Robbery at least started.", "reward": "Morytania legs 3" },
+      "Elite":  { "s": { "Fishing": 96, "Strength": 76, "Firemaking": 80, "Magic": 83, "Crafting": 84, "Slayer": 85 }, "q": ["In Aid of the Myreque", "Lunar Diplomacy", "Shades of Mort'ton", "Desert Treasure I", "Dwarf Cannon", "Ghosts Ahoy"], "note": "Also needs Lair of Tarn Razorlor (miniquest) and The Great Brain Robbery at least started.", "reward": "Morytania legs 4" }
+    },
+    "Varrock": {
+      "Easy":   { "s": { "Mining": 15, "Agility": 13, "Crafting": 8, "Runecraft": 9, "Fishing": 20, "Thieving": 5 }, "q": ["Rune Mysteries"], "reward": "Varrock armour 1" },
+      "Medium": { "s": { "Agility": 30, "Herblore": 10, "Fishing": 20, "Thieving": 25, "Crafting": 36, "Firemaking": 40, "Magic": 25, "Farming": 30 }, "q": ["The Dig Site", "Enlightened Journey", "Garden of Tranquillity", "Gertrude's Cat", "Rune Mysteries", "A Soul's Bane", "Tree Gnome Village"], "reward": "Varrock armour 2" },
+      "Hard":   { "s": { "Mining": 15, "Agility": 51, "Smithing": 20, "Ranged": 40, "Thieving": 53, "Crafting": 36, "Firemaking": 60, "Magic": 54, "Woodcutting": 60, "Farming": 68, "Construction": 50, "Hunter": 66, "Prayer": 52 }, "q": ["Desert Treasure I", "Enlightened Journey", "Garden of Tranquillity", "Gertrude's Cat", "Rune Mysteries", "A Soul's Bane", "Tree Gnome Village"], "reward": "Varrock armour 3" },
+      "Elite":  { "s": { "Mining": 60, "Agility": 51, "Smithing": 89, "Herblore": 90, "Thieving": 53, "Cooking": 95, "Prayer": 52, "Crafting": 61, "Firemaking": 60, "Magic": 86, "Fletching": 81, "Woodcutting": 60, "Runecraft": 78, "Farming": 68, "Construction": 50, "Hunter": 66, "Ranged": 40 }, "q": ["Desert Treasure I", "Dream Mentor", "Enlightened Journey", "Garden of Tranquillity", "Gertrude's Cat", "A Soul's Bane", "Tree Gnome Village"], "reward": "Varrock armour 4" }
+    },
+    "Western Provinces": {
+      "Easy":   { "s": { "Mining": 15, "Fletching": 20, "Hunter": 9 }, "cb": 40, "q": ["Big Chompy Bird Hunting", "Rune Mysteries"], "reward": "Western banner 1" },
+      "Medium": { "s": { "Agility": 37, "Cooking": 42, "Fishing": 46, "Woodcutting": 35, "Firemaking": 35, "Hunter": 31, "Mining": 40 }, "cb": 70, "q": ["Tree Gnome Village", "The Grand Tree", "The Eyes of Glouphrie", "Big Chompy Bird Hunting", "Eagle's Peak"], "note": "Also needs One Small Favour partially.", "reward": "Western banner 2" },
+      "Hard":   { "s": { "Ranged": 70, "Fishing": 62, "Cooking": 62, "Agility": 48, "Woodcutting": 50, "Firemaking": 50, "Hunter": 69, "Mining": 70, "Farming": 68, "Construction": 65, "Magic": 64, "Thieving": 75 }, "cb": 100, "q": ["Roving Elves", "Swan Song"], "note": "Also needs Regicide and Mourning's End Part I started, plus the Awowogei subquest of Recipe for Disaster.", "reward": "Western banner 3" },
+      "Elite":  { "s": { "Fletching": 85, "Slayer": 93, "Farming": 75, "Agility": 85, "Thieving": 85 }, "cb": 100, "q": ["Underground Pass"], "note": "Also needs Regicide and Mourning's End Part I at least started.", "reward": "Western banner 4" }
+    },
+    "Wilderness": {
+      "Easy":   { "s": { "Mining": 15, "Agility": 15, "Magic": 21 }, "q": [], "note": "Needs Enter the Abyss (miniquest).", "reward": "Wilderness sword 1" },
+      "Medium": { "s": { "Mining": 55, "Woodcutting": 61, "Agility": 52, "Magic": 60, "Slayer": 50, "Smithing": 50 }, "q": [], "note": "Needs Enter the Abyss (miniquest).", "reward": "Wilderness sword 2" },
+      "Hard":   { "s": { "Mining": 55, "Agility": 64, "Smithing": 75, "Magic": 66, "Fishing": 53, "Hunter": 67, "Slayer": 68 }, "q": ["Death Plateau"], "note": "Needs Enter the Abyss and Mage Arena I (miniquests).", "reward": "Wilderness sword 3" },
+      "Elite":  { "s": { "Mining": 85, "Smithing": 90, "Magic": 96, "Fishing": 85, "Cooking": 90, "Thieving": 84, "Slayer": 83, "Woodcutting": 75, "Firemaking": 75 }, "q": ["Death Plateau", "Desert Treasure I"], "note": "Needs Enter the Abyss and Mage Arena I (miniquests).", "reward": "Wilderness sword 4" }
+    }
+  }
+}
