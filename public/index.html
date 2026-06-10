@@ -507,6 +507,37 @@ body {
 .chat-send { padding:9px 18px; background:#6a4a14; color:#ffd700; border:none; border-radius:5px; font-weight:600; cursor:pointer; }
 .chat-send:disabled { opacity:.6; cursor:default; }
 .chat-hint { font-size:11px; color:#8a6030; margin-bottom:10px; font-style:italic; }
+
+/* ── CHECKLIST ── */
+.checklist-section { margin-bottom: 20px; }
+.checklist-section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.checklist-section-title { font-size: 15px; font-weight: 700; color: #3a2010; }
+.checklist-reset-label { font-size: 11px; color: #8a6030; font-style: italic; margin-left: auto; }
+.checklist-progress { font-size: 12px; color: #2e6614; font-weight: 600; }
+.checklist-row { display: flex; align-items: center; gap: 10px; padding: 8px 11px; border: 1px solid #d8c590; border-radius: 5px; background: #fffdf5; margin-bottom: 5px; cursor: pointer; transition: background 0.12s; user-select: none; }
+.checklist-row:hover { background: #f5ecd5; }
+.checklist-row.done { background: #f0f7ec; border-color: #b8d8a0; }
+.checklist-row.done .checklist-title { text-decoration: line-through; color: #8a9a80; }
+.checklist-check { width: 20px; height: 20px; border: 2px solid #b89850; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #fff; transition: background 0.12s; }
+.checklist-row.done .checklist-check { background: #4a8a30; border-color: #4a8a30; color: #fff; }
+.checklist-title { font-size: 13px; color: #2c1a08; font-weight: 500; flex: 1; }
+.checklist-add-form { display: flex; gap: 8px; margin-top: 8px; }
+.checklist-add-input { flex: 1; padding: 6px 10px; border: 1px solid #b89850; border-radius: 5px; font-size: 13px; font-family: inherit; background: #fffdf5; }
+.checklist-add-btn { padding: 6px 14px; background: #3a2410; color: #e8c870; border: 1px solid #6a4a14; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.checklist-add-btn:hover { background: #4a3220; }
+.checklist-manage { margin-top: 24px; border-top: 1px solid #d8c590; padding-top: 14px; }
+.checklist-manage-toggle { background: none; border: none; font-size: 13px; color: #6a4a14; font-weight: 600; cursor: pointer; padding: 0; }
+.checklist-manage-toggle:hover { color: #3a2010; }
+.checklist-manage-list { margin-top: 10px; display: none; }
+.checklist-manage-list.open { display: block; }
+.checklist-manage-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #ece4c4; font-size: 13px; color: #3a2010; }
+.checklist-manage-row:last-child { border-bottom: none; }
+.checklist-toggle-btn { padding: 2px 10px; font-size: 11px; font-weight: 600; border-radius: 9px; border: 1px solid #b89850; cursor: pointer; background: #efe4c4; color: #5a3a10; }
+.checklist-toggle-btn.on  { background: #e6f3df; border-color: #b8d8a0; color: #2e6614; }
+.checklist-toggle-btn.off { background: #f5e8d0; border-color: #c8a060; color: #8a5010; }
+.checklist-delete-btn { margin-left: auto; padding: 2px 8px; font-size: 11px; background: none; border: 1px solid #c06040; border-radius: 9px; color: #c06040; cursor: pointer; }
+.checklist-delete-btn:hover { background: #fce8e0; }
+.checklist-freq-badge { font-size: 11px; padding: 1px 7px; border-radius: 9px; background: #efe4c4; color: #5a3a10; border: 1px solid #d8c590; }
 </style>
 </head>
 <body>
@@ -533,6 +564,7 @@ body {
   <div class="tab"         onclick="switchTab('money')">💰 Money</div>
   <div class="tab"         onclick="switchTab('ai')">🧙 AI Journey</div>
   <div class="tab"         onclick="switchTab('goals')">🎯 Goals</div>
+  <div class="tab"         onclick="switchTab('checklist')">📋 Checklist</div>
   <div class="tab"         onclick="switchTab('chat')">💬 Chat</div>
 </div>
 
@@ -639,6 +671,12 @@ body {
     </div>
     <div class="goals-list" id="goals-list"></div>
   </div>
+</div>
+
+<!-- CHECKLIST -->
+<div id="tab-checklist" class="tab-content">
+  <div class="section-header">Daily &amp; Weekly Checklist <span class="section-sub">Tasks reset automatically · syncs to vault</span></div>
+  <div id="checklist-body"></div>
 </div>
 
 <!-- CHAT -->
@@ -998,6 +1036,224 @@ function savePresetGoalsLocal(g) {
   try { localStorage.setItem('osrs_nullyn_presetgoals', JSON.stringify(g)); } catch {}
 }
 
+// ── CHECKLIST ─────────────────────────────────────────────────────────────────
+
+const CHECKLIST_PRESETS = [
+  { task_id: 'preset_battlestaves', title: 'Buy battlestaves from Zaff', frequency: 'daily',  sort_order: 0 },
+  { task_id: 'preset_herb_run',     title: 'Herb run',                   frequency: 'daily',  sort_order: 1 },
+  { task_id: 'preset_birdhouse',    title: 'Birdhouse run',              frequency: 'daily',  sort_order: 2 },
+  { task_id: 'preset_kingdom',      title: 'Check Miscellania kingdom',  frequency: 'daily',  sort_order: 3 },
+  { task_id: 'preset_farming_run',  title: 'Farming run',                frequency: 'daily',  sort_order: 4 },
+  { task_id: 'preset_slayer',       title: 'Slayer task',                frequency: 'daily',  sort_order: 5 },
+  { task_id: 'preset_tog',          title: 'Tears of Guthix',            frequency: 'weekly', sort_order: 0 },
+  { task_id: 'preset_penguins',     title: 'Penguin points',             frequency: 'weekly', sort_order: 1 },
+  { task_id: 'preset_circus',       title: 'The Circus',                 frequency: 'weekly', sort_order: 2 },
+  { task_id: 'preset_stars',        title: 'Shooting Stars',             frequency: 'weekly', sort_order: 3 },
+];
+
+function getChecklist() {
+  try { const v = JSON.parse(localStorage.getItem('osrs_nullyn_checklist') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function saveChecklistLocal(tasks) {
+  try { localStorage.setItem('osrs_nullyn_checklist', JSON.stringify(tasks)); } catch {}
+}
+
+// Period key: YYYY-MM-DD UTC for daily; date of most recent Wednesday UTC for weekly.
+const dailyKey  = () => new Date().toISOString().slice(0, 10);
+const weeklyKey = () => {
+  const d = new Date();
+  const daysFromWed = (d.getUTCDay() + 4) % 7; // 0 when today is Wed
+  const wed = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - daysFromWed));
+  return wed.toISOString().slice(0, 10);
+};
+const periodKey = (freq) => freq === 'weekly' ? weeklyKey() : dailyKey();
+const isTaskDone = (task) => !!task.last_completed && task.last_completed === periodKey(task.frequency);
+
+function timeUntilReset(freq) {
+  const now = new Date();
+  let next;
+  if (freq === 'daily') {
+    next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  } else {
+    const daysToWed = (3 - now.getUTCDay() + 7) % 7 || 7; // days until next Wednesday
+    next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysToWed));
+  }
+  const ms = next - now;
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h >= 48) return `Resets in ${Math.ceil(h / 24)} days`;
+  if (h >= 1)  return `Resets in ${h}h ${m}m`;
+  return `Resets in ${m}m`;
+}
+
+function checklistSummary() {
+  const tasks  = getChecklist();
+  const today  = dailyKey();
+  const wk     = weeklyKey();
+  const enabled = tasks.filter(t => t.enabled);
+  const dailyTasks   = enabled.filter(t => t.frequency === 'daily');
+  const weeklyTasks  = enabled.filter(t => t.frequency === 'weekly');
+  const dailyDone    = dailyTasks.filter(t => t.last_completed === today).length;
+  const weeklyLeft   = weeklyTasks.filter(t => t.last_completed !== wk).length;
+  return { dailyDone, dailyTotal: dailyTasks.length, weeklyLeft };
+}
+
+async function loadChecklist() {
+  try {
+    const r = await fetch('/api/checklist');
+    if (!r.ok) throw new Error('checklist ' + r.status);
+    const data = await r.json();
+    let tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    // Merge: add any presets not yet in DB (e.g. after a preset update)
+    const knownIds = new Set(tasks.map(t => t.task_id));
+    for (const p of CHECKLIST_PRESETS) {
+      if (!knownIds.has(p.task_id)) {
+        tasks.push({ ...p, enabled: 1, is_preset: 1, last_completed: null });
+      }
+    }
+    saveChecklistLocal(tasks);
+    renderChecklist();
+    if (document.getElementById('dash-body')) renderDashboard();
+  } catch (e) {
+    // Fall back to localStorage; render with whatever we have
+    renderChecklist();
+  }
+}
+
+async function saveChecklist() {
+  const tasks = getChecklist();
+  try {
+    await fetch('/api/checklist', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tasks }) });
+  } catch {}
+}
+
+let checklistSaveTimer = null;
+function scheduleChecklistSave() {
+  clearTimeout(checklistSaveTimer);
+  checklistSaveTimer = setTimeout(saveChecklist, 700);
+}
+
+function renderChecklist() {
+  const body = document.getElementById('checklist-body');
+  if (!body) return;
+  const tasks = getChecklist();
+  const today = dailyKey();
+  const wk    = weeklyKey();
+
+  const dailyTasks  = tasks.filter(t => t.enabled && t.frequency === 'daily').sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
+  const weeklyTasks = tasks.filter(t => t.enabled && t.frequency === 'weekly').sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
+
+  const renderSection = (label, sectionTasks, freq) => {
+    const done  = sectionTasks.filter(t => t.last_completed === periodKey(freq)).length;
+    const total = sectionTasks.length;
+    const rows  = sectionTasks.map(t => {
+      const done = t.last_completed === periodKey(freq);
+      return `<div class="checklist-row${done ? ' done' : ''}" onclick="toggleTask('${t.task_id}')">
+        <div class="checklist-check">${done ? '✓' : ''}</div>
+        <span class="checklist-title">${t.title}</span>
+      </div>`;
+    }).join('');
+    return `<div class="checklist-section">
+      <div class="checklist-section-head">
+        <span class="checklist-section-title">${label}</span>
+        <span class="checklist-progress">${done}/${total}</span>
+        <span class="checklist-reset-label">${timeUntilReset(freq)}</span>
+      </div>
+      ${rows || '<div class="data-note">No ' + label.toLowerCase() + ' tasks enabled.</div>'}
+      <div class="checklist-add-form">
+        <input class="checklist-add-input" id="checklist-add-${freq}" type="text" placeholder="Add ${label.toLowerCase()} task…" onkeydown="if(event.key==='Enter')addCustomTask('${freq}')">
+        <button class="checklist-add-btn" onclick="addCustomTask('${freq}')">+ Add</button>
+      </div>
+    </div>`;
+  };
+
+  // Manage presets section
+  const allPresets = CHECKLIST_PRESETS;
+  const taskMap    = Object.fromEntries(tasks.map(t => [t.task_id, t]));
+  const customTasks = tasks.filter(t => !t.is_preset);
+
+  const manageRows = [
+    ...allPresets.map(p => {
+      const stored = taskMap[p.task_id];
+      const on = stored ? stored.enabled : 1;
+      return `<div class="checklist-manage-row">
+        <button class="checklist-toggle-btn ${on ? 'on' : 'off'}" onclick="togglePreset('${p.task_id}')">${on ? 'ON' : 'OFF'}</button>
+        <span>${p.title}</span>
+        <span class="checklist-freq-badge">${p.frequency}</span>
+      </div>`;
+    }),
+    ...customTasks.map(t => `<div class="checklist-manage-row">
+      <span style="flex:1">${t.title}</span>
+      <span class="checklist-freq-badge">${t.frequency}</span>
+      <button class="checklist-delete-btn" onclick="deleteCustomTask('${t.task_id}')">✕ Remove</button>
+    </div>`)
+  ].join('');
+
+  body.innerHTML =
+    renderSection('Daily', dailyTasks, 'daily') +
+    renderSection('Weekly', weeklyTasks, 'weekly') +
+    `<div class="checklist-manage">
+       <button class="checklist-manage-toggle" onclick="toggleManagePanel(this)">⚙️ Manage Presets ▾</button>
+       <div class="checklist-manage-list" id="checklist-manage-list">${manageRows}</div>
+     </div>`;
+}
+
+function toggleManagePanel(btn) {
+  const list = document.getElementById('checklist-manage-list');
+  const open = list.classList.toggle('open');
+  btn.textContent = (open ? '⚙️ Manage Presets ▴' : '⚙️ Manage Presets ▾');
+}
+
+function toggleTask(taskId) {
+  const tasks = getChecklist();
+  const task  = tasks.find(t => t.task_id === taskId);
+  if (!task) return;
+  const key = periodKey(task.frequency);
+  task.last_completed = task.last_completed === key ? null : key;
+  saveChecklistLocal(tasks);
+  scheduleChecklistSave();
+  renderChecklist();
+  if (document.getElementById('dash-body')) renderDashboard();
+}
+
+function addCustomTask(freq) {
+  const input = document.getElementById('checklist-add-' + freq);
+  const title = (input && input.value || '').trim();
+  if (!title) return;
+  const tasks = getChecklist();
+  const maxOrder = tasks.filter(t => t.frequency === freq && !t.is_preset).reduce((m, t) => Math.max(m, t.sort_order), 99);
+  tasks.push({ task_id: 'custom_' + Date.now(), title, frequency: freq, enabled: 1, is_preset: 0, sort_order: maxOrder + 1, last_completed: null });
+  saveChecklistLocal(tasks);
+  scheduleChecklistSave();
+  if (input) input.value = '';
+  renderChecklist();
+  if (document.getElementById('dash-body')) renderDashboard();
+}
+
+function deleteCustomTask(taskId) {
+  const tasks = getChecklist().filter(t => t.task_id !== taskId);
+  saveChecklistLocal(tasks);
+  scheduleChecklistSave();
+  renderChecklist();
+  if (document.getElementById('dash-body')) renderDashboard();
+}
+
+function togglePreset(taskId) {
+  const tasks = getChecklist();
+  const task  = tasks.find(t => t.task_id === taskId);
+  if (task) {
+    task.enabled = task.enabled ? 0 : 1;
+  } else {
+    // Preset not in localStorage yet — add it as disabled (toggling off a default-on preset)
+    const preset = CHECKLIST_PRESETS.find(p => p.task_id === taskId);
+    if (preset) tasks.push({ ...preset, enabled: 0, is_preset: 1, last_completed: null });
+  }
+  saveChecklistLocal(tasks);
+  scheduleChecklistSave();
+  renderChecklist();
+  if (document.getElementById('dash-body')) renderDashboard();
+}
+
 // First-run offline seed (matches vault as of 2026-06-08)
 const SEED_VERSION = 'v2';
 const SEED_COMPLETED = [
@@ -1074,8 +1330,9 @@ function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.querySelector(`.tab[onclick="switchTab('${name}')"]`).classList.add('active');
   document.getElementById('tab-'+name).classList.add('active');
-  if (name === 'progress') renderChart();
+  if (name === 'progress')  renderChart();
   if (name === 'dashboard') renderDashboard();
+  if (name === 'checklist') renderChecklist();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
@@ -1298,6 +1555,7 @@ function renderDashboard() {
     tile('📊', 'Total Level', totalLevel(), `${SKILL_NAMES.length - 1} skills`) +
     tile('📜', 'Quest Points', `${earnedQP} <span class="dash-frac">/ ${TOTAL_QP}</span>`, `${doneQuests.length} / ${QUESTS.length} quests done`) +
     tile('✅', 'Ready Quests', readyCount, 'can start now →', { cls: 'dash-clickable', onclick: "switchTab('quests')", title: 'Go to Quests' }) +
+    (() => { const cs = checklistSummary(); return tile('📋', 'Dailies', cs.dailyDone === cs.dailyTotal && cs.dailyTotal > 0 ? '✓ All done' : `${cs.dailyDone} / ${cs.dailyTotal}`, cs.weeklyLeft > 0 ? `${cs.weeklyLeft} weekly left` : cs.dailyTotal === 0 ? 'no tasks set up' : 'weeklies done', cs.dailyTotal > 0 ? { cls: 'dash-clickable', onclick: "switchTab('checklist')", title: 'Go to Checklist' } : null); })() +
     stub('🏦', 'Bank Value') +
     stub('🗺️', 'Diaries') +
     stub('📒', 'Collection Log');
@@ -2350,6 +2608,7 @@ commitSnapshot();            // record current levels for next-visit gain detect
 loadQuestData();             // async: pull structured quest requirement data, then re-render
 loadVaultState();            // async: pull durable state from the vault, then re-render
 loadStats();                 // async: pull live levels + progress history from OSRS Hiscores
+loadChecklist();             // async: pull daily/weekly checklist from SQLite, then re-render
 loadMoney();                 // async: pull money methods, auto-bucket vs live stats/quests
 loadGephr();                 // async: compute live GP/hr from current GE prices
 </script>

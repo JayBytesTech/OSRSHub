@@ -19,7 +19,7 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const anthropic = API_KEY ? new Anthropic({ apiKey: API_KEY }) : null;
 
 // SQLite store (history/time-series + account scoping). Vault stays for human notes.
-const { getCurrentAccount, snapshots, state, accountValue } = require('./db');
+const { getCurrentAccount, snapshots, state, accountValue, checklist } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -48,6 +48,26 @@ app.put('/api/state', (req, res) => {
   try {
     const account = getCurrentAccount();
     state.setState(account.id, req.body || {});   // full replace of this account's state
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ── Checklist API (daily/weekly recurring tasks, backed by SQLite) ────────────
+app.get('/api/checklist', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json(checklist.getChecklist(account.id));
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.put('/api/checklist', (req, res) => {
+  try {
+    const account = getCurrentAccount();
+    checklist.setChecklist(account.id, req.body || {});
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: String(e) });
@@ -370,6 +390,24 @@ app.post('/api/chat', async (req, res) => {
     } catch (e) {
       if (e.code !== 'ENOENT') console.warn('State import skipped:', e.message);
     }
+  }
+
+  // One-time seed: populate checklist presets if this account has no tasks yet.
+  if (checklist.count(account.id) === 0) {
+    const presets = [
+      { task_id: 'preset_battlestaves', title: 'Buy battlestaves from Zaff', frequency: 'daily',  sort_order: 0 },
+      { task_id: 'preset_herb_run',     title: 'Herb run',                   frequency: 'daily',  sort_order: 1 },
+      { task_id: 'preset_birdhouse',    title: 'Birdhouse run',              frequency: 'daily',  sort_order: 2 },
+      { task_id: 'preset_kingdom',      title: 'Check Miscellania kingdom',  frequency: 'daily',  sort_order: 3 },
+      { task_id: 'preset_farming_run',  title: 'Farming run',                frequency: 'daily',  sort_order: 4 },
+      { task_id: 'preset_slayer',       title: 'Slayer task',                frequency: 'daily',  sort_order: 5 },
+      { task_id: 'preset_tog',          title: 'Tears of Guthix',            frequency: 'weekly', sort_order: 0 },
+      { task_id: 'preset_penguins',     title: 'Penguin points',             frequency: 'weekly', sort_order: 1 },
+      { task_id: 'preset_circus',       title: 'The Circus',                 frequency: 'weekly', sort_order: 2 },
+      { task_id: 'preset_stars',        title: 'Shooting Stars',             frequency: 'weekly', sort_order: 3 },
+    ].map(t => ({ ...t, enabled: 1, is_preset: 1, last_completed: null }));
+    const r = checklist.setChecklist(account.id, { tasks: presets });
+    console.log(`Seeded ${r.tasks} checklist presets`);
   }
 
   app.listen(PORT, () => {

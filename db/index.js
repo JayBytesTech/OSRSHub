@@ -44,8 +44,9 @@ function getCurrentAccount() {
   return db.prepare('SELECT id, rsn FROM accounts WHERE rsn = ?').get(rsn);
 }
 
-const snapshots = require('./snapshots')(db);
-const state = require('./state')(db);
+const snapshots    = require('./snapshots')(db);
+const state        = require('./state')(db);
 const accountValue = require('./accountValue')(db);
+const checklist    = require('./checklist')(db);
 
-module.exports = { db, getCurrentAccount, snapshots, state, accountValue };
+module.exports = { db, getCurrentAccount, snapshots, state, accountValue, checklist };
