@@ -1351,7 +1351,7 @@ function scheduleChecklistSave() {
 
 // ── TIMELINE (passive telemetry feed, F3.4) ─────────────────────────────────────
 let TIMELINE = [];
-const TL_ICON = { level: '🎉', quest: '📜', loot: '💰', kc: '⚔️', other: '📌' };
+const TL_ICON = { level: '🎉', quest: '📜', loot: '💰', kc: '⚔️', diary: '📖', other: '📌' };
 
 function escapeHtml(s) {
   return String(s == null ? '' : s)
@@ -1805,6 +1805,52 @@ function goToQuest(name) {
   }
 }
 
+// The single most useful diary nudge for the dashboard ranker: prefer a tier whose
+// requirements are all met (a claimable win), else the closest near-ready locked tier.
+// Returns one action object or null. Opportunity-tier (not goal-driven), so it sits
+// after quest/skill goals in the ranking.
+function bestDiaryAction() {
+  if (!DIARY_DATA || !Object.keys(DIARY_DATA).length) return null;
+  const TIER_ORDER = { Easy: 0, Medium: 1, Hard: 2, Elite: 3 };
+  const ready = [], near = [];
+  for (const region in DIARY_DATA) {
+    for (const tier of DIARY_TIERS) {
+      if (!(DIARY_DATA[region] || {})[tier]) continue;
+      const st = diaryTierStatus(region, tier);
+      if (st.state === 'done') continue;
+      if (st.state === 'ready') {
+        ready.push({ region, tier, entry: st.entry, order: TIER_ORDER[tier] });
+      } else {
+        const skillGap = st.missingSkills.reduce((s, m) => s + (m.need - m.have), 0);
+        const cbGap = st.missingCombat ? (st.missingCombat.need - st.missingCombat.have) : 0;
+        const qGap = st.missingQuests.length;
+        if (qGap <= 1 && skillGap <= 5 && cbGap <= 5) {
+          near.push({ region, tier, st, order: TIER_ORDER[tier], dist: skillGap + cbGap + qGap * 3 });
+        }
+      }
+    }
+  }
+  if (ready.length) {
+    ready.sort((a, b) => a.order - b.order || a.region.localeCompare(b.region));
+    const r = ready[0];
+    const reward = r.entry && r.entry.reward ? ` · 🎁 ${r.entry.reward.split(' — ')[0]}` : '';
+    return { icon: '📖', title: `Do the ${r.region} ${r.tier} diary`,
+             reason: `All requirements met${reward}`,
+             onclick: `switchTab('diaries');setDiaryFilter('ready')` };
+  }
+  if (near.length) {
+    near.sort((a, b) => a.dist - b.dist || a.order - b.order);
+    const n = near[0];
+    const bits = [];
+    n.st.missingSkills.forEach(m => bits.push(`${m.need} ${m.skill}`));
+    if (n.st.missingCombat) bits.push(`${n.st.missingCombat.need} Combat`);
+    n.st.missingQuests.forEach(q => bits.push(q));
+    return { icon: '📖', title: `Almost: ${n.region} ${n.tier} diary`,
+             reason: `needs ${bits.join(', ')}`, onclick: `switchTab('diaries')`, _soft: true };
+  }
+  return null;
+}
+
 function nextActions() {
   const MAX = 6;
   const completed = getCompleted();
@@ -1899,6 +1945,10 @@ function nextActions() {
                reason: `~${fmt(bestGp)}/hr available now${live ? ' · 🟢 LIVE' : ''}`,
                onclick: `switchTab('money');setMoneyFilter('ready')` });
   }
+
+  // Tier 4 — best achievement-diary opportunity (claimable now, or nearly so).
+  const diaryAction = bestDiaryAction();
+  if (diaryAction) out.push(diaryAction);
 
   const trimmed = out.slice(0, MAX);
   const noGoals = !getQuestGoals().length && !getGoals().length && !getPresetGoals().length;

@@ -155,6 +155,14 @@ function normalizeDinkEvent(payload) {
                  data: { boss, count: Number.isFinite(count) ? count : null } });
       break;
     }
+    case 'ACHIEVEMENT_DIARY': {
+      const region = extra.area || extra.diaryName || '';
+      const d = String(extra.difficulty || '');                       // Dink sends UPPERCASE
+      const tier = d ? d.charAt(0).toUpperCase() + d.slice(1).toLowerCase() : '';
+      out.push({ type: 'diary', summary: `📖 ${region || 'Diary'} ${tier} diary complete`,
+                 data: { region, tier } });
+      break;
+    }
     default: {
       const label = (p.text && String(p.text).trim()) || (p.type ? `${p.type} event` : 'Game event');
       out.push({ type: 'other', summary: `📌 ${label}`, data: extra });
@@ -176,10 +184,13 @@ app.post('/api/ingest', ingestUpload.any(), (req, res) => {
     const nowIso = new Date().toISOString();
     const minute = nowIso.slice(0, 16);            // YYYY-MM-DDTHH:mm (dedupe granularity)
     const normalized = normalizeDinkEvent(payload);
-    let stored = 0, questsTicked = 0;
+    let stored = 0, questsTicked = 0, diariesTicked = 0;
     for (const ev of normalized) {
       if (ev.type === 'quest' && ev.data && ev.data.questName) {
         if (state.addQuestCompletion(account.id, ev.data.questName)) questsTicked++;
+      }
+      if (ev.type === 'diary' && ev.data && ev.data.region && ev.data.tier) {
+        if (state.addDiaryCompletion(account.id, ev.data.region, ev.data.tier)) diariesTicked++;
       }
       const inserted = events.addEvent(account.id, {
         type: ev.type, occurred_at: nowIso, summary: ev.summary, data: ev.data,
@@ -187,8 +198,8 @@ app.post('/api/ingest', ingestUpload.any(), (req, res) => {
       });
       if (inserted) stored++;
     }
-    console.log(`[ingest] type=${(payload && payload.type) || '?'} received=${normalized.length} stored=${stored}${questsTicked ? ` questsTicked=${questsTicked}` : ''}`);
-    res.json({ ok: true, stored, questsTicked });
+    console.log(`[ingest] type=${(payload && payload.type) || '?'} received=${normalized.length} stored=${stored}${questsTicked ? ` questsTicked=${questsTicked}` : ''}${diariesTicked ? ` diariesTicked=${diariesTicked}` : ''}`);
+    res.json({ ok: true, stored, questsTicked, diariesTicked });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }

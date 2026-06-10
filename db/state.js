@@ -90,6 +90,16 @@ module.exports = function makeState(db) {
     return info.changes > 0;
   }
 
+  // Additive, non-destructive diary-tier completion (used by Dink telemetry ingest).
+  // Won't touch the rest of state. Returns true if the tier was newly marked complete.
+  function addDiaryCompletion(accountId, region, tier) {
+    if (typeof region !== 'string' || !region || typeof tier !== 'string' || !tier) return false;
+    const info = db.prepare(
+      'INSERT OR IGNORE INTO diary_completions (account_id, region, tier) VALUES (?, ?, ?)'
+    ).run(accountId, region, tier);
+    return info.changes > 0;
+  }
+
   function count(accountId) {
     const q = db.prepare('SELECT COUNT(*) AS c FROM quest_completions WHERE account_id = ?').get(accountId).c;
     const g = db.prepare('SELECT COUNT(*) AS c FROM goals WHERE account_id = ?').get(accountId).c;
@@ -107,5 +117,5 @@ module.exports = function makeState(db) {
     return replaceTx(accountId, data.completed || {}, Array.isArray(data.goals) ? data.goals : [], Array.isArray(data.questGoals) ? data.questGoals : [], Array.isArray(data.presetGoals) ? data.presetGoals : []);
   }
 
-  return { getState, setState, addQuestCompletion, count, importFromVaultMarkdown };
+  return { getState, setState, addQuestCompletion, addDiaryCompletion, count, importFromVaultMarkdown };
 };

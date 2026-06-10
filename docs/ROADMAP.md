@@ -81,7 +81,8 @@ and the dashboard recommends agreeable next actions.
 *The living-history layer and the multi-user turn. Largest scope; do last.*
 
 - 🟡 **F3.1** `POST /api/ingest` telemetry contract (ADR D2) — **live via the Dink plugin** (levels,
-  quests, loot → `account_events`; quests auto-tick). Custom-plugin payloads (bank, GP/hr) still pending.
+  quests, loot, KC, achievement diaries → `account_events`; quests **and diary tiers** auto-tick).
+  Custom-plugin payloads (bank, GP/hr) still pending.
 - ⚪ **F3.2** RuneLite plugin (passive telemetry: XP, loot, bank, KC, clues, sessions). *Dink covers the
   common events today; a custom plugin is only needed for bank value + true GP/hr.*
 - 🟡 **F3.3** Boss & collection-log dashboards (KC, PB, profit, deaths, log completion, missing items) —
