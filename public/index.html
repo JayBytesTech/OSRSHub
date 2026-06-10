@@ -598,6 +598,11 @@ body {
 .dash-activity .dash-activity-item { display: flex; align-items: baseline; gap: 9px; padding: 5px 0; border-bottom: 1px solid #ece0bc; }
 .dash-activity .dash-activity-item:last-child { border-bottom: none; }
 .dash-activity-summary { flex: 1; font-size: 12px; color: #4a3210; }
+.dash-ms-row { display: flex; align-items: baseline; gap: 9px; padding: 5px 0; border-bottom: 1px solid #ece0bc; }
+.dash-ms-row:last-child { border-bottom: none; }
+.dash-ms-icon { width: 16px; flex: none; text-align: center; }
+.dash-ms-label { font-size: 12px; color: #6a4a14; font-weight: 600; flex: none; min-width: 124px; }
+.dash-ms-val { flex: 1; font-size: 12px; color: #2e1c08; font-weight: 600; text-align: right; }
 /* Loot & Wealth (F3.3) */
 .loot-headline { background: #f6edd4; border: 1px solid #d8c590; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
 .loot-headline-num { font-size: 30px; font-weight: 800; color: #1d6b10; }
@@ -1351,7 +1356,7 @@ function scheduleChecklistSave() {
 
 // ── TIMELINE (passive telemetry feed, F3.4) ─────────────────────────────────────
 let TIMELINE = [];
-const TL_ICON = { level: '🎉', quest: '📜', loot: '💰', kc: '⚔️', diary: '📖', other: '📌' };
+const TL_ICON = { level: '🎉', quest: '📜', loot: '💰', kc: '⚔️', diary: '📖', clog: '📒', clue: '🗺️', ca: '🏅', pet: '🐾', slayer: '💀', death: '☠️', other: '📌' };
 
 function escapeHtml(s) {
   return String(s == null ? '' : s)
@@ -1388,10 +1393,27 @@ async function loadTimeline(opts) {
     TIMELINE = [];
   }
   renderTimeline();
+  loadMilestones();            // refresh progression milestones alongside the feed (cheap)
   if (document.getElementById('dash-body')) renderDashboard();
   // Telemetry may have auto-ticked quests server-side; re-sync durable state so the
   // Quests/Goals/Dashboard views reflect them (skipped on quiet poll cycles).
   if (!quiet && typeof loadVaultState === 'function') loadVaultState();
+}
+
+// Progression milestones (collection log / clues / CAs / pets / deaths) from the typed
+// telemetry feed. Starts empty so the dashboard tile + panel degrade to an honest "—".
+let MILESTONES = { clog: { completed: null, total: null, pct: null, lastItem: null },
+                   clues: {}, ca: { points: null }, pets: { count: 0, names: [] }, deaths: { count: 0, valueLost: 0 } };
+
+async function loadMilestones() {
+  try {
+    const r = await fetch('/api/milestones');
+    if (!r.ok) throw new Error('milestones ' + r.status);
+    MILESTONES = await r.json();
+  } catch (e) {
+    console.warn('Could not load milestones.', e);
+  }
+  if (document.getElementById('dash-body')) renderDashboard();
 }
 
 // Auto-refresh while the Timeline tab is open, so events appear without a manual click.
@@ -1993,7 +2015,9 @@ function renderDashboard() {
     (() => { const ds = diarySummary(); return ds.total > 0
       ? tile('📖', 'Diaries', `${ds.done} <span class="dash-frac">/ ${ds.total}</span>`, `${ds.pct}% · ${ds.ready} ready now →`, { cls: 'dash-clickable', onclick: "switchTab('diaries')", title: 'Go to Diaries' })
       : stub('📖', 'Diaries'); })() +
-    stub('📒', 'Collection Log');
+    ((MILESTONES.clog && MILESTONES.clog.completed != null)
+      ? tile('📒', 'Collection Log', `${MILESTONES.clog.completed}${MILESTONES.clog.total ? ` <span class="dash-frac">/ ${MILESTONES.clog.total}</span>` : ''}`, `${MILESTONES.clog.pct != null ? MILESTONES.clog.pct + '% slots →' : 'slots logged →'}`, { cls: 'dash-clickable', onclick: "switchTab('timeline')", title: 'View in Timeline' })
+      : stub('📒', 'Collection Log'));
 
   let momentum;
   const dayLabel = (n) => `${n} day${n === 1 ? '' : 's'}`;
@@ -2093,6 +2117,27 @@ function renderDashboard() {
       ${activityRows || '<div class="dash-sub">No activity yet — connect RuneLite (Dink) to auto-log level-ups, quests, and drops.</div>'}
     </div>`;
 
+  // Progression milestones panel (collection log / clues / CAs / pets / deaths).
+  const ms = MILESTONES || {};
+  const CLUE_ORDER = ['Beginner', 'Easy', 'Medium', 'Hard', 'Elite', 'Master'];
+  const clueTiers = Object.keys(ms.clues || {});
+  const clueBits = CLUE_ORDER.filter(t => (ms.clues || {})[t] != null).map(t => `${t} ${ms.clues[t]}`)
+    .concat(clueTiers.filter(t => !CLUE_ORDER.includes(t)).map(t => `${t} ${ms.clues[t]}`));
+  const msRows = [];
+  if (ms.clog && ms.clog.completed != null)
+    msRows.push(['📒', 'Collection log', `${ms.clog.completed}${ms.clog.total ? ` / ${ms.clog.total}` : ''}${ms.clog.pct != null ? ` (${ms.clog.pct}%)` : ''}`]);
+  if (clueBits.length) msRows.push(['🗺️', 'Clues', clueBits.join(' · ')]);
+  if (ms.ca && ms.ca.points != null) msRows.push(['🏅', 'Combat achievements', `${ms.ca.points} pts`]);
+  if (ms.pets && ms.pets.count) msRows.push(['🐾', 'Pets', `${ms.pets.count}${ms.pets.names && ms.pets.names.length ? ` — ${ms.pets.names.join(', ')}` : ''}`]);
+  if (ms.deaths && ms.deaths.count) msRows.push(['☠️', 'Deaths', `${ms.deaths.count}${ms.deaths.valueLost ? ` · ${fmt(ms.deaths.valueLost)} gp lost` : ''}`]);
+  const milestonesPanel = `
+    <div class="dash-panel">
+      <div class="dash-panel-title">🏆 Milestones</div>
+      ${msRows.length
+        ? msRows.map(r => `<div class="dash-ms-row"><span class="dash-ms-icon">${r[0]}</span><span class="dash-ms-label">${r[1]}</span><span class="dash-ms-val">${escapeHtml(r[2])}</span></div>`).join('')
+        : '<div class="dash-sub">No milestones yet — collection-log unlocks, clues, combat achievements, and pets appear here as Dink reports them.</div>'}
+    </div>`;
+
   body.innerHTML = `
     <div class="dash-grid">${tiles}</div>
     ${nextPanel}
@@ -2107,7 +2152,10 @@ function renderDashboard() {
         ${goalsHtml}
       </div>
     </div>
-    ${activityPanel}`;
+    <div class="dash-cols">
+      ${milestonesPanel}
+      ${activityPanel}
+    </div>`;
 }
 
 // ── SKILLS ────────────────────────────────────────────────────────────────────
@@ -3237,6 +3285,7 @@ loadStats();                 // async: pull live levels + progress history from 
 loadChecklist();             // async: pull daily/weekly checklist from SQLite, then re-render
 loadTimeline();              // async: pull telemetry event feed (timeline + dashboard peek)
 loadLoot();                  // async: pull aggregated loot/wealth summary (Loot tab + tile)
+loadMilestones();            // async: pull progression milestones (Collection Log tile + panel)
 loadMoney();                 // async: pull money methods, auto-bucket vs live stats/quests
 loadGephr();                 // async: compute live GP/hr from current GE prices
 </script>

@@ -94,5 +94,55 @@ module.exports = function makeEvents(db) {
     return { totalValue, dropCount: lootRows.length, bySource, biggestDrops, wealth: { dates, cumulative } };
   }
 
-  return { addEvent, recent, count, lootSummary };
+  // Progression milestones from the typed telemetry feed (collection log, clues, combat
+  // achievements, pets, deaths). Dink sends running totals, so we take the latest/max value
+  // for cumulative figures rather than counting rows. All JS over the account's rows.
+  function milestonesSummary(accountId) {
+    const parse = (s) => { try { return s ? JSON.parse(s) : {}; } catch { return {}; } };
+    const rowsOf = (type) => db.prepare(
+      "SELECT occurred_at, summary, data FROM account_events WHERE account_id = ? AND type = ? ORDER BY occurred_at"
+    ).all(accountId, type).map(r => ({ occurred_at: r.occurred_at, summary: r.summary, data: parse(r.data) }));
+
+    // Collection log: the most recent event carries the current completed/total slots.
+    let clog = { completed: null, total: null, pct: null, lastItem: null };
+    for (const r of rowsOf('clog')) {
+      const c = Number(r.data.completedEntries), t = Number(r.data.totalEntries);
+      if (Number.isFinite(c)) clog.completed = c;
+      if (Number.isFinite(t)) clog.total = t;
+      if (r.data.itemName) clog.lastItem = r.data.itemName;
+    }
+    if (clog.completed != null && clog.total) clog.pct = Math.round((clog.completed / clog.total) * 100);
+
+    // Clues: max numberCompleted per tier (running count); fall back to row count if absent.
+    const clues = {}, clueSeen = {};
+    for (const r of rowsOf('clue')) {
+      const tier = r.data.clueType || 'Clue';
+      clueSeen[tier] = (clueSeen[tier] || 0) + 1;
+      const n = Number(r.data.numberCompleted);
+      if (Number.isFinite(n)) clues[tier] = Math.max(clues[tier] || 0, n);
+    }
+    for (const tier in clueSeen) if (clues[tier] == null) clues[tier] = clueSeen[tier];
+
+    // Combat achievements: latest running totalPoints.
+    let caPoints = null;
+    for (const r of rowsOf('ca')) { const p = Number(r.data.totalPoints); if (Number.isFinite(p)) caPoints = p; }
+
+    // Pets: count non-duplicate obtains + names.
+    const petNames = [];
+    for (const r of rowsOf('pet')) { if (!r.data.duplicate && r.data.petName) petNames.push(r.data.petName); }
+
+    // Deaths: count + total value lost.
+    const deathRows = rowsOf('death');
+    const valueLost = deathRows.reduce((s, r) => s + (Number(r.data.valueLost) || 0), 0);
+
+    return {
+      clog,
+      clues,
+      ca: { points: caPoints },
+      pets: { count: petNames.length, names: petNames.slice(-12) },
+      deaths: { count: deathRows.length, valueLost },
+    };
+  }
+
+  return { addEvent, recent, count, lootSummary, milestonesSummary };
 };

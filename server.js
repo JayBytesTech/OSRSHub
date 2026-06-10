@@ -163,6 +163,53 @@ function normalizeDinkEvent(payload) {
                  data: { region, tier } });
       break;
     }
+    case 'COLLECTION': {
+      const item = extra.itemName || 'item';
+      const done = Number(extra.completedEntries), total = Number(extra.totalEntries);
+      const prog = (Number.isFinite(done) && Number.isFinite(total)) ? ` (${done}/${total})` : '';
+      out.push({ type: 'clog', summary: `📒 New collection log: ${item}${prog}`,
+                 data: { itemName: item, completedEntries: Number.isFinite(done) ? done : null,
+                         totalEntries: Number.isFinite(total) ? total : null, price: Number(extra.price) || 0 } });
+      break;
+    }
+    case 'CLUE': {
+      const tier = extra.clueType || extra.clueScrollType || 'Clue';
+      const n = Number(extra.numberCompleted);
+      const value = sumLootValue(extra.items || []);
+      out.push({ type: 'clue', summary: `🗺️ ${tier} clue completed${Number.isFinite(n) ? ` (#${n})` : ''}`,
+                 data: { clueType: tier, numberCompleted: Number.isFinite(n) ? n : null, value } });
+      break;
+    }
+    case 'COMBAT_ACHIEVEMENT': {
+      const task = extra.task || 'task';
+      const tier = extra.tier || '';
+      const points = Number(extra.totalPoints);
+      out.push({ type: 'ca', summary: `🏅 Combat achievement: ${task}${tier ? ` (${tier})` : ''}`,
+                 data: { task, tier, totalPoints: Number.isFinite(points) ? points : null,
+                         taskPoints: Number(extra.taskPoints) || null } });
+      break;
+    }
+    case 'PET': {
+      const pet = extra.petName || '';
+      const dup = !!extra.duplicate;
+      out.push({ type: 'pet', summary: `🐾 Pet${pet ? `: ${pet}` : ''}${dup ? ' (duplicate)' : ''}${extra.milestone ? ` — ${extra.milestone}` : ''}`,
+                 data: { petName: pet || null, duplicate: dup, milestone: extra.milestone || null } });
+      break;
+    }
+    case 'SLAYER': {
+      const task = extra.slayerTask || 'task';
+      const completed = extra.slayerCompleted != null ? String(extra.slayerCompleted) : null;
+      out.push({ type: 'slayer', summary: `💀 Slayer task complete: ${task}${completed ? ` (${completed} done)` : ''}`,
+                 data: { slayerTask: task, slayerCompleted: completed, slayerPoints: extra.slayerPoints != null ? String(extra.slayerPoints) : null } });
+      break;
+    }
+    case 'DEATH': {
+      const lost = Number(extra.valueLost) || 0;
+      const killer = extra.killerName || '';
+      out.push({ type: 'death', summary: `☠️ Died${killer ? ` to ${killer}` : ''}${lost ? ` — ${lost.toLocaleString()} gp lost` : ''}`,
+                 data: { valueLost: lost, isPvp: !!extra.isPvp, killerName: killer || null } });
+      break;
+    }
     default: {
       const label = (p.text && String(p.text).trim()) || (p.type ? `${p.type} event` : 'Game event');
       out.push({ type: 'other', summary: `📌 ${label}`, data: extra });
@@ -218,6 +265,15 @@ app.get('/api/loot', (_req, res) => {
   try {
     const account = getCurrentAccount();
     res.json(events.lootSummary(account.id));
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.get('/api/milestones', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json(events.milestonesSummary(account.id));
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }

@@ -87,7 +87,9 @@ and the dashboard recommends agreeable next actions.
   common events today; a custom plugin is only needed for bank value + true GP/hr.*
 - 🟡 **F3.3** Boss & collection-log dashboards (KC, PB, profit, deaths, log completion, missing items) —
   **Loot & Wealth view live** (GP from drops, per-source breakdown, biggest drops, true KC from Dink
-  `KILL_COUNT`). Collection-log / PB / deaths dashboards still pending.
+  `KILL_COUNT`); **progression milestones live** (typed collection-log / clue / combat-achievement / pet /
+  slayer / death events → `/api/milestones` → dashboard Collection Log tile + Milestones panel). Full
+  collection-log item grid, PB tracking, and per-tier clue/CA/death dashboards still pending.
 - 🟡 **F3.4** Account timeline (living feed of level-ups, drops, completions, net-worth changes) —
   timeline tab + dashboard peek live; net-worth changes await the custom plugin.
 - ⚪ Real auth + sessions: turn `getCurrentAccount()` into actual accounts.
