@@ -48,5 +48,6 @@ const snapshots    = require('./snapshots')(db);
 const state        = require('./state')(db);
 const accountValue = require('./accountValue')(db);
 const checklist    = require('./checklist')(db);
+const events       = require('./events')(db);
 
-module.exports = { db, getCurrentAccount, snapshots, state, accountValue, checklist };
+module.exports = { db, getCurrentAccount, snapshots, state, accountValue, checklist, events };

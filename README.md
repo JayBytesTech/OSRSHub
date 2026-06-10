@@ -53,9 +53,23 @@ node scripts/port-hub.js ~/Downloads/osrs-hub.html --force
 | Progress chart | `Gaming/OSRS/OSRS Hiscores History.md` | One snapshot per day, appended automatically on first load; same-day loads refresh today's column in place |
 | Money methods | `Gaming/OSRS/OSRS Money Methods Data.md` | Read via `GET /api/money`; the hub auto-buckets each method (Available / Next / Endgame) live against your current stats + completed quests |
 | Live GP/hr | OSRS Wiki real-time prices API | `GET /api/gephr` computes net GP/hr (live GE price × modeled throughput − input costs) for methods that have an `output`/`cost` model. Shown with a 🟢 LIVE tag; methods without a model keep their static estimate. Tune `qtyPerHr` in the data file to adjust throughput. |
+| Account Timeline | RuneLite (Dink plugin) | `POST /api/ingest` receives webhooks → stored in `account_events` → shown on the **Timeline** tab + dashboard peek. Quest completions also auto-tick the Quests tab. |
 
 The Hiscores fetch uses `RSN` (default "Nullyn Voyd"), no API key. If the Hiscores
 are unreachable, the hub falls back to the values embedded in `public/index.html`.
+
+## Connect RuneLite (auto-updating timeline)
+
+Make the hub update itself while you play — no manual refresh:
+
+1. In RuneLite, install the **Dink** plugin (Plugin Hub) and enable it.
+2. Set Dink's **webhook URL** to `http://localhost:5173/api/ingest`
+   (append `?token=YOUR_TOKEN` if you set `INGEST_TOKEN` in `.env`).
+3. Turn on the notifications you want — at minimum **Level**, **Quest**, and **Loot**.
+
+Now level-ups, quest completions, and drops flow into the **Timeline** tab automatically, and
+completed quests tick themselves off in the Quests tab. *Passive only — the hub never controls the
+game.* Bank value and true GP/hr need a future custom plugin (Dink can't read those).
 
 ## Config (.env)
 

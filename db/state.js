@@ -66,6 +66,17 @@ module.exports = function makeState(db) {
     return replaceTx(accountId, body.completed || {}, body.goals || [], body.questGoals || [], body.presetGoals || []);
   }
 
+  // Additive, non-destructive single-quest completion (used by telemetry ingest).
+  // Unlike setState (full replace), this won't touch goals/quest_goals/preset_goals.
+  // Returns true if the quest was newly marked complete.
+  function addQuestCompletion(accountId, quest) {
+    if (typeof quest !== 'string' || !quest) return false;
+    const info = db.prepare(
+      'INSERT OR IGNORE INTO quest_completions (account_id, quest) VALUES (?, ?)'
+    ).run(accountId, quest);
+    return info.changes > 0;
+  }
+
   function count(accountId) {
     const q = db.prepare('SELECT COUNT(*) AS c FROM quest_completions WHERE account_id = ?').get(accountId).c;
     const g = db.prepare('SELECT COUNT(*) AS c FROM goals WHERE account_id = ?').get(accountId).c;
@@ -83,5 +94,5 @@ module.exports = function makeState(db) {
     return replaceTx(accountId, data.completed || {}, Array.isArray(data.goals) ? data.goals : [], Array.isArray(data.questGoals) ? data.questGoals : [], Array.isArray(data.presetGoals) ? data.presetGoals : []);
   }
 
-  return { getState, setState, count, importFromVaultMarkdown };
+  return { getState, setState, addQuestCompletion, count, importFromVaultMarkdown };
 };

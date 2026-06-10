@@ -555,6 +555,17 @@ body {
 .checklist-delete-btn { margin-left: auto; padding: 2px 8px; font-size: 11px; background: none; border: 1px solid #c06040; border-radius: 9px; color: #c06040; cursor: pointer; }
 .checklist-delete-btn:hover { background: #fce8e0; }
 .checklist-freq-badge { font-size: 11px; padding: 1px 7px; border-radius: 9px; background: #efe4c4; color: #5a3a10; border: 1px solid #d8c590; }
+/* Timeline (F3.4) */
+.timeline-item { display: flex; align-items: baseline; gap: 10px; padding: 9px 12px; border: 1px solid #d8c590; border-radius: 6px; background: #f6edd4; margin-bottom: 7px; }
+.tl-icon { font-size: 15px; flex: 0 0 auto; }
+.tl-summary { flex: 1; color: #4a3210; font-size: 13px; }
+.tl-time { flex: 0 0 auto; color: #8a6a2a; font-size: 11px; white-space: nowrap; }
+.timeline-empty { padding: 22px; border: 1px dashed #c8a860; border-radius: 8px; background: #f6edd4; color: #5a3e12; text-align: center; }
+.timeline-empty .timeline-hint { font-size: 12px; color: #7a5a22; margin-top: 8px; }
+.timeline-empty code { background: #ece0bc; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+.dash-activity .dash-activity-item { display: flex; align-items: baseline; gap: 9px; padding: 5px 0; border-bottom: 1px solid #ece0bc; }
+.dash-activity .dash-activity-item:last-child { border-bottom: none; }
+.dash-activity-summary { flex: 1; font-size: 12px; color: #4a3210; }
 </style>
 </head>
 <body>
@@ -582,6 +593,7 @@ body {
   <div class="tab"         onclick="switchTab('ai')">🧙 AI Journey</div>
   <div class="tab"         onclick="switchTab('goals')">🎯 Goals</div>
   <div class="tab"         onclick="switchTab('checklist')">📋 Checklist</div>
+  <div class="tab"         onclick="switchTab('timeline')">🛰️ Timeline</div>
   <div class="tab"         onclick="switchTab('chat')">💬 Chat</div>
 </div>
 
@@ -703,6 +715,14 @@ body {
 <div id="tab-checklist" class="tab-content">
   <div class="section-header">Daily &amp; Weekly Checklist <span class="section-sub">Tasks reset automatically · syncs to vault</span></div>
   <div id="checklist-body"></div>
+</div>
+
+<!-- TIMELINE -->
+<div id="tab-timeline" class="tab-content">
+  <div class="section-header">Account Timeline <span class="section-sub">Live feed from RuneLite — level-ups, quests, drops</span>
+    <button class="refresh-btn" id="timeline-refresh-btn" onclick="loadTimeline()">↻ Refresh</button>
+  </div>
+  <div id="timeline-list"></div>
 </div>
 
 <!-- CHAT -->
@@ -1233,6 +1253,69 @@ function scheduleChecklistSave() {
   checklistSaveTimer = setTimeout(saveChecklist, 700);
 }
 
+// ── TIMELINE (passive telemetry feed, F3.4) ─────────────────────────────────────
+let TIMELINE = [];
+const TL_ICON = { level: '🎉', quest: '📜', loot: '💰', other: '📌' };
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function relTime(iso) {
+  const then = new Date(iso).getTime();
+  if (!isFinite(then)) return '';
+  const secs = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (secs < 60)   return 'just now';
+  const mins = Math.round(secs / 60);
+  if (mins < 60)   return mins + 'm ago';
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24)    return hrs + 'h ago';
+  const days = Math.round(hrs / 24);
+  if (days < 30)   return days + 'd ago';
+  return new Date(iso).toLocaleDateString();
+}
+
+async function loadTimeline() {
+  try {
+    const r = await fetch('/api/timeline');
+    if (!r.ok) throw new Error('timeline ' + r.status);
+    const data = await r.json();
+    TIMELINE = Array.isArray(data.events) ? data.events : [];
+  } catch (e) {
+    console.warn('Could not load timeline.', e);
+    TIMELINE = [];
+  }
+  renderTimeline();
+  if (document.getElementById('dash-body')) renderDashboard();
+  // Telemetry may have auto-ticked quests server-side; re-sync durable state so the
+  // Quests/Goals/Dashboard views reflect them.
+  if (typeof loadVaultState === 'function') loadVaultState();
+}
+
+function timelineItemHTML(ev) {
+  return `<div class="timeline-item">
+    <span class="tl-icon">${TL_ICON[ev.type] || '📌'}</span>
+    <span class="tl-summary">${escapeHtml(ev.summary || '')}</span>
+    <span class="tl-time" title="${escapeHtml(ev.occurred_at || '')}">${relTime(ev.occurred_at)}</span>
+  </div>`;
+}
+
+function renderTimeline() {
+  const list = document.getElementById('timeline-list');
+  if (!list) return;
+  if (!TIMELINE.length) {
+    list.innerHTML = `<div class="timeline-empty">
+      <p>No activity yet. Connect RuneLite to see level-ups, quest completions, and drops appear here automatically.</p>
+      <p class="timeline-hint">Install the <strong>Dink</strong> plugin → set its webhook URL to
+      <code>http://localhost:5173/api/ingest</code> → enable Level, Quest, and Loot notifications.</p>
+    </div>`;
+    return;
+  }
+  list.innerHTML = TIMELINE.map(timelineItemHTML).join('');
+}
+
 function renderChecklist() {
   const body = document.getElementById('checklist-body');
   if (!body) return;
@@ -1433,6 +1516,7 @@ function switchTab(name) {
   if (name === 'progress')  renderChart();
   if (name === 'dashboard') renderDashboard();
   if (name === 'checklist') renderChecklist();
+  if (name === 'timeline')  loadTimeline();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
@@ -1748,6 +1832,18 @@ function renderDashboard() {
       ${trendHtml}
     </div>`;
 
+  const activityRows = (TIMELINE || []).slice(0, 5).map(ev =>
+    `<div class="dash-activity-item">
+       <span class="tl-icon">${TL_ICON[ev.type] || '📌'}</span>
+       <span class="dash-activity-summary">${escapeHtml(ev.summary || '')}</span>
+       <span class="tl-time">${relTime(ev.occurred_at)}</span>
+     </div>`).join('');
+  const activityPanel = `
+    <div class="dash-panel dash-activity">
+      <div class="dash-panel-title">🛰️ Recent Activity <a class="dash-link" href="#" onclick="switchTab('timeline');return false;">timeline</a></div>
+      ${activityRows || '<div class="dash-sub">No activity yet — connect RuneLite (Dink) to auto-log level-ups, quests, and drops.</div>'}
+    </div>`;
+
   body.innerHTML = `
     <div class="dash-grid">${tiles}</div>
     ${nextPanel}
@@ -1761,7 +1857,8 @@ function renderDashboard() {
         <div class="dash-panel-title">🎯 Active Goals <a class="dash-link" href="#" onclick="switchTab('goals');return false;">manage</a></div>
         ${goalsHtml}
       </div>
-    </div>`;
+    </div>
+    ${activityPanel}`;
 }
 
 // ── SKILLS ────────────────────────────────────────────────────────────────────
@@ -2750,6 +2847,7 @@ loadXpMethods();             // async: pull XP/hr-per-method data for time-to-go
 loadVaultState();            // async: pull durable state from the vault, then re-render
 loadStats();                 // async: pull live levels + progress history from OSRS Hiscores
 loadChecklist();             // async: pull daily/weekly checklist from SQLite, then re-render
+loadTimeline();              // async: pull telemetry event feed (timeline + dashboard peek)
 loadMoney();                 // async: pull money methods, auto-bucket vs live stats/quests
 loadGephr();                 // async: compute live GP/hr from current GE prices
 </script>

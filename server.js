@@ -19,7 +19,7 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const anthropic = API_KEY ? new Anthropic({ apiKey: API_KEY }) : null;
 
 // SQLite store (history/time-series + account scoping). Vault stays for human notes.
-const { getCurrentAccount, snapshots, state, accountValue, checklist } = require('./db');
+const { getCurrentAccount, snapshots, state, accountValue, checklist, events } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -97,6 +97,98 @@ app.post('/api/account-value', (req, res) => {
       questsPct: clampPct((req.body || {}).questsPct),
     });
     res.json({ ok: true, trend: accountValue.getTrend(account.id) });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ── Telemetry ingest (passive) + Account Timeline (F3.1/F3.4) ─────────────────
+// Receives RuneLite webhooks (Dink today; a custom plugin later) and records them as
+// account-scoped events. Passive only — we never act on the game (ADR D2). Dink posts
+// multipart/form-data with a `payload_json` text field (+ optional screenshot file), so
+// multer parses that one route; raw application/json is still accepted for testing.
+const multer = require('multer');
+const ingestUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const INGEST_TOKEN = process.env.INGEST_TOKEN || '';
+
+const sumLootValue = (items) =>
+  (Array.isArray(items) ? items : []).reduce((s, it) =>
+    s + (Number(it && it.quantity) || 0) * (Number(it && (it.priceEach ?? it.price)) || 0), 0);
+
+// Map a Dink payload → array of { type, summary, data }. Unknown event types fall
+// through to a generic 'other' row so nothing is silently dropped.
+function normalizeDinkEvent(payload) {
+  const p = payload || {};
+  const extra = p.extra || {};
+  const out = [];
+  switch (p.type) {
+    case 'LEVEL': {
+      const levelled = extra.levelledSkills || extra.levelledSkill || {};
+      for (const skill in levelled) {
+        out.push({ type: 'level', summary: `🎉 Reached level ${levelled[skill]} ${skill}`,
+                   data: { skill, level: levelled[skill] } });
+      }
+      if (!out.length && extra.combatLevel && extra.combatLevel.value) {
+        out.push({ type: 'level', summary: `🎉 Combat level ${extra.combatLevel.value}`, data: extra.combatLevel });
+      }
+      break;
+    }
+    case 'QUEST': {
+      const name = extra.questName || extra.quest || '';
+      out.push({ type: 'quest', summary: `📜 Completed quest: ${name || 'Unknown'}`,
+                 data: { questName: name, questPoints: extra.questPoints, completedQuests: extra.completedQuests, totalQuests: extra.totalQuests } });
+      break;
+    }
+    case 'LOOT': {
+      const items = extra.items || [];
+      const value = sumLootValue(items);
+      const names = items.map(it => `${it.name}${it.quantity > 1 ? ' x' + it.quantity : ''}`).filter(Boolean);
+      const src = extra.source || extra.npcName || 'Loot';
+      out.push({ type: 'loot', summary: `💰 ${src}: ${value.toLocaleString()} gp${names.length ? ' (' + names.slice(0, 4).join(', ') + (names.length > 4 ? '…' : '') + ')' : ''}`,
+                 data: { source: src, value, items } });
+      break;
+    }
+    default: {
+      const label = (p.text && String(p.text).trim()) || (p.type ? `${p.type} event` : 'Game event');
+      out.push({ type: 'other', summary: `📌 ${label}`, data: extra });
+    }
+  }
+  return out;
+}
+
+app.post('/api/ingest', ingestUpload.any(), (req, res) => {
+  try {
+    if (INGEST_TOKEN && req.query.token !== INGEST_TOKEN) {
+      return res.status(401).json({ error: 'invalid or missing token' });
+    }
+    let payload = req.body || {};
+    if (payload.payload_json) {
+      try { payload = JSON.parse(payload.payload_json); } catch { return res.status(400).json({ error: 'payload_json is not valid JSON' }); }
+    }
+    const account = getCurrentAccount();
+    const nowIso = new Date().toISOString();
+    const minute = nowIso.slice(0, 16);            // YYYY-MM-DDTHH:mm (dedupe granularity)
+    let stored = 0, questsTicked = 0;
+    for (const ev of normalizeDinkEvent(payload)) {
+      if (ev.type === 'quest' && ev.data && ev.data.questName) {
+        if (state.addQuestCompletion(account.id, ev.data.questName)) questsTicked++;
+      }
+      const inserted = events.addEvent(account.id, {
+        type: ev.type, occurred_at: nowIso, summary: ev.summary, data: ev.data,
+        source: 'dink', dedupe_key: `${ev.type}|${ev.summary}|${minute}`,
+      });
+      if (inserted) stored++;
+    }
+    res.json({ ok: true, stored, questsTicked });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.get('/api/timeline', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json({ events: events.recent(account.id, 50) });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }

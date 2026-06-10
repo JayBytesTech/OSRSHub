@@ -100,6 +100,14 @@ POST /api/ingest        (auth: per-account ingest token)
 The web app derives XP graphs, net-worth graphs, timelines, and "what changed since last
 login" from ingested rows. **Passive only** — the plugin reads game state, never acts.
 
+**Status: partially implemented.** A first slice is live (`POST /api/ingest` + `GET /api/timeline`,
+backed by the `account_events` table and `db/events.js`). It receives webhooks from the existing
+**Dink** RuneLite plugin (no custom Java yet): level-ups, quest completions, and loot drops feed an
+**Account Timeline** (F3.4), and quest completions additionally auto-tick the Quests tab via
+`state.addQuestCompletion()`. Ingest auth is an optional shared `INGEST_TOKEN` (`?token=`), checked
+only if set. Still deferred to a **custom plugin**: bank value (only readable while the bank is open),
+true GP/hr (derived/session-based), and any live override of displayed levels.
+
 ---
 
 ## 3. Migration path (no big-bang rewrites)
