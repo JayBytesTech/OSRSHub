@@ -379,6 +379,23 @@ body {
 .goal-progress-wrap { height: 10px; background: #d4c080; border-radius: 5px; overflow: hidden; }
 .goal-progress-bar { height: 100%; background: linear-gradient(90deg, #1a6aaa, #44aaee); border-radius: 5px; transition: width 0.4s; }
 .goal-xp-info { display: flex; justify-content: space-between; font-size: 11px; color: #6a4a14; margin-top: 5px; flex-wrap: wrap; gap: 4px; }
+/* XP planning (F2.2) */
+.goal-eta { margin-top: 7px; font-size: 12px; font-weight: 700; color: #1d6b10; }
+.goal-eta.muted { color: #8a6a2a; font-weight: 600; }
+.goal-methods { margin-top: 5px; border-top: 1px dashed #c8a860; padding-top: 5px; }
+.goal-method-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: #5a3e12; padding: 2px 0; }
+.goal-method-row.locked { color: #a08a5a; }
+.goal-method-row .gm-hours { font-weight: 700; color: #2a5a8a; }
+.goal-method-row .gm-locked { font-style: italic; }
+.goal-method-row .gm-note { cursor: help; opacity: 0.7; }
+.xp-planner { background: #f0e4c8; border: 1px solid #c8a860; border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; }
+.xp-planner-title { font-weight: 700; color: #4a3210; margin-bottom: 8px; }
+.xp-planner-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.xp-planner-row select, .xp-planner-row input { padding: 6px 8px; border: 1px solid #c8a860; border-radius: 4px; background: #fff8e8; color: #4a3210; }
+.xp-planner-row input { width: 110px; }
+.xp-plan-result { margin-top: 10px; }
+.xp-plan-result .plan-head { font-weight: 700; color: #4a3210; margin-bottom: 4px; }
+.xp-plan-result .plan-msg { font-size: 12px; color: #8a6a2a; }
 .goal-quest-input { width: auto; flex: 1; min-width: 220px; }
 .quest-goal-card .goal-skill-name a { color: inherit; text-decoration: none; }
 .quest-goal-card .goal-skill-name a:hover { text-decoration: underline; }
@@ -580,6 +597,15 @@ body {
 <div id="tab-skills" class="tab-content">
   <div class="section-header">Skills <span class="section-sub">Green numbers = gained since your last refresh</span>
     <button class="refresh-btn" id="refresh-btn" onclick="loadStats(true)">⟳ Refresh stats</button>
+  </div>
+  <div class="xp-planner" id="xp-planner">
+    <div class="xp-planner-title">⏱ XP Planner <span class="section-sub">estimate hours to any level — no goal needed</span></div>
+    <div class="xp-planner-row">
+      <select id="plan-skill"><option value="">Select skill…</option></select>
+      <input id="plan-target" type="number" min="2" max="99" placeholder="Target lvl" />
+      <button class="add-goal-btn" onclick="renderXpPlan()">Estimate</button>
+    </div>
+    <div class="xp-plan-result" id="xp-plan-result"></div>
   </div>
   <div class="skills-grid" id="skills-grid"></div>
   <div class="data-note">📅 Stats are embedded from the last Hiscores fetch (June 8, 2026). To update, ask Claude: "Refresh my OSRS hub stats."</div>
@@ -1002,6 +1028,80 @@ async function loadQuestData() {
   if (document.getElementById('quest-list')) renderQuests();
   if (document.getElementById('goals-list')) renderGoals();
   if (document.getElementById('dash-body')) renderDashboard();
+}
+
+// ── XP PLANNING (F2.2) ──────────────────────────────────────────────────────────
+// Loaded at startup from /xp-methods.json (structured reference data, like quest-data).
+// Shape: { Skill: [ { name, xphr, req?{Skill:level}, note? } ] }. Used to turn
+// "XP remaining" into "~N hours at <method>". Starts empty so the app works if the
+// fetch fails — goal cards then simply omit the time estimate.
+let XP_METHODS = {};
+
+async function loadXpMethods() {
+  try {
+    const r = await fetch('/xp-methods.json', { cache: 'no-cache' });
+    if (!r.ok) throw new Error('xp-methods ' + r.status);
+    const data = await r.json();
+    XP_METHODS = (data && data.skills) || {};
+  } catch (e) {
+    console.warn('Could not load xp-methods.json — time-to-goal estimates will be hidden.', e);
+    XP_METHODS = {};
+  }
+  if (document.getElementById('goals-list')) renderGoals();
+  if (document.getElementById('skills-grid')) renderSkills();
+  if (document.getElementById('dash-body')) renderDashboard();
+}
+
+// Methods for a skill, annotated with unlock state + hours for the given xpLeft,
+// sorted unlocked-first then fastest-first. Empty array when the skill has no entry.
+function methodsForSkill(skill, curLevel, xpLeft) {
+  const list = XP_METHODS[skill];
+  if (!Array.isArray(list)) return [];
+  return list.map(m => {
+    const need = (m.req && typeof m.req[skill] === 'number') ? m.req[skill] : 1;
+    return { ...m, reqLevel: need, unlocked: curLevel >= need, hours: m.xphr > 0 ? xpLeft / m.xphr : Infinity };
+  }).sort((a, b) => (a.unlocked === b.unlocked) ? (b.xphr - a.xphr) : (a.unlocked ? -1 : 1));
+}
+
+// Fastest method already unlocked at the current level (or null).
+function bestMethod(skill, curLevel) {
+  let best = null;
+  for (const m of (XP_METHODS[skill] || [])) {
+    const need = (m.req && typeof m.req[skill] === 'number') ? m.req[skill] : 1;
+    if (curLevel < need) continue;
+    if (!best || m.xphr > best.xphr) best = m;
+  }
+  return best;
+}
+
+function fmtHours(h) {
+  if (!isFinite(h) || h <= 0) return '0 hrs';
+  if (h < 1) return '<1 hr';
+  const r = Math.round(h);
+  return r.toLocaleString() + ' hr' + (r === 1 ? '' : 's');
+}
+
+// Shared time-to-goal block (goal cards + ad-hoc planner). Returns '' when there's
+// no dataset entry for the skill, so callers degrade gracefully.
+function xpPlanHTML(skill, curLevel, xpLeft) {
+  if (xpLeft <= 0) return '';
+  const methods = methodsForSkill(skill, curLevel, xpLeft);
+  if (!methods.length) return '';
+  const unlocked = methods.filter(m => m.unlocked);
+  const headline = unlocked.length
+    ? `<div class="goal-eta">⏱ ~${fmtHours(unlocked[0].hours)} at ${unlocked[0].name}</div>`
+    : `<div class="goal-eta muted">⏱ no method unlocked yet at level ${curLevel}</div>`;
+  const rows = methods.map(m => {
+    const right = m.unlocked
+      ? `<span class="gm-hours">${fmtHours(m.hours)}</span>`
+      : `<span class="gm-locked">needs ${m.reqLevel}</span>`;
+    const note = m.note ? `<span class="gm-note" title="${m.note.replace(/"/g, '&quot;')}">ⓘ</span>` : '';
+    return `<div class="goal-method-row${m.unlocked ? '' : ' locked'}">
+      <span class="gm-name">${m.name} ${note}</span>
+      <span class="gm-right">${fmt(m.xphr)}/hr · ${right}</span>
+    </div>`;
+  }).join('');
+  return headline + `<div class="goal-methods">${rows}</div>`;
 }
 
 // ── PERSISTENCE / SYNC ──────────────────────────────────────────────────────────
@@ -1499,8 +1599,10 @@ function nextActions() {
     const targetXP = xpForLevel(g.target), curLvlXP = xpForLevel(curLvl);
     const need = targetXP - curLvlXP, got = curXP - curLvlXP;
     const pct = need > 0 ? Math.min(100, (got / need) * 100) : 100;
+    const bm = bestMethod(g.skill, curLvl);
+    const eta = bm ? ` · ~${fmtHours(Math.max(0, targetXP - curXP) / bm.xphr)}` : '';
     skillRows.push({ icon: '📈', title: `Train ${g.skill} to ${g.target}`,
-                     reason: `${fmt(Math.max(0, targetXP - curXP))} XP to go · ${pct.toFixed(0)}%`,
+                     reason: `${fmt(Math.max(0, targetXP - curXP))} XP to go · ${pct.toFixed(0)}%${eta}`,
                      onclick: `switchTab('goals')`, _pct: pct });
   }
   skillRows.sort((a, b) => b._pct - a._pct).forEach(r => out.push(r));
@@ -1577,8 +1679,10 @@ function renderDashboard() {
       const targetXP = xpForLevel(g.target), curLvlXP = xpForLevel(curLvl);
       const need = targetXP - curLvlXP, got = curXP - curLvlXP;
       const pct  = need > 0 ? Math.min(100, (got / need) * 100).toFixed(0) : '100';
+      const bm   = bestMethod(g.skill, curLvl);
+      const eta  = (bm && curLvl < g.target) ? ` · ~${fmtHours(Math.max(0, targetXP - curXP) / bm.xphr)}` : '';
       return `<div class="dash-goal">
-        <div class="dash-goal-top"><span>${SKILL_EMOJIS[g.skill]} ${g.skill}</span><span class="dash-goal-lvl">Lvl ${curLvl} → ${g.target} · ${pct}%</span></div>
+        <div class="dash-goal-top"><span>${SKILL_EMOJIS[g.skill]} ${g.skill}</span><span class="dash-goal-lvl">Lvl ${curLvl} → ${g.target} · ${pct}%${eta}</span></div>
         <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div>
       </div>`;
     }).join('');
@@ -1712,6 +1816,41 @@ function renderSkills() {
       </div>`;
     grid.appendChild(card);
   });
+  populateXpPlannerSkills();
+}
+
+// Ad-hoc XP planner (F2.2): estimate hours to any level without committing a goal.
+// Reads live STATS only; never touches goals / localStorage / SQLite.
+function populateXpPlannerSkills() {
+  const sel = document.getElementById('plan-skill');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Select skill…</option>';
+  SKILL_NAMES.slice(1).forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    sel.appendChild(opt);
+  });
+  if (cur) sel.value = cur;
+}
+
+function renderXpPlan() {
+  const out = document.getElementById('xp-plan-result');
+  const skill = document.getElementById('plan-skill').value;
+  const target = parseInt(document.getElementById('plan-target').value, 10);
+  if (!out) return;
+  if (!skill) { out.innerHTML = '<div class="plan-msg">Pick a skill first.</div>'; return; }
+  if (!Number.isInteger(target) || target < 2 || target > 99) {
+    out.innerHTML = '<div class="plan-msg">Enter a target level between 2 and 99.</div>'; return;
+  }
+  const [, curLvl, curXP] = STATS[skill] || [0, 1, 0];
+  if (target <= curLvl) {
+    out.innerHTML = `<div class="plan-msg">You're already ${curLvl} ${skill} — pick a higher target.</div>`; return;
+  }
+  const xpLeft = Math.max(0, xpForLevel(target) - curXP);
+  const plan = xpPlanHTML(skill, curLvl, xpLeft);
+  out.innerHTML = `<div class="plan-head">${SKILL_EMOJIS[skill]} ${skill}: ${curLvl} → ${target} · ${fmt(xpLeft)} XP to go</div>`
+    + (plan || '<div class="plan-msg">No training-method data for this skill yet.</div>');
 }
 
 // ── QUEST GATING ────────────────────────────────────────────────────────────────
@@ -2349,7 +2488,8 @@ function renderGoals() {
       <div class="goal-xp-info">
         <span>${fmt(curXP)} / ${fmt(targetXP)} XP</span>
         <span>${pct}% · ${fmt(xpLeft)} XP to go</span>
-      </div>`;
+      </div>
+      ${xpPlanHTML(g.skill, curLvl, xpLeft)}`;
     list.appendChild(card);
   });
 
@@ -2606,6 +2746,7 @@ renderGains();
 loadSavedAI();
 commitSnapshot();            // record current levels for next-visit gain detection
 loadQuestData();             // async: pull structured quest requirement data, then re-render
+loadXpMethods();             // async: pull XP/hr-per-method data for time-to-goal estimates
 loadVaultState();            // async: pull durable state from the vault, then re-render
 loadStats();                 // async: pull live levels + progress history from OSRS Hiscores
 loadChecklist();             // async: pull daily/weekly checklist from SQLite, then re-render

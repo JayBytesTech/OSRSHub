@@ -1,0 +1,122 @@
+{
+  "_meta": {
+    "source": "OSRS Wiki — approximate mid-game / common-meta XP/hr (mid-2025).",
+    "note": "Rates are approximate and vary with gear, tick-manipulation, host worlds, and efficiency. Used only to estimate hours-to-goal; treat as a ballpark, not a promise.",
+    "schema": "skills{ <Skill>: [ { name, xphr, req?{Skill:level}, note? } ] }"
+  },
+  "skills": {
+    "Attack": [
+      { "name": "Nightmare Zone (afk)", "xphr": 70000, "req": { "Attack": 60 }, "note": "Higher with absorptions + flicked overloads" },
+      { "name": "Slayer tasks (cannon/melee)", "xphr": 45000, "req": { "Attack": 50 } },
+      { "name": "Sand Crabs", "xphr": 35000, "req": { "Attack": 30 } }
+    ],
+    "Strength": [
+      { "name": "Nightmare Zone (afk)", "xphr": 80000, "req": { "Strength": 60 } },
+      { "name": "Slayer tasks (melee)", "xphr": 45000, "req": { "Strength": 50 } },
+      { "name": "Sand Crabs", "xphr": 40000, "req": { "Strength": 30 } }
+    ],
+    "Defence": [
+      { "name": "Nightmare Zone (afk)", "xphr": 70000, "req": { "Defence": 60 } },
+      { "name": "Slayer tasks (defensive)", "xphr": 40000, "req": { "Defence": 40 } },
+      { "name": "Sand Crabs", "xphr": 35000, "req": { "Defence": 30 } }
+    ],
+    "Hitpoints": [
+      { "name": "Nightmare Zone (controlled)", "xphr": 55000, "req": { "Hitpoints": 50 }, "note": "Trains passively alongside melee/range/mage" }
+    ],
+    "Ranged": [
+      { "name": "Chinning (MM2 caves)", "xphr": 650000, "req": { "Ranged": 80 }, "note": "Very click-intensive; requires Monkey Madness II" },
+      { "name": "Nightmare Zone (afk)", "xphr": 90000, "req": { "Ranged": 60 } },
+      { "name": "Cannon + slayer", "xphr": 50000, "req": { "Ranged": 40 } }
+    ],
+    "Magic": [
+      { "name": "Ice Barrage (bursting/barraging)", "xphr": 250000, "req": { "Magic": 94 }, "note": "Nechryael / Maniacal monkeys" },
+      { "name": "High Alchemy", "xphr": 78000, "req": { "Magic": 55 }, "note": "Profit/loss depends on items" },
+      { "name": "Splashing (afk)", "xphr": 30000, "req": { "Magic": 1 } }
+    ],
+    "Prayer": [
+      { "name": "Wrath altar (dragon bones)", "xphr": 700000, "req": { "Prayer": 1 }, "note": "Expensive; ~half rate with gilded altar" },
+      { "name": "Ourania / gilded altar bones", "xphr": 350000, "req": { "Prayer": 1 } },
+      { "name": "Ensouled heads (Arceuus)", "xphr": 250000, "req": { "Prayer": 1 } }
+    ],
+    "Cooking": [
+      { "name": "Wines (Zeah)", "xphr": 480000, "req": { "Cooking": 65 }, "note": "1-tick wines at high level" },
+      { "name": "Karambwans", "xphr": 300000, "req": { "Cooking": 30 } },
+      { "name": "Sharks / monkfish", "xphr": 130000, "req": { "Cooking": 80 } }
+    ],
+    "Woodcutting": [
+      { "name": "Redwoods", "xphr": 70000, "req": { "Woodcutting": 90 } },
+      { "name": "Teak trees (2-tick)", "xphr": 150000, "req": { "Woodcutting": 35 }, "note": "Tick-manip; afk teaks ~45k" },
+      { "name": "Willows / Yews (afk)", "xphr": 45000, "req": { "Woodcutting": 30 } }
+    ],
+    "Fletching": [
+      { "name": "Broad bolts / dragon darts", "xphr": 500000, "req": { "Fletching": 70 } },
+      { "name": "Adamant darts", "xphr": 270000, "req": { "Fletching": 67 } },
+      { "name": "Bows (cut + string)", "xphr": 120000, "req": { "Fletching": 35 } }
+    ],
+    "Fishing": [
+      { "name": "Barbarian Fishing", "xphr": 45000, "req": { "Fishing": 48 }, "note": "Higher with 3-tick; trains Agility + Strength too" },
+      { "name": "Tempoross", "xphr": 70000, "req": { "Fishing": 35 } },
+      { "name": "Drift net fishing", "xphr": 55000, "req": { "Fishing": 47 } }
+    ],
+    "Firemaking": [
+      { "name": "Wintertodt", "xphr": 300000, "req": { "Firemaking": 50 }, "note": "Also gives skilling supplies" },
+      { "name": "Burning redwood/yew logs", "xphr": 200000, "req": { "Firemaking": 60 } },
+      { "name": "Burning logs (early)", "xphr": 60000, "req": { "Firemaking": 1 } }
+    ],
+    "Crafting": [
+      { "name": "Gem cutting / battlestaves", "xphr": 280000, "req": { "Crafting": 66 } },
+      { "name": "Green/blue d'hide bodies", "xphr": 180000, "req": { "Crafting": 63 } },
+      { "name": "Glassblowing", "xphr": 90000, "req": { "Crafting": 46 } }
+    ],
+    "Smithing": [
+      { "name": "Blast Furnace (gold bars)", "xphr": 350000, "req": { "Smithing": 40 }, "note": "Goldsmith gauntlets" },
+      { "name": "Cannonballs", "xphr": 35000, "req": { "Smithing": 35 }, "note": "Afk profit" },
+      { "name": "Giants' Foundry", "xphr": 220000, "req": { "Smithing": 15 } }
+    ],
+    "Mining": [
+      { "name": "Motherlode Mine", "xphr": 50000, "req": { "Mining": 30 }, "note": "Afk; nuggets for prospector kit" },
+      { "name": "Iron (3-tick power-mine)", "xphr": 90000, "req": { "Mining": 15 }, "note": "Click-intensive" },
+      { "name": "Volcanic Mine", "xphr": 80000, "req": { "Mining": 50 } }
+    ],
+    "Herblore": [
+      { "name": "Super combat / divine potions", "xphr": 400000, "req": { "Herblore": 90 } },
+      { "name": "Prayer potions", "xphr": 280000, "req": { "Herblore": 38 } },
+      { "name": "Cleaning herbs (early)", "xphr": 60000, "req": { "Herblore": 1 } }
+    ],
+    "Agility": [
+      { "name": "Hallowed Sepulchre", "xphr": 90000, "req": { "Agility": 72 }, "note": "Best at floor 5 (lvl 92)" },
+      { "name": "Ardougne Rooftop Course", "xphr": 60000, "req": { "Agility": 90 } },
+      { "name": "Canifis Rooftop Course", "xphr": 50000, "req": { "Agility": 40 } }
+    ],
+    "Thieving": [
+      { "name": "Blackjacking (Pyramid Plunder mix)", "xphr": 250000, "req": { "Thieving": 65 } },
+      { "name": "Ardougne Knights (with splash)", "xphr": 230000, "req": { "Thieving": 55 } },
+      { "name": "Pickpocketing master farmers", "xphr": 100000, "req": { "Thieving": 38 } }
+    ],
+    "Slayer": [
+      { "name": "Efficient slayer (cannon/burst)", "xphr": 55000, "req": { "Slayer": 50 } },
+      { "name": "Konar / Nieve tasks", "xphr": 35000, "req": { "Slayer": 35 } },
+      { "name": "Early slayer (Turael skip)", "xphr": 18000, "req": { "Slayer": 1 } }
+    ],
+    "Farming": [
+      { "name": "Tree + herb runs", "xphr": 120000, "req": { "Farming": 60 }, "note": "Burst XP per run, not continuous" },
+      { "name": "Tithe Farm", "xphr": 100000, "req": { "Farming": 34 } },
+      { "name": "Allotments + herbs (early)", "xphr": 40000, "req": { "Farming": 1 } }
+    ],
+    "Runecraft": [
+      { "name": "Blood/soul runes (Arceuus)", "xphr": 45000, "req": { "Runecraft": 77 } },
+      { "name": "Guardians of the Rift", "xphr": 50000, "req": { "Runecraft": 27 }, "note": "Also gives rewards + pet chance" },
+      { "name": "Lava runes (ring of dueling)", "xphr": 40000, "req": { "Runecraft": 23 } }
+    ],
+    "Hunter": [
+      { "name": "Black chinchompas", "xphr": 250000, "req": { "Hunter": 80 }, "note": "Wilderness; risk involved" },
+      { "name": "Red chinchompas", "xphr": 130000, "req": { "Hunter": 63 } },
+      { "name": "Birdhouse runs", "xphr": 40000, "req": { "Hunter": 5 }, "note": "Passive; ~5 min per run" }
+    ],
+    "Construction": [
+      { "name": "Mahogany tables / oak larders", "xphr": 600000, "req": { "Construction": 52 }, "note": "Expensive; needs butler" },
+      { "name": "Oak larders", "xphr": 480000, "req": { "Construction": 33 } },
+      { "name": "Crude wooden chairs (early)", "xphr": 20000, "req": { "Construction": 1 } }
+    ]
+  }
+}

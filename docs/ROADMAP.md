@@ -66,10 +66,10 @@ and the dashboard recommends agreeable next actions.
 *Make progress measurable and motivating.*
 
 - ⚪ **F2.1** Money-maker analytics: historical GP/hr, profit per activity, wealth-over-time charts.
-- ⚪ **F2.2** XP planning: per-skill XP-remaining + time-to-goal per method.
+- 🟢 **F2.2** XP planning: per-skill XP-remaining + time-to-goal per method (curated XP/hr dataset + ad-hoc planner).
 - ⚪ **F2.3** Achievement-diary planner (per region).
-- ⚪ **F2.4** Daily/weekly checklist with reset timers.
-- ⚪ **F2.5** Account Value score, trended over time.
+- 🟢 **F2.4** Daily/weekly checklist with reset timers.
+- 🟢 **F2.5** Account Value score, trended over time.
 - ⚪ Frontend modularization if/when `index.html` interactivity outgrows hand-editing (ADR first).
 
 **Exit criteria:** the hub shows trends over time, not just current state.
