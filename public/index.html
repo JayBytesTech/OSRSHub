@@ -719,7 +719,7 @@ body {
 
 <!-- TIMELINE -->
 <div id="tab-timeline" class="tab-content">
-  <div class="section-header">Account Timeline <span class="section-sub">Live feed from RuneLite — level-ups, quests, drops</span>
+  <div class="section-header">Account Timeline <span class="section-sub" id="timeline-sub">Live feed from RuneLite — level-ups, quests, drops</span>
     <button class="refresh-btn" id="timeline-refresh-btn" onclick="loadTimeline()">↻ Refresh</button>
   </div>
   <div id="timeline-list"></div>
@@ -1277,7 +1277,11 @@ function relTime(iso) {
   return new Date(iso).toLocaleDateString();
 }
 
-async function loadTimeline() {
+// loadTimeline(opts): opts.quiet skips the durable-state re-sync (used by the poll, so
+// the Quests/Goals views don't churn every cycle). The manual button + tab-open do a
+// full sync so freshly auto-ticked quests show up.
+async function loadTimeline(opts) {
+  const quiet = opts && opts.quiet;
   try {
     const r = await fetch('/api/timeline');
     if (!r.ok) throw new Error('timeline ' + r.status);
@@ -1290,8 +1294,23 @@ async function loadTimeline() {
   renderTimeline();
   if (document.getElementById('dash-body')) renderDashboard();
   // Telemetry may have auto-ticked quests server-side; re-sync durable state so the
-  // Quests/Goals/Dashboard views reflect them.
-  if (typeof loadVaultState === 'function') loadVaultState();
+  // Quests/Goals/Dashboard views reflect them (skipped on quiet poll cycles).
+  if (!quiet && typeof loadVaultState === 'function') loadVaultState();
+}
+
+// Auto-refresh while the Timeline tab is open, so events appear without a manual click.
+const TIMELINE_POLL_MS = 30000;
+let timelinePollTimer = null;
+function startTimelinePolling() {
+  stopTimelinePolling();
+  timelinePollTimer = setInterval(() => {
+    const tab = document.getElementById('tab-timeline');
+    if (tab && tab.classList.contains('active')) loadTimeline({ quiet: true });
+    else stopTimelinePolling();   // self-clean if the tab was left
+  }, TIMELINE_POLL_MS);
+}
+function stopTimelinePolling() {
+  if (timelinePollTimer) { clearInterval(timelinePollTimer); timelinePollTimer = null; }
 }
 
 function timelineItemHTML(ev) {
@@ -1305,6 +1324,12 @@ function timelineItemHTML(ev) {
 function renderTimeline() {
   const list = document.getElementById('timeline-list');
   if (!list) return;
+  const sub = document.getElementById('timeline-sub');
+  if (sub) {
+    sub.textContent = TIMELINE.length
+      ? `${TIMELINE.length} event${TIMELINE.length === 1 ? '' : 's'} · auto-refreshes every ${TIMELINE_POLL_MS / 1000}s · updated ${new Date().toLocaleTimeString()}`
+      : 'Live feed from RuneLite — level-ups, quests, drops';
+  }
   if (!TIMELINE.length) {
     list.innerHTML = `<div class="timeline-empty">
       <p>No activity yet. Connect RuneLite to see level-ups, quest completions, and drops appear here automatically.</p>
@@ -1516,7 +1541,8 @@ function switchTab(name) {
   if (name === 'progress')  renderChart();
   if (name === 'dashboard') renderDashboard();
   if (name === 'checklist') renderChecklist();
-  if (name === 'timeline')  loadTimeline();
+  if (name === 'timeline')  { loadTimeline(); startTimelinePolling(); }
+  else stopTimelinePolling();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────

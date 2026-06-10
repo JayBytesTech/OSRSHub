@@ -168,8 +168,9 @@ app.post('/api/ingest', ingestUpload.any(), (req, res) => {
     const account = getCurrentAccount();
     const nowIso = new Date().toISOString();
     const minute = nowIso.slice(0, 16);            // YYYY-MM-DDTHH:mm (dedupe granularity)
+    const normalized = normalizeDinkEvent(payload);
     let stored = 0, questsTicked = 0;
-    for (const ev of normalizeDinkEvent(payload)) {
+    for (const ev of normalized) {
       if (ev.type === 'quest' && ev.data && ev.data.questName) {
         if (state.addQuestCompletion(account.id, ev.data.questName)) questsTicked++;
       }
@@ -179,6 +180,7 @@ app.post('/api/ingest', ingestUpload.any(), (req, res) => {
       });
       if (inserted) stored++;
     }
+    console.log(`[ingest] type=${(payload && payload.type) || '?'} received=${normalized.length} stored=${stored}${questsTicked ? ` questsTicked=${questsTicked}` : ''}`);
     res.json({ ok: true, stored, questsTicked });
   } catch (e) {
     res.status(500).json({ error: String(e) });
