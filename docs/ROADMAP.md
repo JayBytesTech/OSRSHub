@@ -83,7 +83,9 @@ and the dashboard recommends agreeable next actions.
   quests, loot → `account_events`; quests auto-tick). Custom-plugin payloads (bank, GP/hr) still pending.
 - ⚪ **F3.2** RuneLite plugin (passive telemetry: XP, loot, bank, KC, clues, sessions). *Dink covers the
   common events today; a custom plugin is only needed for bank value + true GP/hr.*
-- ⚪ **F3.3** Boss & collection-log dashboards (KC, PB, profit, deaths, log completion, missing items).
+- 🟡 **F3.3** Boss & collection-log dashboards (KC, PB, profit, deaths, log completion, missing items) —
+  **Loot & Wealth view live** (GP from drops, per-source breakdown, biggest drops, true KC from Dink
+  `KILL_COUNT`). Collection-log / PB / deaths dashboards still pending.
 - 🟡 **F3.4** Account timeline (living feed of level-ups, drops, completions, net-worth changes) —
   timeline tab + dashboard peek live; net-worth changes await the custom plugin.
 - ⚪ Real auth + sessions: turn `getCurrentAccount()` into actual accounts.

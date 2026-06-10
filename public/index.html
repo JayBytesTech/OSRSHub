@@ -566,6 +566,17 @@ body {
 .dash-activity .dash-activity-item { display: flex; align-items: baseline; gap: 9px; padding: 5px 0; border-bottom: 1px solid #ece0bc; }
 .dash-activity .dash-activity-item:last-child { border-bottom: none; }
 .dash-activity-summary { flex: 1; font-size: 12px; color: #4a3210; }
+/* Loot & Wealth (F3.3) */
+.loot-headline { background: #f6edd4; border: 1px solid #d8c590; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+.loot-headline-num { font-size: 30px; font-weight: 800; color: #1d6b10; }
+.loot-headline-unit { font-size: 16px; font-weight: 600; color: #5a7a3a; }
+.loot-section-title { font-weight: 700; color: #4a3210; margin: 14px 0 7px; }
+.loot-table { width: 100%; border-collapse: collapse; background: #f6edd4; border: 1px solid #d8c590; border-radius: 6px; overflow: hidden; }
+.loot-table th, .loot-table td { padding: 7px 12px; text-align: left; font-size: 13px; border-bottom: 1px solid #e6d8b4; }
+.loot-table th { background: #ece0bc; color: #4a3210; font-weight: 700; }
+.loot-table tr:last-child td { border-bottom: none; }
+.loot-table .loot-num { text-align: right; font-variant-numeric: tabular-nums; }
+.loot-biggest .timeline-item { margin-bottom: 6px; }
 </style>
 </head>
 <body>
@@ -594,6 +605,7 @@ body {
   <div class="tab"         onclick="switchTab('goals')">🎯 Goals</div>
   <div class="tab"         onclick="switchTab('checklist')">📋 Checklist</div>
   <div class="tab"         onclick="switchTab('timeline')">🛰️ Timeline</div>
+  <div class="tab"         onclick="switchTab('loot')">🪙 Loot</div>
   <div class="tab"         onclick="switchTab('chat')">💬 Chat</div>
 </div>
 
@@ -723,6 +735,15 @@ body {
     <button class="refresh-btn" id="timeline-refresh-btn" onclick="loadTimeline()">↻ Refresh</button>
   </div>
   <div id="timeline-list"></div>
+</div>
+
+<!-- LOOT -->
+<div id="tab-loot" class="tab-content">
+  <div class="section-header">Loot &amp; Wealth <span class="section-sub">GP earned from drops, by source · from RuneLite (Dink)</span>
+    <button class="refresh-btn" id="loot-refresh-btn" onclick="loadLoot()">↻ Refresh</button>
+  </div>
+  <div id="loot-summary"></div>
+  <div id="loot-body"></div>
 </div>
 
 <!-- CHAT -->
@@ -1255,7 +1276,7 @@ function scheduleChecklistSave() {
 
 // ── TIMELINE (passive telemetry feed, F3.4) ─────────────────────────────────────
 let TIMELINE = [];
-const TL_ICON = { level: '🎉', quest: '📜', loot: '💰', other: '📌' };
+const TL_ICON = { level: '🎉', quest: '📜', loot: '💰', kc: '⚔️', other: '📌' };
 
 function escapeHtml(s) {
   return String(s == null ? '' : s)
@@ -1339,6 +1360,75 @@ function renderTimeline() {
     return;
   }
   list.innerHTML = TIMELINE.map(timelineItemHTML).join('');
+}
+
+// ── LOOT & WEALTH (aggregated from telemetry, F3.3 start) ───────────────────────
+let LOOT_SUMMARY = { totalValue: 0, dropCount: 0, bySource: [], biggestDrops: [], wealth: { dates: [], cumulative: [] } };
+
+async function loadLoot() {
+  try {
+    const r = await fetch('/api/loot');
+    if (!r.ok) throw new Error('loot ' + r.status);
+    LOOT_SUMMARY = await r.json();
+  } catch (e) {
+    console.warn('Could not load loot summary.', e);
+    LOOT_SUMMARY = { totalValue: 0, dropCount: 0, bySource: [], biggestDrops: [], wealth: { dates: [], cumulative: [] } };
+  }
+  renderLoot();
+  if (document.getElementById('dash-body')) renderDashboard();
+}
+
+function renderLoot() {
+  const summary = document.getElementById('loot-summary');
+  const body = document.getElementById('loot-body');
+  if (!summary || !body) return;
+
+  const s = LOOT_SUMMARY;
+  if (!s.dropCount) {
+    summary.innerHTML = '';
+    body.innerHTML = `<div class="timeline-empty">
+      <p>No drops logged yet. Loot and kill counts populate automatically from RuneLite.</p>
+      <p class="timeline-hint">In the <strong>Dink</strong> plugin, enable <strong>Loot</strong> (and <strong>Kill Count</strong>) notifications.
+      Drops above Dink's value/rarity threshold are logged here, valued at their drop-time GE price.</p>
+    </div>`;
+    return;
+  }
+
+  const w = s.wealth || { dates: [], cumulative: [] };
+  const chart = (w.cumulative && w.cumulative.length >= 2)
+    ? `<div class="dash-spark-wrap">${sparklineSVG(w.cumulative, { w: 320, h: 48 })}
+         <div class="dash-spark-ends"><span>${fmt(w.cumulative[0])} · ${String(w.dates[0]).slice(5)}</span><span>${fmt(w.cumulative[w.cumulative.length - 1])} · ${String(w.dates[w.dates.length - 1]).slice(5)}</span></div>
+       </div>`
+    : `<div class="dash-sub" style="margin-top:8px">📈 Wealth trend builds as you log drops across more days.</div>`;
+
+  summary.innerHTML = `<div class="loot-headline">
+      <div class="loot-headline-num">💰 ${fmt(s.totalValue)} <span class="loot-headline-unit">gp</span></div>
+      <div class="dash-sub">from ${s.dropCount} drop${s.dropCount === 1 ? '' : 's'} · drop-time GE value</div>
+      ${chart}
+    </div>`;
+
+  const sourceRows = s.bySource.map(row => `<tr>
+      <td>${escapeHtml(row.source)}</td>
+      <td class="loot-num">${row.dropCount}</td>
+      <td class="loot-num">${fmt(row.totalValue)}</td>
+      <td class="loot-num">${fmt(row.biggest)}</td>
+      <td class="loot-num">${row.kc != null ? row.kc.toLocaleString() : '—'}</td>
+    </tr>`).join('');
+
+  const biggestRows = s.biggestDrops.map(d => `<div class="timeline-item">
+      <span class="tl-icon">💰</span>
+      <span class="tl-summary">${escapeHtml(d.summary)}</span>
+      <span class="tl-time">${relTime(d.occurred_at)}</span>
+    </div>`).join('');
+
+  body.innerHTML = `
+    <div class="loot-section-title">By source</div>
+    <table class="loot-table">
+      <thead><tr><th>Source</th><th class="loot-num">Drops</th><th class="loot-num">Total value</th><th class="loot-num">Biggest</th><th class="loot-num">KC</th></tr></thead>
+      <tbody>${sourceRows}</tbody>
+    </table>
+    <div class="loot-section-title">Biggest drops</div>
+    <div class="loot-biggest">${biggestRows}</div>`;
 }
 
 function renderChecklist() {
@@ -1543,6 +1633,7 @@ function switchTab(name) {
   if (name === 'checklist') renderChecklist();
   if (name === 'timeline')  { loadTimeline(); startTimelinePolling(); }
   else stopTimelinePolling();
+  if (name === 'loot')      loadLoot();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
@@ -1768,6 +1859,9 @@ function renderDashboard() {
     tile('📜', 'Quest Points', `${earnedQP} <span class="dash-frac">/ ${TOTAL_QP}</span>`, `${doneQuests.length} / ${QUESTS.length} quests done`) +
     tile('✅', 'Ready Quests', readyCount, 'can start now →', { cls: 'dash-clickable', onclick: "switchTab('quests')", title: 'Go to Quests' }) +
     (() => { const cs = checklistSummary(); return tile('📋', 'Dailies', cs.dailyDone === cs.dailyTotal && cs.dailyTotal > 0 ? '✓ All done' : `${cs.dailyDone} / ${cs.dailyTotal}`, cs.weeklyLeft > 0 ? `${cs.weeklyLeft} weekly left` : cs.dailyTotal === 0 ? 'no tasks set up' : 'weeklies done', cs.dailyTotal > 0 ? { cls: 'dash-clickable', onclick: "switchTab('checklist')", title: 'Go to Checklist' } : null); })() +
+    (LOOT_SUMMARY.dropCount > 0
+      ? tile('🪙', 'Loot Logged', fmt(LOOT_SUMMARY.totalValue), `${LOOT_SUMMARY.dropCount} drop${LOOT_SUMMARY.dropCount === 1 ? '' : 's'} →`, { cls: 'dash-clickable', onclick: "switchTab('loot')", title: 'Go to Loot' })
+      : stub('🪙', 'Loot Logged')) +
     stub('🏦', 'Bank Value') +
     stub('🗺️', 'Diaries') +
     stub('📒', 'Collection Log');
@@ -2874,6 +2968,7 @@ loadVaultState();            // async: pull durable state from the vault, then r
 loadStats();                 // async: pull live levels + progress history from OSRS Hiscores
 loadChecklist();             // async: pull daily/weekly checklist from SQLite, then re-render
 loadTimeline();              // async: pull telemetry event feed (timeline + dashboard peek)
+loadLoot();                  // async: pull aggregated loot/wealth summary (Loot tab + tile)
 loadMoney();                 // async: pull money methods, auto-bucket vs live stats/quests
 loadGephr();                 // async: compute live GP/hr from current GE prices
 </script>

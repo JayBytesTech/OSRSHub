@@ -145,7 +145,14 @@ function normalizeDinkEvent(payload) {
       const names = items.map(it => `${it.name}${it.quantity > 1 ? ' x' + it.quantity : ''}`).filter(Boolean);
       const src = extra.source || extra.npcName || 'Loot';
       out.push({ type: 'loot', summary: `💰 ${src}: ${value.toLocaleString()} gp${names.length ? ' (' + names.slice(0, 4).join(', ') + (names.length > 4 ? '…' : '') + ')' : ''}`,
-                 data: { source: src, value, items } });
+                 data: { source: src, value, items, category: extra.category || null } });
+      break;
+    }
+    case 'KILL_COUNT': {
+      const boss = extra.boss || extra.bossName || extra.source || 'Boss';
+      const count = Number(extra.count != null ? extra.count : extra.killCount);
+      out.push({ type: 'kc', summary: `⚔️ ${boss} KC: ${Number.isFinite(count) ? count.toLocaleString() : '?'}`,
+                 data: { boss, count: Number.isFinite(count) ? count : null } });
       break;
     }
     default: {
@@ -191,6 +198,15 @@ app.get('/api/timeline', (_req, res) => {
   try {
     const account = getCurrentAccount();
     res.json({ events: events.recent(account.id, 50) });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.get('/api/loot', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json(events.lootSummary(account.id));
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
