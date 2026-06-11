@@ -2,14 +2,61 @@
   "_meta": {
     "about": "Tier-level aggregate Achievement Diary requirements (Phase 4 / F2.3). Static, non-account-scoped reference data served from /public like quest-data.json. Entry shape per tier: s = aggregate skill levels (the highest level any task in that tier needs, per skill), cb = combat-level gate (Western Provinces only), q = quests that must be COMPLETED (verifiable against your ticked quest completions), reward = the unlock, note = extra caveats. The engine marks a tier 'ready' when every s/cb gate is met and every q quest is complete; 'locked' otherwise; 'done' when you've toggled it complete.",
     "caveats": "Skill levels are best-effort aggregates from oldschool.runescape.wiki and many are boostable. The q list only contains standard quests the hub can verify; miniquests (e.g. Enter the Abyss, Mage Arena I, Alfred Grimhand's Barcrawl) and quests that only need to be STARTED are listed in `note` instead of `q`, so they never falsely lock a tier. Completion itself is all-or-nothing per tier and tracked by you ticking it — the hub answers 'can I do this now?', not 'which individual tasks have I done?'.",
-    "source": "Curated from oldschool.runescape.wiki diary pages (per-region requirement summaries)."
+    "tasks": "Each tier may carry an optional `tasks` array for per-task drill-down: { id (globally-unique stable key, used for completion ticks), t (task text), s? (notable per-task skill gate), q? (full quests required for that task), cb? (combat-level gate), note? (started/partial quests, miniquests, items, or other caveats not auto-verified) }. Per-task completion is a manual checklist (the game/Dink report only whole-tier completion). Curated regions so far: Lumbridge & Draynor, Varrock, Falador, Ardougne — the rest follow iteratively and show tier-level only until then.",
+    "source": "Curated from oldschool.runescape.wiki diary pages (per-region requirement summaries + per-task tables)."
   },
   "diaries": {
     "Ardougne": {
-      "Easy":   { "s": { "Thieving": 5 }, "q": ["Biohazard", "Rune Mysteries"], "reward": "Ardougne cloak 1 — Monastery teleport; Ardougne Farm patch perks" },
-      "Medium": { "s": { "Magic": 51, "Agility": 39, "Farming": 31, "Thieving": 38, "Firemaking": 50 }, "q": ["Enlightened Journey", "The Hand in the Sand", "Rune Mysteries", "Tower of Life", "Underground Pass"], "note": "Also needs Fairy Tale II, Sea Slug, and Watchtower at least started.", "reward": "Ardougne cloak 2" },
-      "Hard":   { "s": { "Thieving": 72, "Magic": 66, "Farming": 70, "Smithing": 68, "Runecraft": 65, "Hunter": 59, "Fishing": 53, "Cooking": 53, "Construction": 50 }, "q": ["Enlightened Journey", "The Hand in the Sand", "Legends' Quest", "Monkey Madness I", "Mourning's End Part II", "Rune Mysteries", "Tower of Life", "Watchtower"], "note": "Also needs Fairy Tale II and Sea Slug at least started.", "reward": "Ardougne cloak 3" },
-      "Elite":  { "s": { "Magic": 94, "Fishing": 81, "Cooking": 91, "Thieving": 82, "Smithing": 91, "Fletching": 69, "Farming": 85, "Agility": 90 }, "q": ["Desert Treasure I", "Enlightened Journey", "The Hand in the Sand", "Haunted Mine", "Legends' Quest", "Monkey Madness I", "Mourning's End Part II", "Rune Mysteries", "Tower of Life", "Watchtower"], "note": "Also needs Fairy Tale II and Sea Slug at least started.", "reward": "Ardougne cloak 4" }
+      "Easy":   { "s": { "Thieving": 5 }, "q": ["Biohazard", "Rune Mysteries"], "reward": "Ardougne cloak 1 — Monastery teleport; Ardougne Farm patch perks", "tasks": [
+        { "id": "ardougne-easy-1", "t": "Teleport to the Rune Essence mine via Wizard Cromperty", "q": ["Rune Mysteries"] },
+        { "id": "ardougne-easy-2", "t": "Steal a cake from an East Ardougne market stall", "s": { "Thieving": 5 } },
+        { "id": "ardougne-easy-3", "t": "Sell silk to the silk trader for 60 coins", "note": "Needs a piece of silk." },
+        { "id": "ardougne-easy-4", "t": "Use the altar in the East Ardougne church" },
+        { "id": "ardougne-easy-5", "t": "Start a Fishing Trawler game with Murphy" },
+        { "id": "ardougne-easy-6", "t": "Enter the Combat Training Camp north of West Ardougne", "q": ["Biohazard"] },
+        { "id": "ardougne-easy-7", "t": "Have Tindel Marchant identify a rusty sword", "note": "Needs a rusty sword + 100 coins." },
+        { "id": "ardougne-easy-8", "t": "Pull the Ardougne lever to teleport to the Wilderness" },
+        { "id": "ardougne-easy-9", "t": "View Aleck's Hunter Emporium in Yanille" },
+        { "id": "ardougne-easy-10", "t": "Check your pet insurance with Probita" }
+      ] },
+      "Medium": { "s": { "Magic": 51, "Agility": 39, "Farming": 31, "Thieving": 38, "Firemaking": 50 }, "q": ["Enlightened Journey", "The Hand in the Sand", "Rune Mysteries", "Tower of Life", "Underground Pass"], "note": "Also needs Fairy Tale II, Sea Slug, and Watchtower at least started.", "reward": "Ardougne cloak 2", "tasks": [
+        { "id": "ardougne-medium-1", "t": "Enter the unicorn pen north of Ardougne via fairy ring", "note": "Needs Fairy Tale II started + a dramen/lunar staff." },
+        { "id": "ardougne-medium-2", "t": "Grapple over Yanille's south wall", "s": { "Agility": 39, "Strength": 38, "Ranged": 21 } },
+        { "id": "ardougne-medium-3", "t": "Harvest strawberries from the Ardougne farm patch", "s": { "Farming": 31 } },
+        { "id": "ardougne-medium-4", "t": "Cast the Ardougne Teleport spell", "s": { "Magic": 51 }, "q": ["Plague City"] },
+        { "id": "ardougne-medium-5", "t": "Travel to Castle Wars by Ardougne hot air balloon", "s": { "Firemaking": 50 }, "q": ["Enlightened Journey"] },
+        { "id": "ardougne-medium-6", "t": "Claim buckets of sand from Bert in Yanille", "q": ["The Hand in the Sand"] },
+        { "id": "ardougne-medium-7", "t": "Catch a fish on the Fishing Platform", "note": "Needs Sea Slug started + a small fishing net." },
+        { "id": "ardougne-medium-8", "t": "Pickpocket a Master Farmer north of Ardougne", "s": { "Thieving": 38 } },
+        { "id": "ardougne-medium-9", "t": "Collect cave nightshade from the Skavid caves", "note": "Needs Watchtower partially + a light source." },
+        { "id": "ardougne-medium-10", "t": "Kill a swordchick in the Tower of Life", "q": ["Tower of Life"] },
+        { "id": "ardougne-medium-11", "t": "Equip Iban's staff", "q": ["Underground Pass"] },
+        { "id": "ardougne-medium-12", "t": "Visit the island east of the Necromancer's Tower", "note": "Needs Fairy Tale II started + a dramen/lunar staff." }
+      ] },
+      "Hard":   { "s": { "Thieving": 72, "Magic": 66, "Farming": 70, "Smithing": 68, "Runecraft": 65, "Hunter": 59, "Fishing": 53, "Cooking": 53, "Construction": 50 }, "q": ["Enlightened Journey", "The Hand in the Sand", "Legends' Quest", "Monkey Madness I", "Mourning's End Part II", "Rune Mysteries", "Tower of Life", "Watchtower"], "note": "Also needs Fairy Tale II and Sea Slug at least started.", "reward": "Ardougne cloak 3", "tasks": [
+        { "id": "ardougne-hard-1", "t": "Recharge jewellery at the Legends' Guild totem pole", "q": ["Legends' Quest"] },
+        { "id": "ardougne-hard-2", "t": "Enter the Magic Guild", "s": { "Magic": 66 } },
+        { "id": "ardougne-hard-3", "t": "Steal from a chest in Ardougne Castle", "s": { "Thieving": 72 }, "note": "Needs a lockpick." },
+        { "id": "ardougne-hard-4", "t": "Enter the Ardougne Zoo monkey cage", "note": "Needs Monkey Madness I partially + a karamjan monkey greegree." },
+        { "id": "ardougne-hard-5", "t": "Teleport to the Watchtower", "s": { "Magic": 58 }, "q": ["Watchtower"] },
+        { "id": "ardougne-hard-6", "t": "Catch a red salamander", "s": { "Hunter": 59 } },
+        { "id": "ardougne-hard-7", "t": "Check the health of a palm tree near the Tree Gnome Village", "s": { "Farming": 68 } },
+        { "id": "ardougne-hard-8", "t": "Pick poison ivy berries south of Ardougne", "s": { "Farming": 70 } },
+        { "id": "ardougne-hard-9", "t": "Smith a mithril platebody near Ardougne", "s": { "Smithing": 68 } },
+        { "id": "ardougne-hard-10", "t": "Enter your player-owned house from Yanille", "s": { "Construction": 50 } },
+        { "id": "ardougne-hard-11", "t": "Smith a dragon sq shield in West Ardougne", "s": { "Smithing": 60 }, "note": "Needs Plague City partially + both shield halves." },
+        { "id": "ardougne-hard-12", "t": "Craft death runes from essence at the Ourania/Death altar", "s": { "Runecraft": 65 }, "q": ["Mourning's End Part II"] }
+      ] },
+      "Elite":  { "s": { "Magic": 94, "Fishing": 81, "Cooking": 91, "Thieving": 82, "Smithing": 91, "Fletching": 69, "Farming": 85, "Agility": 90 }, "q": ["Desert Treasure I", "Enlightened Journey", "The Hand in the Sand", "Haunted Mine", "Legends' Quest", "Monkey Madness I", "Mourning's End Part II", "Rune Mysteries", "Tower of Life", "Watchtower"], "note": "Also needs Fairy Tale II and Sea Slug at least started.", "reward": "Ardougne cloak 4", "tasks": [
+        { "id": "ardougne-elite-1", "t": "Catch a manta ray in the Fishing Trawler and cook it in Port Khazard", "s": { "Fishing": 81, "Cooking": 91 } },
+        { "id": "ardougne-elite-2", "t": "Pick the lock in the Yanille Agility dungeon basement", "s": { "Thieving": 82 }, "note": "Needs a lockpick." },
+        { "id": "ardougne-elite-3", "t": "Pickpocket a hero in East Ardougne", "s": { "Thieving": 80 } },
+        { "id": "ardougne-elite-4", "t": "Make a rune crossbow from scratch in Witchaven or Yanille", "s": { "Smithing": 91, "Fletching": 69, "Crafting": 10 } },
+        { "id": "ardougne-elite-5", "t": "Imbue a salve amulet at the Nightmare Zone", "q": ["Haunted Mine"], "note": "Needs 800k Nightmare Zone points + a salve amulet." },
+        { "id": "ardougne-elite-6", "t": "Pick torstol from the patch north of Ardougne", "s": { "Farming": 85 } },
+        { "id": "ardougne-elite-7", "t": "Complete a lap of the Ardougne rooftop agility course", "s": { "Agility": 90 } },
+        { "id": "ardougne-elite-8", "t": "Cast Ice Barrage on another player in Castle Wars", "s": { "Magic": 94 }, "q": ["Desert Treasure I"] }
+      ] }
     },
     "Desert": {
       "Easy":   { "s": { "Hunter": 5, "Thieving": 21 }, "q": [], "note": "One task starts Icthlarin's Little Helper.", "reward": "Desert amulet 1" },
@@ -18,10 +65,56 @@
       "Elite":  { "s": { "Cooking": 85, "Magic": 94, "Fletching": 95, "Thieving": 91, "Prayer": 85, "Construction": 78 }, "q": ["Contact!", "Desert Treasure I", "Dream Mentor", "Eagle's Peak", "Enakhra's Lament", "The Feud", "The Golem", "Spirits of the Elid"], "reward": "Desert amulet 4" }
     },
     "Falador": {
-      "Easy":   { "s": { "Mining": 10, "Agility": 5, "Smithing": 13, "Construction": 16 }, "q": ["Doric's Quest", "The Knight's Sword"], "reward": "Falador shield 1" },
-      "Medium": { "s": { "Firemaking": 49, "Magic": 37, "Farming": 23, "Agility": 42, "Thieving": 40, "Crafting": 40, "Woodcutting": 30, "Mining": 40, "Slayer": 32 }, "q": ["Doric's Quest", "The Knight's Sword", "Recruitment Drive"], "note": "Also needs Skippy and the Mogres (miniquest) and Ratcatchers partially.", "reward": "Falador shield 2" },
-      "Hard":   { "s": { "Runecraft": 56, "Agility": 59, "Mining": 60, "Slayer": 72, "Woodcutting": 71, "Thieving": 58, "Fishing": 53, "Cooking": 53, "Herblore": 52 }, "q": ["Doric's Quest", "Grim Tales", "Heroes' Quest", "The Knight's Sword", "The Slug Menace"], "note": "Also needs Skippy and the Mogres (miniquest) and Ratcatchers partially.", "reward": "Falador shield 3" },
-      "Elite":  { "s": { "Runecraft": 88, "Farming": 91, "Agility": 80, "Herblore": 81, "Woodcutting": 75, "Mining": 60 }, "q": ["Doric's Quest", "Grim Tales", "Heroes' Quest", "The Knight's Sword", "The Slug Menace", "Wanted!"], "note": "Also needs Skippy and the Mogres (miniquest) and Ratcatchers partially.", "reward": "Falador shield 4" }
+      "Easy":   { "s": { "Mining": 10, "Agility": 5, "Smithing": 13, "Construction": 16 }, "q": ["Doric's Quest", "The Knight's Sword"], "reward": "Falador shield 1", "tasks": [
+        { "id": "falador-easy-1", "t": "Find out your family crest from Sir Renitee", "s": { "Construction": 16 } },
+        { "id": "falador-easy-2", "t": "Climb over the western Falador wall", "s": { "Agility": 5 } },
+        { "id": "falador-easy-3", "t": "Browse Sarah's farm shop" },
+        { "id": "falador-easy-4", "t": "Get a haircut or shave from the Falador hairdresser" },
+        { "id": "falador-easy-5", "t": "Fill a bucket from the pump north of the west bank" },
+        { "id": "falador-easy-6", "t": "Kill a duck in Falador Park" },
+        { "id": "falador-easy-7", "t": "Make a mind tiara", "note": "Needs a mind talisman + tiara." },
+        { "id": "falador-easy-8", "t": "Take the boat to Entrana" },
+        { "id": "falador-easy-9", "t": "Repair a broken strut in the Motherlode Mine" },
+        { "id": "falador-easy-10", "t": "Claim a security book from the Port Sarim jail guard" },
+        { "id": "falador-easy-11", "t": "Smith blurite limbs on Doric's anvil", "s": { "Mining": 10, "Smithing": 13 }, "q": ["The Knight's Sword", "Doric's Quest"] }
+      ] },
+      "Medium": { "s": { "Firemaking": 49, "Magic": 37, "Farming": 23, "Agility": 42, "Thieving": 40, "Crafting": 40, "Woodcutting": 30, "Mining": 40, "Slayer": 32 }, "q": ["Doric's Quest", "The Knight's Sword", "Recruitment Drive"], "note": "Also needs Skippy and the Mogres (miniquest) and Ratcatchers partially.", "reward": "Falador shield 2", "tasks": [
+        { "id": "falador-medium-1", "t": "Light a bullseye lantern at the Rimmington chemist", "s": { "Firemaking": 49 } },
+        { "id": "falador-medium-2", "t": "Telegrab a Wine of Zamorak at the Chaos Temple", "s": { "Magic": 33 } },
+        { "id": "falador-medium-3", "t": "Unlock the Crystal chest in Taverley", "note": "Needs a crystal key." },
+        { "id": "falador-medium-4", "t": "Place a scarecrow in the Falador farm flower patch", "s": { "Farming": 23 } },
+        { "id": "falador-medium-5", "t": "Kill a Mogre at Mudskipper Point", "s": { "Slayer": 32 }, "note": "Needs Skippy and the Mogres (miniquest)." },
+        { "id": "falador-medium-6", "t": "Visit the Port Sarim Rat Pits", "note": "Needs Ratcatchers started." },
+        { "id": "falador-medium-7", "t": "Grapple up and jump off the north Falador wall", "s": { "Agility": 11, "Strength": 37, "Ranged": 19 } },
+        { "id": "falador-medium-8", "t": "Pickpocket a Falador guard", "s": { "Thieving": 40 } },
+        { "id": "falador-medium-9", "t": "Pray at the Taverley Guthix altar in Initiate armour", "s": { "Prayer": 10, "Defence": 20 }, "q": ["Recruitment Drive"] },
+        { "id": "falador-medium-10", "t": "Mine gold ore at the Crafting Guild", "s": { "Crafting": 40, "Mining": 40 } },
+        { "id": "falador-medium-11", "t": "Squeeze through the crevice in the Dwarven mine", "s": { "Agility": 42 } },
+        { "id": "falador-medium-12", "t": "Chop and burn willow logs in Taverley", "s": { "Woodcutting": 30, "Firemaking": 30 } },
+        { "id": "falador-medium-13", "t": "Craft a fruit basket on the Falador farm loom", "s": { "Crafting": 36 } },
+        { "id": "falador-medium-14", "t": "Cast the Falador Teleport spell", "s": { "Magic": 37 } }
+      ] },
+      "Hard":   { "s": { "Runecraft": 56, "Agility": 59, "Mining": 60, "Slayer": 72, "Woodcutting": 71, "Thieving": 58, "Fishing": 53, "Cooking": 53, "Herblore": 52 }, "q": ["Doric's Quest", "Grim Tales", "Heroes' Quest", "The Knight's Sword", "The Slug Menace"], "note": "Also needs Skippy and the Mogres (miniquest) and Ratcatchers partially.", "reward": "Falador shield 3", "tasks": [
+        { "id": "falador-hard-1", "t": "Craft 140 mind runes simultaneously", "s": { "Runecraft": 56 } },
+        { "id": "falador-hard-2", "t": "Change your family crest to the Saradomin symbol", "s": { "Prayer": 70, "Construction": 16 } },
+        { "id": "falador-hard-3", "t": "Kill the Giant Mole beneath Falador Park" },
+        { "id": "falador-hard-4", "t": "Kill a Skeletal Wyvern in the Asgarnia Ice Dungeon", "s": { "Slayer": 72 } },
+        { "id": "falador-hard-5", "t": "Complete a lap of the Falador rooftop agility course", "s": { "Agility": 50 } },
+        { "id": "falador-hard-6", "t": "Enter the Mining Guild wearing a Prospector helmet", "s": { "Mining": 60 } },
+        { "id": "falador-hard-7", "t": "Kill a blue dragon under the Heroes' Guild", "q": ["Heroes' Quest"] },
+        { "id": "falador-hard-8", "t": "Crack the wall safe in the Rogues' Den", "s": { "Thieving": 50 } },
+        { "id": "falador-hard-9", "t": "Recharge prayer in the Port Sarim church in Proselyte armour", "s": { "Defence": 30, "Prayer": 20 }, "q": ["The Slug Menace"] },
+        { "id": "falador-hard-10", "t": "Enter the Warriors' Guild", "note": "Needs 130 combined Attack + Strength." },
+        { "id": "falador-hard-11", "t": "Equip a dwarven helmet in the Dwarven mine", "s": { "Defence": 50 }, "q": ["Grim Tales"] }
+      ] },
+      "Elite":  { "s": { "Runecraft": 88, "Farming": 91, "Agility": 80, "Herblore": 81, "Woodcutting": 75, "Mining": 60 }, "q": ["Doric's Quest", "Grim Tales", "Heroes' Quest", "The Knight's Sword", "The Slug Menace", "Wanted!"], "note": "Also needs Skippy and the Mogres (miniquest) and Ratcatchers partially.", "reward": "Falador shield 4", "tasks": [
+        { "id": "falador-elite-1", "t": "Craft 252 air runes simultaneously", "s": { "Runecraft": 88 } },
+        { "id": "falador-elite-2", "t": "Purchase a white 2h sword from Sir Vyvin", "q": ["Wanted!"], "note": "Needs 1,920 coins." },
+        { "id": "falador-elite-3", "t": "Dig up 3+ magic roots from the Falador magic tree", "s": { "Farming": 91, "Woodcutting": 75 } },
+        { "id": "falador-elite-4", "t": "Perform a skillcape or quest cape emote atop Falador Castle", "note": "Needs a level-99 skill or every quest completed." },
+        { "id": "falador-elite-5", "t": "Jump over the strange floor in Taverley Dungeon", "s": { "Agility": 80 } },
+        { "id": "falador-elite-6", "t": "Mix a Saradomin brew in the Falador east bank", "s": { "Herblore": 81 } }
+      ] }
     },
     "Fremennik": {
       "Easy":   { "s": { "Attack": 20, "Hitpoints": 20, "Mining": 20, "Strength": 20, "Agility": 20, "Smithing": 20, "Defence": 20, "Herblore": 20, "Fishing": 20, "Ranged": 20, "Thieving": 5, "Cooking": 20, "Prayer": 20, "Crafting": 23, "Firemaking": 15, "Magic": 20, "Fletching": 20, "Woodcutting": 15, "Runecraft": 20, "Slayer": 20, "Farming": 20, "Construction": 20, "Hunter": 11 }, "q": ["The Fremennik Trials"], "reward": "Fremennik sea boots 1" },
@@ -48,10 +141,55 @@
       "Elite":  { "s": { "Runecraft": 77, "Woodcutting": 90, "Fishing": 82, "Cooking": 84, "Magic": 90, "Slayer": 95, "Farming": 85, "Fletching": 40, "Mining": 38, "Crafting": 38 }, "q": ["Dream Mentor", "The Forsaken Tower", "The Depths of Despair", "The Queen of Thieves", "Tale of the Righteous", "The Ascent of Arceuus"], "note": "Also needs Fairy Tale II and Eagle's Peak at least started.", "reward": "Rada's blessing 4" }
     },
     "Lumbridge & Draynor": {
-      "Easy":   { "s": { "Runecraft": 5, "Slayer": 7, "Fishing": 15, "Woodcutting": 15, "Firemaking": 15, "Mining": 15 }, "q": ["Cook's Assistant", "Rune Mysteries"], "reward": "Explorer's ring 1" },
-      "Medium": { "s": { "Agility": 20, "Magic": 31, "Fishing": 30, "Crafting": 38, "Thieving": 38, "Woodcutting": 30, "Runecraft": 23, "Hunter": 42 }, "q": ["Animal Magnetism", "Cook's Assistant", "The Lost City", "Rune Mysteries"], "note": "Also needs Fairy Tale II at least started.", "reward": "Explorer's ring 2" },
-      "Hard":   { "s": { "Magic": 60, "Agility": 46, "Woodcutting": 57, "Runecraft": 59, "Cooking": 70, "Crafting": 70, "Firemaking": 65, "Farming": 63 }, "q": ["Animal Magnetism", "Another Slice of H.A.M.", "Recipe for Disaster", "Rune Mysteries", "Tears of Guthix"], "note": "Also needs Fairy Tale II at least started.", "reward": "Explorer's ring 3" },
-      "Elite":  { "s": { "Thieving": 78, "Woodcutting": 75, "Smithing": 88, "Runecraft": 76, "Ranged": 70, "Strength": 70, "Agility": 70 }, "q": ["Animal Magnetism", "Another Slice of H.A.M.", "Cook's Assistant", "The Lost City", "Recipe for Disaster", "Rune Mysteries", "Tears of Guthix"], "reward": "Explorer's ring 4" }
+      "Easy":   { "s": { "Runecraft": 5, "Slayer": 7, "Fishing": 15, "Woodcutting": 15, "Firemaking": 15, "Mining": 15 }, "q": ["Cook's Assistant", "Rune Mysteries"], "reward": "Explorer's ring 1", "tasks": [
+        { "id": "lumbridge-easy-1", "t": "Complete a lap of the Draynor Village agility course" },
+        { "id": "lumbridge-easy-2", "t": "Slay a Cave bug in the Lumbridge Swamp Caves", "s": { "Slayer": 7 } },
+        { "id": "lumbridge-easy-3", "t": "Teleport to the Rune Essence mine via Sedridor", "q": ["Rune Mysteries"] },
+        { "id": "lumbridge-easy-4", "t": "Craft water runes from rune essence", "s": { "Runecraft": 5 } },
+        { "id": "lumbridge-easy-5", "t": "Learn your age from Hans" },
+        { "id": "lumbridge-easy-6", "t": "Pickpocket a man or woman in Lumbridge" },
+        { "id": "lumbridge-easy-7", "t": "Chop and burn oak logs in Lumbridge", "s": { "Woodcutting": 15, "Firemaking": 15 } },
+        { "id": "lumbridge-easy-8", "t": "Kill a zombie in the Draynor Sewers" },
+        { "id": "lumbridge-easy-9", "t": "Catch anchovies in Al Kharid", "s": { "Fishing": 15 } },
+        { "id": "lumbridge-easy-10", "t": "Bake bread on the Lumbridge kitchen range", "q": ["Cook's Assistant"] },
+        { "id": "lumbridge-easy-11", "t": "Mine iron ore at the Al Kharid mine", "s": { "Mining": 15 } },
+        { "id": "lumbridge-easy-12", "t": "Enter the H.A.M. Hideout" }
+      ] },
+      "Medium": { "s": { "Agility": 20, "Magic": 31, "Fishing": 30, "Crafting": 38, "Thieving": 38, "Woodcutting": 30, "Runecraft": 23, "Hunter": 42 }, "q": ["Animal Magnetism", "Cook's Assistant", "The Lost City", "Rune Mysteries"], "note": "Also needs Fairy Tale II at least started.", "reward": "Explorer's ring 2", "tasks": [
+        { "id": "lumbridge-medium-1", "t": "Complete a lap of the Al Kharid agility course", "s": { "Agility": 20 } },
+        { "id": "lumbridge-medium-2", "t": "Grapple across the River Lum", "s": { "Agility": 8, "Strength": 19, "Ranged": 37 } },
+        { "id": "lumbridge-medium-3", "t": "Purchase an upgraded device from Ava", "s": { "Ranged": 50 }, "q": ["Animal Magnetism"] },
+        { "id": "lumbridge-medium-4", "t": "Travel to the Wizards' Tower by fairy ring", "note": "Needs Fairy Tale II started + a dramen/lunar staff." },
+        { "id": "lumbridge-medium-5", "t": "Cast the Teleport to Lumbridge spell", "s": { "Magic": 31 } },
+        { "id": "lumbridge-medium-6", "t": "Catch salmon in Lumbridge", "s": { "Fishing": 30 } },
+        { "id": "lumbridge-medium-7", "t": "Craft a coif in the Lumbridge cow pen", "s": { "Crafting": 38 } },
+        { "id": "lumbridge-medium-8", "t": "Chop willow logs in Draynor Village", "s": { "Woodcutting": 30 } },
+        { "id": "lumbridge-medium-9", "t": "Pickpocket Martin the Master Gardener", "s": { "Thieving": 38 } },
+        { "id": "lumbridge-medium-10", "t": "Get a slayer task from Chaeldar", "cb": 70, "q": ["The Lost City"] },
+        { "id": "lumbridge-medium-11", "t": "Catch an essence impling in Puro-Puro", "s": { "Hunter": 42 } },
+        { "id": "lumbridge-medium-12", "t": "Craft lava runes at the Fire Altar", "s": { "Runecraft": 23 } }
+      ] },
+      "Hard":   { "s": { "Magic": 60, "Agility": 46, "Woodcutting": 57, "Runecraft": 59, "Cooking": 70, "Crafting": 70, "Firemaking": 65, "Farming": 63 }, "q": ["Animal Magnetism", "Another Slice of H.A.M.", "Recipe for Disaster", "Rune Mysteries", "Tears of Guthix"], "note": "Also needs Fairy Tale II at least started.", "reward": "Explorer's ring 3", "tasks": [
+        { "id": "lumbridge-hard-1", "t": "Cast Bones to Peaches in the Al Kharid palace", "s": { "Magic": 60 }, "note": "Needs the Bones to Peaches reward from the Mage Training Arena." },
+        { "id": "lumbridge-hard-2", "t": "Squeeze past the jutting wall toward the Cosmic Altar", "s": { "Agility": 46 }, "q": ["The Lost City"] },
+        { "id": "lumbridge-hard-3", "t": "Craft 56 cosmic runes simultaneously", "s": { "Runecraft": 59 }, "q": ["The Lost City"] },
+        { "id": "lumbridge-hard-4", "t": "Travel from Lumbridge to Edgeville by waka canoe", "s": { "Woodcutting": 57 } },
+        { "id": "lumbridge-hard-5", "t": "Collect 100+ Tears of Guthix in one visit", "q": ["Tears of Guthix"] },
+        { "id": "lumbridge-hard-6", "t": "Take the train from Dorgesh-Kaan to Keldagrim", "q": ["Another Slice of H.A.M."] },
+        { "id": "lumbridge-hard-7", "t": "Purchase Barrows gloves from the Lumbridge bank chest", "q": ["Recipe for Disaster"] },
+        { "id": "lumbridge-hard-8", "t": "Pick belladonna from the Draynor Manor farm patch", "s": { "Farming": 63 } },
+        { "id": "lumbridge-hard-9", "t": "Light a mining helmet in the Lumbridge castle basement", "s": { "Firemaking": 65 } },
+        { "id": "lumbridge-hard-10", "t": "Recharge prayer at Emir's Arena with Smite active", "s": { "Prayer": 52 } },
+        { "id": "lumbridge-hard-11", "t": "Craft, string and enchant an amulet of power", "s": { "Crafting": 70, "Magic": 57 } }
+      ] },
+      "Elite":  { "s": { "Thieving": 78, "Woodcutting": 75, "Smithing": 88, "Runecraft": 76, "Ranged": 70, "Strength": 70, "Agility": 70 }, "q": ["Animal Magnetism", "Another Slice of H.A.M.", "Cook's Assistant", "The Lost City", "Recipe for Disaster", "Rune Mysteries", "Tears of Guthix"], "reward": "Explorer's ring 4", "tasks": [
+        { "id": "lumbridge-elite-1", "t": "Steal from the Dorgesh-Kaan rich chest", "s": { "Thieving": 78 }, "q": ["Death to the Dorgeshuun"] },
+        { "id": "lumbridge-elite-2", "t": "Grapple across the Dorgesh-Kaan agility pylon", "s": { "Agility": 70, "Ranged": 70, "Strength": 70 }, "q": ["Death to the Dorgeshuun"] },
+        { "id": "lumbridge-elite-3", "t": "Chop magic logs at the Mage Training Arena", "s": { "Woodcutting": 75 } },
+        { "id": "lumbridge-elite-4", "t": "Smith an adamant platebody in the Draynor sewer", "s": { "Smithing": 88 } },
+        { "id": "lumbridge-elite-5", "t": "Craft 140+ water runes simultaneously", "s": { "Runecraft": 76 } },
+        { "id": "lumbridge-elite-6", "t": "Perform the Quest cape emote at the Wise Old Man's house", "note": "Needs every quest completed." }
+      ] }
     },
     "Morytania": {
       "Easy":   { "s": { "Crafting": 15, "Cooking": 12, "Slayer": 15, "Farming": 23 }, "q": ["Nature Spirit"], "reward": "Morytania legs 1" },
@@ -60,10 +198,56 @@
       "Elite":  { "s": { "Fishing": 96, "Strength": 76, "Firemaking": 80, "Magic": 83, "Crafting": 84, "Slayer": 85 }, "q": ["In Aid of the Myreque", "Lunar Diplomacy", "Shades of Mort'ton", "Desert Treasure I", "Dwarf Cannon", "Ghosts Ahoy"], "note": "Also needs Lair of Tarn Razorlor (miniquest) and The Great Brain Robbery at least started.", "reward": "Morytania legs 4" }
     },
     "Varrock": {
-      "Easy":   { "s": { "Mining": 15, "Agility": 13, "Crafting": 8, "Runecraft": 9, "Fishing": 20, "Thieving": 5 }, "q": ["Rune Mysteries"], "reward": "Varrock armour 1" },
-      "Medium": { "s": { "Agility": 30, "Herblore": 10, "Fishing": 20, "Thieving": 25, "Crafting": 36, "Firemaking": 40, "Magic": 25, "Farming": 30 }, "q": ["The Dig Site", "Enlightened Journey", "Garden of Tranquillity", "Gertrude's Cat", "Rune Mysteries", "A Soul's Bane", "Tree Gnome Village"], "reward": "Varrock armour 2" },
-      "Hard":   { "s": { "Mining": 15, "Agility": 51, "Smithing": 20, "Ranged": 40, "Thieving": 53, "Crafting": 36, "Firemaking": 60, "Magic": 54, "Woodcutting": 60, "Farming": 68, "Construction": 50, "Hunter": 66, "Prayer": 52 }, "q": ["Desert Treasure I", "Enlightened Journey", "Garden of Tranquillity", "Gertrude's Cat", "Rune Mysteries", "A Soul's Bane", "Tree Gnome Village"], "reward": "Varrock armour 3" },
-      "Elite":  { "s": { "Mining": 60, "Agility": 51, "Smithing": 89, "Herblore": 90, "Thieving": 53, "Cooking": 95, "Prayer": 52, "Crafting": 61, "Firemaking": 60, "Magic": 86, "Fletching": 81, "Woodcutting": 60, "Runecraft": 78, "Farming": 68, "Construction": 50, "Hunter": 66, "Ranged": 40 }, "q": ["Desert Treasure I", "Dream Mentor", "Enlightened Journey", "Garden of Tranquillity", "Gertrude's Cat", "A Soul's Bane", "Tree Gnome Village"], "reward": "Varrock armour 4" }
+      "Easy":   { "s": { "Mining": 15, "Agility": 13, "Crafting": 8, "Runecraft": 9, "Fishing": 20, "Thieving": 5 }, "q": ["Rune Mysteries"], "reward": "Varrock armour 1", "tasks": [
+        { "id": "varrock-easy-1", "t": "Browse Thessalia's clothes store" },
+        { "id": "varrock-easy-2", "t": "Have Aubury teleport you to the Rune Essence mine", "q": ["Rune Mysteries"] },
+        { "id": "varrock-easy-3", "t": "Mine iron in the south-east Varrock mine", "s": { "Mining": 15 } },
+        { "id": "varrock-easy-4", "t": "Make a normal plank at the Sawmill" },
+        { "id": "varrock-easy-5", "t": "Enter the second level of the Stronghold of Security" },
+        { "id": "varrock-easy-6", "t": "Jump over the fence south of Varrock", "s": { "Agility": 13 } },
+        { "id": "varrock-easy-7", "t": "Chop down a dying tree in the Lumber Yard" },
+        { "id": "varrock-easy-8", "t": "Buy a newspaper from the Varrock Square paperboy" },
+        { "id": "varrock-easy-9", "t": "Give a dog a bone" },
+        { "id": "varrock-easy-10", "t": "Spin a bowl on the pottery wheel and fire it", "s": { "Crafting": 8 } },
+        { "id": "varrock-easy-11", "t": "Speak to Haig Halen after obtaining 50 Kudos", "note": "Needs 50 Kudos." },
+        { "id": "varrock-easy-12", "t": "Craft earth runes from rune essence", "s": { "Runecraft": 9 } },
+        { "id": "varrock-easy-13", "t": "Catch trout in the River Lum", "s": { "Fishing": 20 } },
+        { "id": "varrock-easy-14", "t": "Steal from the tea stall in Varrock", "s": { "Thieving": 5 } }
+      ] },
+      "Medium": { "s": { "Agility": 30, "Herblore": 10, "Fishing": 20, "Thieving": 25, "Crafting": 36, "Firemaking": 40, "Magic": 25, "Farming": 30 }, "q": ["The Dig Site", "Enlightened Journey", "Garden of Tranquillity", "Gertrude's Cat", "Rune Mysteries", "A Soul's Bane", "Tree Gnome Village"], "reward": "Varrock armour 2", "tasks": [
+        { "id": "varrock-medium-1", "t": "Have the Apothecary make you a strength potion" },
+        { "id": "varrock-medium-2", "t": "Enter the Champions' Guild", "note": "Needs 32 Quest points." },
+        { "id": "varrock-medium-3", "t": "Select a colour for your kitten", "q": ["Gertrude's Cat", "Garden of Tranquillity"] },
+        { "id": "varrock-medium-4", "t": "Use the spirit tree north of Varrock", "q": ["Tree Gnome Village"] },
+        { "id": "varrock-medium-5", "t": "Perform the 4 Stronghold of Security emotes" },
+        { "id": "varrock-medium-6", "t": "Enter the Tolna dungeon", "q": ["A Soul's Bane"] },
+        { "id": "varrock-medium-7", "t": "Teleport to the Dig Site with a Digsite pendant", "q": ["The Dig Site"] },
+        { "id": "varrock-medium-8", "t": "Cast the Varrock Teleport spell", "s": { "Magic": 25 } },
+        { "id": "varrock-medium-9", "t": "Get a slayer task from Vannaka", "cb": 40 },
+        { "id": "varrock-medium-10", "t": "Make 20 mahogany planks in one go at the Sawmill" },
+        { "id": "varrock-medium-11", "t": "Pick a white tree fruit", "s": { "Farming": 25 }, "q": ["Garden of Tranquillity"] },
+        { "id": "varrock-medium-12", "t": "Use the balloon transport system from Varrock", "s": { "Farming": 30, "Firemaking": 40 }, "q": ["Enlightened Journey"] },
+        { "id": "varrock-medium-13", "t": "Complete a lap of the Varrock rooftop agility course", "s": { "Agility": 30 } }
+      ] },
+      "Hard":   { "s": { "Mining": 15, "Agility": 51, "Smithing": 20, "Ranged": 40, "Thieving": 53, "Crafting": 36, "Firemaking": 60, "Magic": 54, "Woodcutting": 60, "Farming": 68, "Construction": 50, "Hunter": 66, "Prayer": 52 }, "q": ["Desert Treasure I", "Enlightened Journey", "Garden of Tranquillity", "Gertrude's Cat", "Rune Mysteries", "A Soul's Bane", "Tree Gnome Village"], "reward": "Varrock armour 3", "tasks": [
+        { "id": "varrock-hard-1", "t": "Trade furs for a spottier cape and equip it", "s": { "Hunter": 66 } },
+        { "id": "varrock-hard-2", "t": "Speak to Orlando Smith after obtaining 153 Kudos", "note": "Needs 153 Kudos." },
+        { "id": "varrock-hard-3", "t": "Make a waka canoe near Edgeville", "s": { "Woodcutting": 57 } },
+        { "id": "varrock-hard-4", "t": "Teleport to Paddewwa", "s": { "Magic": 54 }, "q": ["Desert Treasure I"] },
+        { "id": "varrock-hard-5", "t": "Teleport to Barbarian Village with a skull sceptre", "note": "Needs a skull sceptre." },
+        { "id": "varrock-hard-6", "t": "Chop yew logs and burn them at Varrock church", "s": { "Woodcutting": 60, "Firemaking": 60 } },
+        { "id": "varrock-hard-7", "t": "Decorate your house with Fancy Stone", "s": { "Construction": 50 } },
+        { "id": "varrock-hard-8", "t": "Collect yew roots from the Varrock Palace tree patch", "s": { "Farming": 68, "Woodcutting": 60 } },
+        { "id": "varrock-hard-9", "t": "Pray at the Varrock Palace altar with Smite active", "s": { "Prayer": 52 } },
+        { "id": "varrock-hard-10", "t": "Squeeze through the obstacle pipe in Edgeville dungeon", "s": { "Agility": 51 } }
+      ] },
+      "Elite":  { "s": { "Mining": 60, "Agility": 51, "Smithing": 89, "Herblore": 90, "Thieving": 53, "Cooking": 95, "Prayer": 52, "Crafting": 61, "Firemaking": 60, "Magic": 86, "Fletching": 81, "Woodcutting": 60, "Runecraft": 78, "Farming": 68, "Construction": 50, "Hunter": 66, "Ranged": 40 }, "q": ["Desert Treasure I", "Dream Mentor", "Enlightened Journey", "Garden of Tranquillity", "Gertrude's Cat", "A Soul's Bane", "Tree Gnome Village"], "reward": "Varrock armour 4", "tasks": [
+        { "id": "varrock-elite-1", "t": "Create a super combat potion in the Varrock west bank", "s": { "Herblore": 90 }, "q": ["Druidic Ritual"] },
+        { "id": "varrock-elite-2", "t": "Make 20 mahogany planks with Lunar magic at the Lumber Yard", "s": { "Magic": 86 }, "q": ["Dream Mentor"] },
+        { "id": "varrock-elite-3", "t": "Bake a summer pie in the Cooking Guild", "s": { "Cooking": 95 } },
+        { "id": "varrock-elite-4", "t": "Smith and fletch ten rune darts within Varrock", "s": { "Smithing": 89, "Fletching": 81 }, "q": ["The Tourist Trap"] },
+        { "id": "varrock-elite-5", "t": "Craft 100+ earth runes simultaneously from essence", "s": { "Runecraft": 78 }, "note": "Or 52 Runecraft with Raiments of the Eye." }
+      ] }
     },
     "Western Provinces": {
       "Easy":   { "s": { "Mining": 15, "Fletching": 20, "Hunter": 9 }, "cb": 40, "q": ["Big Chompy Bird Hunting", "Rune Mysteries"], "reward": "Western banner 1" },

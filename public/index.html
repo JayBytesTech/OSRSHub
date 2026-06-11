@@ -298,6 +298,23 @@ body {
 .diary-need-quests a:hover { text-decoration: underline; }
 .diary-note { margin: 3px 0 0 20px; font-size: 10px; color: #9a7a30; font-style: italic; }
 .diary-empty { color: #8a6030; padding: 16px; background: #fbf6e8; border: 1px solid #cdb682; border-radius: 8px; }
+.diary-task-progress {
+  flex: none; font-size: 10px; font-weight: 700; cursor: pointer; border-radius: 4px;
+  border: 1px solid #b9c6a0; background: #eef3e2; color: #3f5a22; padding: 2px 7px; margin-left: auto;
+}
+.diary-task-progress:hover { background: #e3edcf; }
+.diary-tasklist { margin: 6px 0 2px 20px; display: flex; flex-direction: column; gap: 3px; }
+.diary-task { display: flex; align-items: flex-start; gap: 7px; font-size: 11px; line-height: 1.5; padding: 2px 0; }
+.diary-task-check { flex: none; margin-top: 1px; }
+.diary-task-check input { cursor: pointer; }
+.diary-task-dot { flex: none; width: 12px; text-align: center; font-weight: 700; }
+.diary-task.diary-ready .diary-task-dot { color: #2e7d12; }
+.diary-task.diary-locked .diary-task-dot { color: #b05a2a; }
+.diary-task.tdone .diary-task-dot { color: #1d6b10; }
+.diary-task.tdone .diary-task-text { color: #6f8a55; text-decoration: line-through; }
+.diary-task-text { color: #4a3414; }
+.diary-task-reqs { margin-left: 4px; }
+.diary-task-note { display: block; font-size: 10px; color: #9a7a30; font-style: italic; }
 
 /* ── PROGRESS ── */
 .progress-section { max-width: 760px; }
@@ -1355,6 +1372,16 @@ function saveCompletedDiariesLocal(d) {
 function diaryDone(region, tier) {
   return getCompletedDiaries().some(d => d && d.region === region && d.tier === tier);
 }
+// Per-task diary ticks: array of task ids (F2.3 drill-down). Manual checklist, synced like diaries.
+function getCompletedDiaryTasks() {
+  try { const v = JSON.parse(localStorage.getItem('osrs_nullyn_diarytasks') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function saveCompletedDiaryTasksLocal(t) {
+  try { localStorage.setItem('osrs_nullyn_diarytasks', JSON.stringify(Array.isArray(t) ? t : [])); } catch {}
+}
+function diaryTaskDone(id) {
+  return getCompletedDiaryTasks().includes(id);
+}
 
 // ── CHECKLIST ─────────────────────────────────────────────────────────────────
 
@@ -1880,6 +1907,7 @@ async function loadVaultState() {
     if (Array.isArray(data.questGoals)) saveQuestGoalsLocal(data.questGoals);
     if (Array.isArray(data.presetGoals)) savePresetGoalsLocal(data.presetGoals);
     if (Array.isArray(data.diaries)) saveCompletedDiariesLocal(data.diaries);
+    if (Array.isArray(data.diaryTasks)) saveCompletedDiaryTasksLocal(data.diaryTasks);
     SYNC.available = true;
     setSyncBadge('ok', '\u2601 Synced to vault');
     renderQuests(); renderGoals(); populateGoalSelect(); populateQuestGoalDatalist(); renderDiaries(); renderDashboard(); recordAccountValue();
@@ -1896,7 +1924,7 @@ function scheduleVaultSave() {
   saveTimer = setTimeout(saveVaultState, 700);
 }
 async function saveVaultState() {
-  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals(), diaries: getCompletedDiaries() };
+  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals(), diaries: getCompletedDiaries(), diaryTasks: getCompletedDiaryTasks() };
   try {
     const r = await fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!r.ok) throw new Error('save ' + r.status);
@@ -2684,6 +2712,61 @@ function diaryGapsHTML(st) {
   return html;
 }
 
+// Per-task gating — same logic as diaryTierStatus(), applied to a single task. Tasks with no
+// s/q/cb gate are always 'ready'.
+function diaryTaskStatus(task) {
+  const out = { state: 'ready', missingSkills: [], missingQuests: [], missingCombat: null };
+  if (!task) return out;
+  if (task.s) {
+    for (const sk in task.s) {
+      const have = STATS[sk] ? STATS[sk][1] : 1;
+      if (have < task.s[sk]) out.missingSkills.push({ skill: sk, need: task.s[sk], have });
+    }
+  }
+  if (task.cb) {
+    const have = combatLevel();
+    if (have < task.cb) out.missingCombat = { need: task.cb, have };
+  }
+  const completed = getCompleted();
+  for (const q of (task.q || [])) if (!completed[q]) out.missingQuests.push(q);
+  out.state = (out.missingSkills.length === 0 && out.missingQuests.length === 0 && !out.missingCombat) ? 'ready' : 'locked';
+  return out;
+}
+
+// Compact per-task requirement chips (reuses the requirement-tree chip styling).
+function diaryTaskGapsHTML(st) {
+  const bits = [];
+  st.missingSkills
+    .sort((a, b) => (b.need - b.have) - (a.need - a.have))
+    .forEach(m => bits.push(`<span class="rt-skill">${m.need} ${m.skill} <span class="rt-have">(${m.have})</span></span>`));
+  if (st.missingCombat) bits.push(`<span class="rt-skill">${st.missingCombat.need} Combat <span class="rt-have">(${st.missingCombat.have})</span></span>`);
+  st.missingQuests.forEach(q => bits.push(`<span class="rt-skill">📜 <a href="${wikiUrl(q)}" target="_blank" rel="noopener">${q}</a></span>`));
+  return bits.join(' ');
+}
+
+function diaryTaskProgress(entry) {
+  const tasks = (entry && entry.tasks) || [];
+  if (!tasks.length) return null;
+  return { done: tasks.filter(t => diaryTaskDone(t.id)).length, total: tasks.length };
+}
+
+// Which tier drilldowns are expanded (keyed region|tier), mirroring the Bosses drilldown.
+const diaryExpanded = new Set();
+function toggleDiaryExpand(region, tier) {
+  const key = region + '|' + tier;
+  if (diaryExpanded.has(key)) diaryExpanded.delete(key); else diaryExpanded.add(key);
+  renderDiaries();
+}
+
+function toggleDiaryTask(id) {
+  const list = getCompletedDiaryTasks();
+  const i = list.indexOf(id);
+  if (i >= 0) list.splice(i, 1); else list.push(id);
+  saveCompletedDiaryTasksLocal(list);
+  scheduleVaultSave();
+  renderDiaries();
+}
+
 function renderDiaries() {
   const body = document.getElementById('diary-body');
   if (!body) return;
@@ -2711,15 +2794,36 @@ function renderDiaries() {
       const isDone = st.state === 'done';
       const gaps = (st.state === 'locked') ? diaryGapsHTML(st) : '';
       const note = entry.note ? `<div class="diary-note">⚠ ${entry.note}</div>` : '';
+      const rEsc = region.replace(/'/g, "\\'");
+      const prog = diaryTaskProgress(entry);
+      const expanded = diaryExpanded.has(region + '|' + tier);
+      const progCtl = prog
+        ? `<button class="diary-task-progress" onclick="toggleDiaryExpand('${rEsc}','${tier}')">${expanded ? '▾' : '▸'} ${prog.done}/${prog.total} tasks</button>`
+        : '';
+      let tasklist = '';
+      if (prog && expanded) {
+        const rows = entry.tasks.map(t => {
+          const ts = diaryTaskStatus(t);
+          const tdone = diaryTaskDone(t.id);
+          const chips = diaryTaskGapsHTML(ts);
+          return `<div class="diary-task ${tdone ? 'tdone' : 'diary-' + ts.state}">
+            <label class="diary-task-check"><input type="checkbox" ${tdone ? 'checked' : ''} onchange="toggleDiaryTask('${t.id}')"></label>
+            <span class="diary-task-dot">${tdone ? '✓' : (ts.state === 'ready' ? '○' : '✗')}</span>
+            <span class="diary-task-text">${escapeHtml(t.t)}${chips ? ` <span class="diary-task-reqs">${chips}</span>` : ''}${t.note ? `<span class="diary-task-note">⚠ ${escapeHtml(t.note)}</span>` : ''}</span>
+          </div>`;
+        }).join('');
+        tasklist = `<div class="diary-tasklist">${rows}</div>`;
+      }
       tiers.push(`
         <div class="diary-tier diary-${st.state}">
           <div class="diary-tier-head">
             <span class="diary-tier-icon">${DIARY_ICON[st.state]}</span>
             <span class="diary-tier-name">${tier}</span>
             <span class="diary-reward">${entry.reward || ''}</span>
-            <button class="diary-toggle${isDone ? ' on' : ''}" onclick="toggleDiary('${region.replace(/'/g, "\\'")}','${tier}')">${isDone ? '✓ Done' : 'Mark done'}</button>
+            ${progCtl}
+            <button class="diary-toggle${isDone ? ' on' : ''}" onclick="toggleDiary('${rEsc}','${tier}')">${isDone ? '✓ Done' : 'Mark done'}</button>
           </div>
-          ${gaps}${note}
+          ${gaps}${note}${tasklist}
         </div>`);
     }
     if (shown === 0) continue;  // hidden by the active filter
@@ -3501,7 +3605,7 @@ async function switchAccount(id) {
     // localStorage is a single shared cache of the *previously loaded* account; clear the
     // account-scoped keys so the new account loads from server truth and old data can't bleed across.
     ['osrs_nullyn_completed','osrs_nullyn_goals','osrs_nullyn_questgoals','osrs_nullyn_presetgoals',
-     'osrs_nullyn_diaries','osrs_nullyn_checklist','osrs_nullyn_lastsnap'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
+     'osrs_nullyn_diaries','osrs_nullyn_diarytasks','osrs_nullyn_checklist','osrs_nullyn_lastsnap'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
     window.location.reload();          // every view is account-scoped — re-init the whole app
   } catch (e) {
     const status = document.getElementById('add-status');

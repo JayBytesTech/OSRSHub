@@ -73,7 +73,11 @@ and the dashboard recommends agreeable next actions.
   GP/hr history still pending (awaits the GP/hr half of the custom plugin).
 - 🟢 **F2.2** XP planning: per-skill XP-remaining + time-to-goal per method (curated XP/hr dataset + ad-hoc planner).
 - 🟢 **F2.3** Achievement-diary planner: tier-level requirements for all 12 regions (skill/quest/combat
-  gates, "can I do this now?"), completion tracking, dashboard tile. (Per-task drill-down deferred.)
+  gates, "can I do this now?"), completion tracking, dashboard tile. **Per-task drill-down live** —
+  expand a tier to a checklist of its individual tasks, each with its own requirement gating (ready/
+  locked) and a tickable checkbox (synced via `diaryTasks` in `/api/state`, stored in
+  `diary_task_completions`); tier head shows `n/m tasks`. First 4 regions curated (Lumbridge & Draynor,
+  Varrock, Falador, Ardougne — 167 tasks); the other 8 show tier-level only and follow iteratively.
 - 🟢 **F2.4** Daily/weekly checklist with reset timers.
 - 🟢 **F2.5** Account Value score, trended over time.
 - ⚪ Frontend modularization if/when `index.html` interactivity outgrows hand-editing (ADR first).
