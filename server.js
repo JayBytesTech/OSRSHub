@@ -19,7 +19,7 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const anthropic = API_KEY ? new Anthropic({ apiKey: API_KEY }) : null;
 
 // SQLite store (history/time-series + account scoping). Vault stays for human notes.
-const { getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, deleteAccount, snapshots, state, accountValue, checklist, events } = require('./db');
+const { getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, deleteAccount, snapshots, state, accountValue, checklist, events, bank } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -256,6 +256,34 @@ app.get('/api/timeline', (_req, res) => {
   try {
     const account = getCurrentAccount();
     res.json({ events: events.recent(account.id, 50) });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// Bank value (F3.2 — custom RuneLite plugin). A running quantity, stored as a daily snapshot
+// (db/bank.js), NOT a timeline event. The plugin POSTs the GE value of the bank on bank-close;
+// honor the same optional INGEST_TOKEN guard as /api/ingest. GET returns the trend for charts.
+app.post('/api/bank', (req, res) => {
+  try {
+    if (INGEST_TOKEN && req.query.token !== INGEST_TOKEN) {
+      return res.status(401).json({ error: 'invalid or missing token' });
+    }
+    const value = Number((req.body || {}).value);
+    if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: 'value must be a non-negative number' });
+    const account = getCurrentAccount();
+    bank.record(account.id, todayLabel(), value);
+    console.log(`[bank] value=${Math.round(value).toLocaleString()} account=${account.rsn}`);
+    res.json({ ok: true, trend: bank.getTrend(account.id) });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.get('/api/bank', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json(bank.getTrend(account.id));
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }

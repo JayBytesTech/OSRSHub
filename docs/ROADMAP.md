@@ -69,7 +69,8 @@ and the dashboard recommends agreeable next actions.
   **Trends view live** — the Progress tab charts XP-over-time (per-skill + Total; the line breaks at
   the XP-tracking start since legacy history is levels-only), Account Value over time, and cumulative
   Wealth-from-drops, with a Level/XP toggle and XP deltas in the Recent-gains grid (`getHistory()` now
-  returns an `xp` series). Per-activity GP/hr history + bank value still pending (await the custom plugin).
+  returns an `xp` series), plus a **🏦 Bank value** series fed by the custom plugin (F3.2). Per-activity
+  GP/hr history still pending (awaits the GP/hr half of the custom plugin).
 - 🟢 **F2.2** XP planning: per-skill XP-remaining + time-to-goal per method (curated XP/hr dataset + ad-hoc planner).
 - 🟢 **F2.3** Achievement-diary planner: tier-level requirements for all 12 regions (skill/quest/combat
   gates, "can I do this now?"), completion tracking, dashboard tile. (Per-task drill-down deferred.)
@@ -86,9 +87,12 @@ and the dashboard recommends agreeable next actions.
 
 - 🟡 **F3.1** `POST /api/ingest` telemetry contract (ADR D2) — **live via the Dink plugin** (levels,
   quests, loot, KC, achievement diaries → `account_events`; quests **and diary tiers** auto-tick).
-  Custom-plugin payloads (bank, GP/hr) still pending.
-- ⚪ **F3.2** RuneLite plugin (passive telemetry: XP, loot, bank, KC, clues, sessions). *Dink covers the
-  common events today; a custom plugin is only needed for bank value + true GP/hr.*
+  Custom-plugin **bank value** now flows via `POST /api/bank` (F3.2); GP/hr still pending.
+- 🟡 **F3.2** RuneLite plugin (passive telemetry: XP, loot, bank, KC, clues, sessions). *Dink covers the
+  common events today; a custom plugin is only needed for bank value + true GP/hr.* **Custom plugin base
+  live** — `plugin/osrshub-telemetry/` (side-loaded, passive; ADR 0002) reads **bank value** on
+  bank-change and POSTs to a dedicated `POST /api/bank`, stored as a daily `bank_snapshots` snapshot and
+  charted as the **🏦 Bank value** trend. True **GP/hr** (session XP/gp rates) is the next plugin slice.
 - 🟡 **F3.3** Boss & collection-log dashboards (KC, PB, profit, deaths, log completion, missing items) —
   **Loot & Wealth view live** (GP from drops, per-source breakdown, biggest drops, true KC from Dink
   `KILL_COUNT`); **progression milestones live** (typed collection-log / clue / combat-achievement / pet /

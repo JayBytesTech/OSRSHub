@@ -1574,6 +1574,22 @@ async function loadLoot() {
   if (document.getElementById('dash-body')) renderDashboard();
 }
 
+// Bank-value trend (from the custom RuneLite plugin via /api/bank). Charted as the 🏦 Bank value
+// series on the Progress tab; empty until the plugin has logged at least one reading.
+let BANK_TREND = { dates: [], value: [] };
+async function loadBank() {
+  try {
+    const r = await fetch('/api/bank');
+    if (!r.ok) throw new Error('bank ' + r.status);
+    BANK_TREND = await r.json();
+  } catch (e) {
+    console.warn('Could not load bank trend.', e);
+    BANK_TREND = { dates: [], value: [] };
+  }
+  if (document.getElementById('tab-progress') && document.getElementById('tab-progress').classList.contains('active')) renderChart();
+  if (document.getElementById('dash-body')) renderDashboard();
+}
+
 function renderLoot() {
   const summary = document.getElementById('loot-summary');
   const body = document.getElementById('loot-body');
@@ -2808,7 +2824,7 @@ let chartInst = null;
 let chartMetric = 'xp';   // 'xp' | 'level' — applies to skill/Total series only
 
 // Account-wide series live at the top of the dropdown and ignore the Level/XP toggle.
-const CHART_SPECIAL = { __av: 'Account Value', __wealth: 'Wealth from drops' };
+const CHART_SPECIAL = { __av: 'Account Value', __wealth: 'Wealth from drops', __bank: 'Bank value' };
 
 function populateChartSelect() {
   const sel = document.getElementById('chart-skill');
@@ -2816,7 +2832,7 @@ function populateChartSelect() {
   sel.innerHTML = '';
   const grp = document.createElement('optgroup');
   grp.label = 'Wealth & Value';
-  [['__av', '💰 Account Value'], ['__wealth', '🪙 Wealth from drops']].forEach(([v, t]) => {
+  [['__av', '💰 Account Value'], ['__wealth', '🪙 Wealth from drops'], ['__bank', '🏦 Bank value']].forEach(([v, t]) => {
     const o = document.createElement('option'); o.value = v; o.textContent = t; grp.appendChild(o);
   });
   sel.appendChild(grp);
@@ -2844,7 +2860,8 @@ function setChartMetric(m) {
 function fmtBig(n) {
   if (n == null) return '';
   const a = Math.abs(n);
-  if (a >= 1e6) return (n / 1e6).toFixed(2).replace(/\.00$/, '') + 'M';
+  if (a >= 1e9) return (n / 1e9).toFixed(2).replace(/\.?0+$/, '') + 'B';
+  if (a >= 1e6) return (n / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M';
   if (a >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
   return Math.round(n).toLocaleString();
 }
@@ -2869,6 +2886,12 @@ function renderChart() {
     labels = w.dates || []; data = w.cumulative || [];
     label = 'Wealth from drops (gp)'; compact = true;
     note.textContent = data.length < 2 ? 'Wealth trend builds as you log drops across more days.' : 'Cumulative GE value of logged drops.';
+  } else if (key === '__bank') {
+    labels = BANK_TREND.dates || []; data = BANK_TREND.value || [];
+    label = 'Bank value (gp)'; compact = true;
+    note.textContent = data.length < 1
+      ? 'No bank value logged yet — run the OSRS Hub Telemetry RuneLite plugin and open your bank.'
+      : (data.length < 2 ? 'Bank value trends as the plugin logs more days.' : 'Banked items only (excludes worn gear + inventory).');
   } else if (chartMetric === 'xp') {
     labels = HISTORY.dates; data = (HISTORY.xp && HISTORY.xp[key]) || [];
     label = (key === 'Total' ? 'Total' : key) + ' XP'; compact = true;
@@ -3680,6 +3703,7 @@ loadStats();                 // async: pull live levels + progress history from 
 loadChecklist();             // async: pull daily/weekly checklist from SQLite, then re-render
 loadTimeline();              // async: pull telemetry event feed (timeline + dashboard peek)
 loadLoot();                  // async: pull aggregated loot/wealth summary (Loot tab + tile)
+loadBank();                  // async: pull bank-value trend (Progress chart series, from the plugin)
 loadMilestones();            // async: pull progression milestones (Collection Log tile + panel)
 loadBosses();                // async: pull per-boss KC + loot summary (Bosses tab)
 loadAccount();               // async: pull account identity (Settings + header name)

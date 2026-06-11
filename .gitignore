@@ -3,3 +3,8 @@ node_modules/
 .claude/
 *.log
 data/
+
+# RuneLite plugin (Gradle) build output
+plugin/**/build/
+plugin/**/.gradle/
+plugin/**/gradle/wrapper/gradle-wrapper.jar

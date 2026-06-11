@@ -1,0 +1,48 @@
+// OSRS Hub Telemetry — a passive RuneLite plugin that reports bank value to your local hub.
+// Layout mirrors the canonical runelite/example-plugin. Side-loaded (run via the test main /
+// `gradle run` / IntelliJ), NOT published to the Plugin Hub — see docs/decisions/0002.
+
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenLocal()
+    maven {
+        url = 'https://repo.runelite.net'
+    }
+    mavenCentral()
+}
+
+def runeLiteVersion = 'latest.release'
+
+dependencies {
+    compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
+
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+    testImplementation 'junit:junit:4.12'
+    testImplementation group: 'net.runelite', name: 'client', version: runeLiteVersion
+    testImplementation group: 'net.runelite', name: 'jshell', version: runeLiteVersion
+}
+
+group = 'com.osrshub'
+version = '1.0-SNAPSHOT'
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+// Launches a RuneLite dev client with this plugin side-loaded (see OsrsHubPluginTest#main).
+tasks.register('run', JavaExec) {
+    group = 'application'
+    description = 'Run a RuneLite dev client with OSRS Hub Telemetry loaded'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.osrshub.telemetry.OsrsHubPluginTest'
+}
