@@ -640,6 +640,15 @@ body {
 .settings-status.ok { color: #1d6b10; }
 .settings-status.err { color: #9a3010; }
 .settings-note { margin-top: 14px; font-size: 11.5px; line-height: 1.5; color: #6a5326; }
+.accounts-list { margin-bottom: 14px; }
+.account-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid #e0cf97; border-radius: 6px; background: #fffdf5; margin-bottom: 6px; }
+.account-row.is-active { border-color: #8ab86a; background: #f3f9ec; }
+.account-name { font-weight: 700; color: #3a2010; font-size: 13px; }
+.account-rsn { font-weight: 400; color: #8a6a30; font-size: 11.5px; margin-left: 4px; }
+.account-active { color: #1d6b10; font-weight: 700; font-size: 12px; }
+.account-switch { background: #efe4bf; color: #5a4010; border: 1px solid #c0a85c; border-radius: 5px; padding: 4px 12px; font-weight: 700; font-size: 12px; cursor: pointer; }
+.account-switch:hover { background: #e6d59f; }
+.accounts-add { border-top: 1px solid #e3d4a8; padding-top: 12px; }
 </style>
 </head>
 <body>
@@ -847,9 +856,31 @@ body {
 
 <!-- SETTINGS -->
 <div id="tab-settings" class="tab-content">
-  <div class="section-header">Settings <span class="section-sub">Account identity · more coming as the hub goes multi-user</span></div>
+  <div class="section-header">Settings <span class="section-sub">Accounts · more coming as the hub goes multi-user</span></div>
+
   <div class="settings-card">
-    <div class="settings-card-title">Account</div>
+    <div class="settings-card-title">Accounts</div>
+    <div id="accounts-list" class="accounts-list"></div>
+    <div class="accounts-add">
+      <div class="settings-field">
+        <label for="add-displayname">Display name <span class="settings-opt">(optional)</span></label>
+        <input id="add-displayname" class="settings-input" type="text" maxlength="40" placeholder="e.g. Iron">
+      </div>
+      <div class="settings-field">
+        <label for="add-rsn">RSN <span class="settings-opt">(OSRS name)</span></label>
+        <input id="add-rsn" class="settings-input" type="text" maxlength="12" placeholder="OSRS name">
+      </div>
+      <div class="settings-row">
+        <button class="settings-save" id="add-account-btn" onclick="addAccount()">+ Add account</button>
+        <span class="settings-status" id="add-status"></span>
+      </div>
+    </div>
+    <div class="settings-note">Switching changes which account the whole hub shows — each account keeps its own
+      stats history, quests, diaries, and telemetry. Adding an account doesn't switch to it; use <b>Switch</b> when ready.</div>
+  </div>
+
+  <div class="settings-card">
+    <div class="settings-card-title">Current account</div>
     <div class="settings-field">
       <label for="set-displayname">Display name <span class="settings-opt">(optional)</span></label>
       <input id="set-displayname" class="settings-input" type="text" maxlength="40" placeholder="e.g. Main, Iron, …">
@@ -863,8 +894,7 @@ body {
       <span class="settings-status" id="set-status"></span>
     </div>
     <div class="settings-note">Changing the RSN re-points Hiscores to that name and refreshes your stats. Your tracked
-      history, quests, and diaries stay attached to this account — this edits the current account, it doesn't
-      switch to a separate one (multi-account is coming later).</div>
+      history, quests, and diaries stay attached to this account.</div>
   </div>
 </div>
 
@@ -1866,7 +1896,7 @@ function switchTab(name) {
   else stopTimelinePolling();
   if (name === 'loot')      loadLoot();
   if (name === 'bosses')    loadBosses();
-  if (name === 'settings')  loadAccount();
+  if (name === 'settings')  { loadAccount(); loadAccounts(); }
   if (name === 'diaries')   renderDiaries();
 }
 
@@ -3291,6 +3321,83 @@ async function saveAccount() {
     if (status) { status.className = 'settings-status err'; status.textContent = '⚠ ' + String(e.message || e); }
   } finally {
     if (btn) btn.disabled = false;
+  }
+}
+
+// Multi-account: list, add, switch (slice 2). All views are account-scoped, so switching
+// just flips the server pointer and reloads the page for a clean re-init under the new account.
+let ACCOUNTS = { accounts: [], currentId: null };
+
+async function loadAccounts() {
+  try {
+    const r = await fetch('/api/accounts');
+    if (!r.ok) throw new Error('accounts ' + r.status);
+    ACCOUNTS = await r.json();
+  } catch (e) {
+    console.warn('Could not load accounts.', e);
+    return;
+  }
+  renderAccounts();
+}
+
+function renderAccounts() {
+  const list = document.getElementById('accounts-list');
+  if (!list) return;
+  list.innerHTML = (ACCOUNTS.accounts || []).map(a => {
+    const active = a.id === ACCOUNTS.currentId;
+    const name = escapeHtml(a.displayName || a.rsn);
+    const sub = a.displayName ? `<span class="account-rsn">${escapeHtml(a.rsn)}</span>` : '';
+    const right = active
+      ? `<span class="account-active">● Active</span>`
+      : `<button class="account-switch" onclick="switchAccount(${a.id})">Switch</button>`;
+    return `<div class="account-row${active ? ' is-active' : ''}">
+        <span class="account-name">${name} ${sub}</span>
+        ${right}
+      </div>`;
+  }).join('') || '<div class="dash-sub">No accounts yet.</div>';
+}
+
+async function addAccount() {
+  const btn = document.getElementById('add-account-btn');
+  const status = document.getElementById('add-status');
+  const rsn = (document.getElementById('add-rsn').value || '').trim();
+  const displayName = (document.getElementById('add-displayname').value || '').trim();
+  if (status) { status.className = 'settings-status'; status.textContent = 'Adding…'; }
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/accounts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rsn, displayName }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || ('add ' + r.status));
+    document.getElementById('add-rsn').value = '';
+    document.getElementById('add-displayname').value = '';
+    await loadAccounts();
+    if (status) { status.className = 'settings-status ok'; status.textContent = '✓ Added — use Switch to load it'; }
+  } catch (e) {
+    if (status) { status.className = 'settings-status err'; status.textContent = '⚠ ' + String(e.message || e); }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function switchAccount(id) {
+  try {
+    const r = await fetch('/api/account/current', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || ('switch ' + r.status));
+    // localStorage is a single shared cache of the *previously loaded* account; clear the
+    // account-scoped keys so the new account loads from server truth and old data can't bleed across.
+    ['osrs_nullyn_completed','osrs_nullyn_goals','osrs_nullyn_questgoals','osrs_nullyn_presetgoals',
+     'osrs_nullyn_diaries','osrs_nullyn_checklist','osrs_nullyn_lastsnap'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
+    window.location.reload();          // every view is account-scoped — re-init the whole app
+  } catch (e) {
+    const status = document.getElementById('add-status');
+    if (status) { status.className = 'settings-status err'; status.textContent = '⚠ ' + String(e.message || e); }
   }
 }
 

@@ -93,10 +93,12 @@ and the dashboard recommends agreeable next actions.
   `/api/bosses`). Full collection-log item grid, PB tracking, and per-tier clue/CA/death dashboards still pending.
 - 🟡 **F3.4** Account timeline (living feed of level-ups, drops, completions, net-worth changes) —
   timeline tab + dashboard peek live; net-worth changes await the custom plugin.
-- 🟡 Real auth + sessions: turn `getCurrentAccount()` into actual accounts. **Slice 1 done** —
-  account identity (RSN + display name) is now DB-owned and editable in-app via a Settings tab
-  (`GET`/`PUT /api/account`); the `RSN` env var only seeds the first account. Multiple accounts,
-  switching, and auth/login still pending.
+- 🟡 Real auth + sessions: turn `getCurrentAccount()` into actual accounts. **Slices 1–2 done** —
+  account identity (RSN + display name) is DB-owned and editable in-app (`GET`/`PUT /api/account`),
+  and **multiple accounts** can be created / listed / switched from the Settings tab
+  (`GET`/`POST /api/accounts`, `PUT /api/account/current`; active account in an `app_settings`
+  pointer). The `RSN` env var only seeds the first account. Account **deletion** and real
+  **auth/login** still pending.
 - ⚪ Hosting decision + deployment (its own ADR).
 - ⚪ Self-serve onboarding: enter an RSN, get value with no vault and no local setup.
 

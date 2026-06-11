@@ -19,7 +19,7 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const anthropic = API_KEY ? new Anthropic({ apiKey: API_KEY }) : null;
 
 // SQLite store (history/time-series + account scoping). Vault stays for human notes.
-const { getCurrentAccount, updateAccount, snapshots, state, accountValue, checklist, events } = require('./db');
+const { getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, snapshots, state, accountValue, checklist, events } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -341,6 +341,38 @@ app.put('/api/account', (req, res) => {
   try {
     const account = getCurrentAccount();
     const result = updateAccount(account.id, { rsn: (req.body || {}).rsn, displayName: (req.body || {}).displayName });
+    if (result.error) return res.status(400).json({ error: result.error });
+    const a = result.account;
+    res.json({ id: a.id, rsn: a.rsn, displayName: a.displayName || null });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// Multi-account (going-public, slice 2): list, create, switch.
+app.get('/api/accounts', (_req, res) => {
+  try {
+    const current = getCurrentAccount();
+    res.json({ accounts: listAccounts(), currentId: current.id });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.post('/api/accounts', (req, res) => {
+  try {
+    const result = createAccount({ rsn: (req.body || {}).rsn, displayName: (req.body || {}).displayName });
+    if (result.error) return res.status(400).json({ error: result.error });
+    const a = result.account;
+    res.status(201).json({ id: a.id, rsn: a.rsn, displayName: a.displayName || null });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.put('/api/account/current', (req, res) => {
+  try {
+    const result = setCurrentAccount((req.body || {}).id);
     if (result.error) return res.status(400).json({ error: result.error });
     const a = result.account;
     res.json({ id: a.id, rsn: a.rsn, displayName: a.displayName || null });

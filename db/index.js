@@ -37,16 +37,64 @@ function migrate() {
   }
 }
 
-// Return the single current account. Identity is DB-owned and editable in-app; the RSN
-// env var only SEEDS the first account (so a UI rename isn't clobbered on the next request).
+// App-level key/value settings (process-wide, not account-scoped). First use: the active
+// account pointer for multi-account switching.
+function getSetting(key) {
+  const r = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key);
+  return r ? r.value : null;
+}
+function setSetting(key, value) {
+  db.prepare('INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .run(key, value == null ? null : String(value));
+}
+
+const selAccount = db.prepare('SELECT id, rsn, display_name AS displayName FROM accounts WHERE id = ?');
+const selFirstAccount = db.prepare('SELECT id, rsn, display_name AS displayName FROM accounts ORDER BY id LIMIT 1');
+
+// Return the active account. Identity is DB-owned; a `current_account_id` pointer in
+// app_settings selects which account is current. Falls back to the first account (seeding
+// one from the RSN env var only when none exist), and self-heals a stale pointer.
 function getCurrentAccount() {
-  let acct = db.prepare('SELECT id, rsn, display_name AS displayName FROM accounts ORDER BY id LIMIT 1').get();
+  const ptr = getSetting('current_account_id');
+  if (ptr) {
+    const acct = selAccount.get(Number(ptr));
+    if (acct) return acct;                          // pointer valid
+  }
+  let acct = selFirstAccount.get();
   if (!acct) {
     const rsn = process.env.RSN || 'Nullyn Voyd';
     db.prepare('INSERT INTO accounts (rsn) VALUES (?)').run(rsn);
-    acct = db.prepare('SELECT id, rsn, display_name AS displayName FROM accounts ORDER BY id LIMIT 1').get();
+    acct = selFirstAccount.get();
   }
+  setSetting('current_account_id', acct.id);        // seed / heal the pointer
   return acct;
+}
+
+function listAccounts() {
+  return db.prepare('SELECT id, rsn, display_name AS displayName FROM accounts ORDER BY id').all();
+}
+
+// Create a new account. Returns { account } or { error } (bad RSN / duplicate).
+function createAccount({ rsn, displayName } = {}) {
+  const norm = normalizeRsn(rsn);
+  if (norm.error) return { error: norm.error };
+  const dn = displayName == null ? null : String(displayName).trim().slice(0, 40) || null;
+  let info;
+  try {
+    info = db.prepare('INSERT INTO accounts (rsn, display_name) VALUES (?, ?)').run(norm.rsn, dn);
+  } catch (e) {
+    if (String(e).includes('UNIQUE')) return { error: 'An account with that RSN already exists.' };
+    throw e;
+  }
+  return { account: selAccount.get(info.lastInsertRowid) };
+}
+
+// Switch the active account. Returns { account } or { error } if the id is unknown.
+function setCurrentAccount(id) {
+  const acct = selAccount.get(Number(id));
+  if (!acct) return { error: 'Unknown account.' };
+  setSetting('current_account_id', acct.id);
+  return { account: acct };
 }
 
 // OSRS RSNs are 1–12 chars: letters, digits, spaces, hyphens, underscores.
@@ -78,4 +126,4 @@ const accountValue = require('./accountValue')(db);
 const checklist    = require('./checklist')(db);
 const events       = require('./events')(db);
 
-module.exports = { db, getCurrentAccount, updateAccount, snapshots, state, accountValue, checklist, events };
+module.exports = { db, getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, snapshots, state, accountValue, checklist, events };
