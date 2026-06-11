@@ -614,6 +614,16 @@ body {
 .loot-table tr:last-child td { border-bottom: none; }
 .loot-table .loot-num { text-align: right; font-variant-numeric: tabular-nums; }
 .loot-biggest .timeline-item { margin-bottom: 6px; }
+/* Bosses / Kill Tracker (F3.3) */
+.boss-table .boss-row td { font-weight: 600; }
+.boss-table .boss-row a { color: #3a2a8a; text-decoration: none; font-weight: 700; }
+.boss-table .boss-row a:hover { text-decoration: underline; }
+.boss-noloot { color: #6a5326; }
+.boss-table .boss-drill td { padding: 0 12px 8px; background: #fbf6e8; border-bottom: 1px solid #e6d8b4; }
+.boss-drops { padding: 4px 0 2px 12px; border-left: 2px solid #d8c590; }
+.boss-drop { display: flex; align-items: baseline; gap: 9px; padding: 3px 0; font-size: 12px; }
+.boss-drop .tl-summary { flex: 1; color: #4a3210; }
+.boss-drop .tl-time { color: #8a6a30; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -644,6 +654,7 @@ body {
   <div class="tab"         onclick="switchTab('checklist')">📋 Checklist</div>
   <div class="tab"         onclick="switchTab('timeline')">🛰️ Timeline</div>
   <div class="tab"         onclick="switchTab('loot')">🪙 Loot</div>
+  <div class="tab"         onclick="switchTab('bosses')">⚔️ Bosses</div>
   <div class="tab"         onclick="switchTab('chat')">💬 Chat</div>
 </div>
 
@@ -794,6 +805,14 @@ body {
   </div>
   <div id="loot-summary"></div>
   <div id="loot-body"></div>
+</div>
+
+<!-- BOSSES -->
+<div id="tab-bosses" class="tab-content">
+  <div class="section-header">Bosses &amp; Kill Tracker <span class="section-sub" id="bosses-sub">KC + loot per boss · from RuneLite (Dink)</span>
+    <button class="refresh-btn" id="bosses-refresh-btn" onclick="loadBosses()">↻ Refresh</button>
+  </div>
+  <div id="bosses-body"></div>
 </div>
 
 <!-- CHAT -->
@@ -1528,6 +1547,80 @@ function renderLoot() {
     <div class="loot-biggest">${biggestRows}</div>`;
 }
 
+// ── BOSSES / KILL TRACKER (F3.3) ────────────────────────────────────────────────
+// Boss-centric view over the telemetry feed: per-boss KC + logged loot, each row
+// expandable to its individual drops. Loaded on tab-open + init (like the Loot tab).
+let BOSS_SUMMARY = { bosses: [], totalBosses: 0, totalValue: 0 };
+let expandedBosses = new Set();
+
+async function loadBosses() {
+  try {
+    const r = await fetch('/api/bosses');
+    if (!r.ok) throw new Error('bosses ' + r.status);
+    BOSS_SUMMARY = await r.json();
+  } catch (e) {
+    console.warn('Could not load boss summary.', e);
+    BOSS_SUMMARY = { bosses: [], totalBosses: 0, totalValue: 0 };
+  }
+  renderBosses();
+}
+
+function toggleBoss(name) {
+  if (expandedBosses.has(name)) expandedBosses.delete(name); else expandedBosses.add(name);
+  renderBosses();
+}
+
+function renderBosses() {
+  const body = document.getElementById('bosses-body');
+  if (!body) return;
+  const sub = document.getElementById('bosses-sub');
+  const b = BOSS_SUMMARY;
+
+  if (!b.bosses || !b.bosses.length) {
+    if (sub) sub.textContent = 'KC + loot per boss · from RuneLite (Dink)';
+    body.innerHTML = `<div class="timeline-empty">
+      <p>No boss kills tracked yet. Kill counts and loot populate automatically from RuneLite.</p>
+      <p class="timeline-hint">In the <strong>Dink</strong> plugin, enable <strong>Kill Count</strong> (and <strong>Loot</strong>) notifications.
+      Bosses you kill appear here with their KC and the loot logged from them.</p>
+    </div>`;
+    return;
+  }
+  if (sub) sub.textContent = `${b.totalBosses} boss${b.totalBosses === 1 ? '' : 'es'} tracked · ${fmt(b.totalValue)} gp logged`;
+
+  const rows = b.bosses.map(boss => {
+    const open = expandedBosses.has(boss.boss);
+    const caret = boss.dropCount ? (open ? '▾' : '▸') : '·';
+    const name = boss.dropCount
+      ? `<a href="#" onclick="toggleBoss('${boss.boss.replace(/'/g, "\\'")}');return false;">${caret} ${escapeHtml(boss.boss)}</a>`
+      : `<span class="boss-noloot">${caret} ${escapeHtml(boss.boss)}</span>`;
+    const main = `<tr class="boss-row">
+        <td>${name}</td>
+        <td class="loot-num">${boss.kc != null ? boss.kc.toLocaleString() : '—'}</td>
+        <td class="loot-num">${boss.dropCount}</td>
+        <td class="loot-num">${fmt(boss.totalValue)}</td>
+        <td class="loot-num">${boss.avgPerDrop != null ? fmt(boss.avgPerDrop) : '—'}</td>
+        <td class="loot-num">${fmt(boss.biggest)}</td>
+      </tr>`;
+    let drill = '';
+    if (open && boss.drops.length) {
+      const items = boss.drops.map(d => `<div class="boss-drop">
+          <span class="tl-icon">💰</span>
+          <span class="tl-summary">${escapeHtml(d.summary)}</span>
+          <span class="tl-time">${relTime(d.occurred_at)}</span>
+        </div>`).join('');
+      drill = `<tr class="boss-drill"><td colspan="6"><div class="boss-drops">${items}</div></td></tr>`;
+    }
+    return main + drill;
+  }).join('');
+
+  body.innerHTML = `
+    <table class="loot-table boss-table">
+      <thead><tr><th>Boss</th><th class="loot-num">KC</th><th class="loot-num">Drops</th><th class="loot-num">Total value</th><th class="loot-num">Avg/drop</th><th class="loot-num">Biggest</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="dash-sub" style="margin-top:8px">Avg/drop is over logged drops only. KC is your in-game total (it includes kills from before tracking began), so this isn't a GP-per-kill figure.</div>`;
+}
+
 function renderChecklist() {
   const body = document.getElementById('checklist-body');
   if (!body) return;
@@ -1732,6 +1825,7 @@ function switchTab(name) {
   if (name === 'timeline')  { loadTimeline(); startTimelinePolling(); }
   else stopTimelinePolling();
   if (name === 'loot')      loadLoot();
+  if (name === 'bosses')    loadBosses();
   if (name === 'diaries')   renderDiaries();
 }
 
@@ -3286,6 +3380,7 @@ loadChecklist();             // async: pull daily/weekly checklist from SQLite, 
 loadTimeline();              // async: pull telemetry event feed (timeline + dashboard peek)
 loadLoot();                  // async: pull aggregated loot/wealth summary (Loot tab + tile)
 loadMilestones();            // async: pull progression milestones (Collection Log tile + panel)
+loadBosses();                // async: pull per-boss KC + loot summary (Bosses tab)
 loadMoney();                 // async: pull money methods, auto-bucket vs live stats/quests
 loadGephr();                 // async: compute live GP/hr from current GE prices
 </script>

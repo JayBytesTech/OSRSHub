@@ -94,6 +94,49 @@ module.exports = function makeEvents(db) {
     return { totalValue, dropCount: lootRows.length, bySource, biggestDrops, wealth: { dates, cumulative } };
   }
 
+  // Boss / kill-tracker view: keyed on bosses that have a KILL_COUNT (the genuinely tracked
+  // bosses), joined with whatever loot we've logged from them, plus a per-boss drilldown of
+  // individual drops. Distinct from lootSummary (which is loot-centric over all sources).
+  function bossSummary(accountId) {
+    const parse = (s) => { try { return s ? JSON.parse(s) : {}; } catch { return {}; } };
+    const kcRows = db.prepare(
+      "SELECT data FROM account_events WHERE account_id = ? AND type = 'kc'"
+    ).all(accountId).map(r => parse(r.data));
+    const lootRows = db.prepare(
+      "SELECT occurred_at, summary, data FROM account_events WHERE account_id = ? AND type = 'loot' ORDER BY occurred_at DESC"
+    ).all(accountId).map(r => ({ occurred_at: r.occurred_at, summary: r.summary, data: parse(r.data) }));
+
+    // Latest (max) KC per boss — kill counts only ever climb.
+    const kcByBoss = {};
+    for (const k of kcRows) {
+      if (!k || !k.boss || k.count == null) continue;
+      kcByBoss[k.boss] = Math.max(kcByBoss[k.boss] || 0, Number(k.count) || 0);
+    }
+
+    // One bucket per tracked boss. Loot from a matching source folds in (incl. drilldown).
+    const bosses = {};
+    for (const boss in kcByBoss) {
+      bosses[boss] = { boss, kc: kcByBoss[boss], dropCount: 0, totalValue: 0, biggest: 0, drops: [] };
+    }
+    for (const row of lootRows) {
+      const src = (row.data && row.data.source) || 'Unknown';
+      if (!bosses[src]) continue;                       // only attribute loot to tracked bosses
+      const val = Number(row.data && row.data.value) || 0;
+      const b = bosses[src];
+      b.dropCount++;
+      b.totalValue += val;
+      if (val > b.biggest) b.biggest = val;
+      if (b.drops.length < 25) b.drops.push({ summary: row.summary, value: val, occurred_at: row.occurred_at });
+    }
+
+    const list = Object.values(bosses)
+      .map(b => ({ ...b, avgPerDrop: b.dropCount ? Math.round(b.totalValue / b.dropCount) : null }))
+      .sort((a, b) => b.kc - a.kc || b.totalValue - a.totalValue);
+
+    const totalValue = list.reduce((s, b) => s + b.totalValue, 0);
+    return { bosses: list, totalBosses: list.length, totalValue };
+  }
+
   // Progression milestones from the typed telemetry feed (collection log, clues, combat
   // achievements, pets, deaths). Dink sends running totals, so we take the latest/max value
   // for cumulative figures rather than counting rows. All JS over the account's rows.
@@ -144,5 +187,5 @@ module.exports = function makeEvents(db) {
     };
   }
 
-  return { addEvent, recent, count, lootSummary, milestonesSummary };
+  return { addEvent, recent, count, lootSummary, milestonesSummary, bossSummary };
 };

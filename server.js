@@ -279,6 +279,15 @@ app.get('/api/milestones', (_req, res) => {
   }
 });
 
+app.get('/api/bosses', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json(events.bossSummary(account.id));
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
 // ── Live stats from the OSRS Hiscores ─────────────────────────────────────────
 // Hiscores skill name → hub name (only where they differ). Snapshots are stored by
 // skill name in SQLite, so there is no longer a positional skill-order coupling.
