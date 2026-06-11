@@ -97,6 +97,29 @@ function setCurrentAccount(id) {
   return { account: acct };
 }
 
+// Tables that scope rows by account_id — computed once so deleteAccount cascades robustly
+// even as new account-scoped tables are added.
+const accountScopedTables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all()
+  .map(t => t.name)
+  .filter(name => db.prepare('PRAGMA table_info(' + name + ')').all().some(c => c.name === 'account_id'));
+
+// Permanently delete an account and all its scoped data. Guarded: can't delete the only
+// account, and can't delete the active one (switch away first). Returns { ok } or { error }.
+function deleteAccount(id) {
+  const acct = selAccount.get(Number(id));
+  if (!acct) return { error: 'Unknown account.' };
+  const total = db.prepare('SELECT COUNT(*) AS c FROM accounts').get().c;
+  if (total <= 1) return { error: 'Cannot delete the only account.' };
+  const current = getSetting('current_account_id');
+  if (current && Number(current) === acct.id) return { error: 'Switch to another account before deleting this one.' };
+
+  db.transaction(() => {
+    for (const t of accountScopedTables) db.prepare('DELETE FROM ' + t + ' WHERE account_id = ?').run(acct.id);
+    db.prepare('DELETE FROM accounts WHERE id = ?').run(acct.id);
+  })();
+  return { ok: true, deletedId: acct.id };
+}
+
 // OSRS RSNs are 1–12 chars: letters, digits, spaces, hyphens, underscores.
 function normalizeRsn(raw) {
   const rsn = String(raw == null ? '' : raw).trim();
@@ -126,4 +149,4 @@ const accountValue = require('./accountValue')(db);
 const checklist    = require('./checklist')(db);
 const events       = require('./events')(db);
 
-module.exports = { db, getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, snapshots, state, accountValue, checklist, events };
+module.exports = { db, getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, deleteAccount, snapshots, state, accountValue, checklist, events };

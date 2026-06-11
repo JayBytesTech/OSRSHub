@@ -646,8 +646,11 @@ body {
 .account-name { font-weight: 700; color: #3a2010; font-size: 13px; }
 .account-rsn { font-weight: 400; color: #8a6a30; font-size: 11.5px; margin-left: 4px; }
 .account-active { color: #1d6b10; font-weight: 700; font-size: 12px; }
+.account-actions { display: flex; align-items: center; gap: 6px; }
 .account-switch { background: #efe4bf; color: #5a4010; border: 1px solid #c0a85c; border-radius: 5px; padding: 4px 12px; font-weight: 700; font-size: 12px; cursor: pointer; }
 .account-switch:hover { background: #e6d59f; }
+.account-delete { background: #f3ddd4; color: #9a3010; border: 1px solid #d8a890; border-radius: 5px; padding: 4px 8px; font-size: 12px; cursor: pointer; line-height: 1; }
+.account-delete:hover { background: #ecc8ba; }
 .accounts-add { border-top: 1px solid #e3d4a8; padding-top: 12px; }
 </style>
 </head>
@@ -3349,7 +3352,10 @@ function renderAccounts() {
     const sub = a.displayName ? `<span class="account-rsn">${escapeHtml(a.rsn)}</span>` : '';
     const right = active
       ? `<span class="account-active">● Active</span>`
-      : `<button class="account-switch" onclick="switchAccount(${a.id})">Switch</button>`;
+      : `<span class="account-actions">
+           <button class="account-switch" onclick="switchAccount(${a.id})">Switch</button>
+           <button class="account-delete" title="Delete account" onclick="deleteAccount(${a.id}, '${(a.displayName || a.rsn).replace(/'/g, "\\'")}')">🗑</button>
+         </span>`;
     return `<div class="account-row${active ? ' is-active' : ''}">
         <span class="account-name">${name} ${sub}</span>
         ${right}
@@ -3397,6 +3403,23 @@ async function switchAccount(id) {
     window.location.reload();          // every view is account-scoped — re-init the whole app
   } catch (e) {
     const status = document.getElementById('add-status');
+    if (status) { status.className = 'settings-status err'; status.textContent = '⚠ ' + String(e.message || e); }
+  }
+}
+
+async function deleteAccount(id, name) {
+  const ok = window.confirm(
+    `Permanently delete "${name}"?\n\nThis erases all of that account's tracked data — stats history, ` +
+    `quests, diaries, goals, checklist, and telemetry. This cannot be undone.`);
+  if (!ok) return;
+  const status = document.getElementById('add-status');
+  try {
+    const r = await fetch('/api/accounts/' + id, { method: 'DELETE' });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || ('delete ' + r.status));
+    await loadAccounts();
+    if (status) { status.className = 'settings-status ok'; status.textContent = `✓ Deleted "${name}"`; }
+  } catch (e) {
     if (status) { status.className = 'settings-status err'; status.textContent = '⚠ ' + String(e.message || e); }
   }
 }

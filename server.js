@@ -19,7 +19,7 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const anthropic = API_KEY ? new Anthropic({ apiKey: API_KEY }) : null;
 
 // SQLite store (history/time-series + account scoping). Vault stays for human notes.
-const { getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, snapshots, state, accountValue, checklist, events } = require('./db');
+const { getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, deleteAccount, snapshots, state, accountValue, checklist, events } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -376,6 +376,16 @@ app.put('/api/account/current', (req, res) => {
     if (result.error) return res.status(400).json({ error: result.error });
     const a = result.account;
     res.json({ id: a.id, rsn: a.rsn, displayName: a.displayName || null });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.delete('/api/accounts/:id', (req, res) => {
+  try {
+    const result = deleteAccount(req.params.id);
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
