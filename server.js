@@ -19,7 +19,7 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const anthropic = API_KEY ? new Anthropic({ apiKey: API_KEY }) : null;
 
 // SQLite store (history/time-series + account scoping). Vault stays for human notes.
-const { getCurrentAccount, snapshots, state, accountValue, checklist, events } = require('./db');
+const { getCurrentAccount, updateAccount, snapshots, state, accountValue, checklist, events } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -293,9 +293,9 @@ app.get('/api/bosses', (_req, res) => {
 // skill name in SQLite, so there is no longer a positional skill-order coupling.
 const HISCORE_NAME_MAP = { Runecraft: 'Runecrafting' };
 
-async function fetchHiscores() {
+async function fetchHiscores(rsn) {
   const url = 'https://secure.runescape.com/m=hiscore_oldschool/index_lite.json?player=' +
-    encodeURIComponent(RSN);
+    encodeURIComponent(rsn || RSN);
   const r = await fetch(url, { headers: { 'User-Agent': 'osrs-hub-local' } });
   if (!r.ok) throw new Error('Hiscores HTTP ' + r.status + (r.status === 404 ? ' (RSN not found?)' : ''));
   const data = await r.json();
@@ -317,13 +317,35 @@ function todayLabel() {
 
 app.get('/api/stats', async (_req, res) => {
   try {
-    const stats = await fetchHiscores();
     const account = getCurrentAccount();
+    const stats = await fetchHiscores(account.rsn);
     snapshots.recordSnapshot(account.id, todayLabel(), stats);   // upsert today's per-skill rows
     const history = snapshots.getHistory(account.id);            // legacy { dates, skills } shape
-    res.json({ stats, history, rsn: RSN });
+    res.json({ stats, history, rsn: account.rsn, displayName: account.displayName || null });
   } catch (e) {
     res.status(502).json({ error: String(e) });
+  }
+});
+
+// Account identity (going-public, slice 1). GET returns the current account; PUT edits it.
+app.get('/api/account', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json({ id: account.id, rsn: account.rsn, displayName: account.displayName || null });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.put('/api/account', (req, res) => {
+  try {
+    const account = getCurrentAccount();
+    const result = updateAccount(account.id, { rsn: (req.body || {}).rsn, displayName: (req.body || {}).displayName });
+    if (result.error) return res.status(400).json({ error: result.error });
+    const a = result.account;
+    res.json({ id: a.id, rsn: a.rsn, displayName: a.displayName || null });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
   }
 });
 
@@ -600,7 +622,7 @@ app.post('/api/chat', async (req, res) => {
     console.log(`OSRS Hub running → http://localhost:${PORT}`);
     console.log(`Vault: ${VAULT_PATH}`);
     console.log(`State file: ${STATE_REL}`);
-    console.log(`Hiscores RSN: ${RSN}`);
+    console.log(`Hiscores RSN: ${getCurrentAccount().rsn}`);
     console.log(`DB: ${process.env.DB_PATH || 'data/osrs-hub.db'}`);
     console.log(`Chat: ${anthropic ? MODEL : 'DISABLED (no ANTHROPIC_API_KEY)'}${anthropic && ENABLE_WEB_SEARCH ? ' + web search' : ''}`);
   });

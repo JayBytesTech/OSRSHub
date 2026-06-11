@@ -83,9 +83,12 @@ The vault becomes **optional and personal**: a hosted public user has no vault, 
 power user can opt in. Never make a core feature *depend* on the vault existing.
 
 ### 2.2 Account scoping (per ADR D1)
-Every domain table has an `account_id`. Today there is exactly one account (yours, seeded
-from `RSN`). The single-account assumption lives behind a `getCurrentAccount()` seam so it
-can become real auth later **without touching feature code**.
+Every domain table has an `account_id`. Today there is exactly one account (yours). Account
+**identity is now DB-owned and editable in-app** (RSN + display name, via a Settings tab and
+`GET`/`PUT /api/account`); the `RSN` env var only **seeds the first account** — after that the
+DB wins, so `getCurrentAccount()` returns the stored account rather than re-upserting from env.
+The single-account assumption still lives behind that seam, so multiple accounts + real auth can
+land later **without touching feature code**.
 
 ### 2.3 Telemetry ingest contract (per ADR D2)
 Define early, implement later. Sketch:

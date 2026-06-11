@@ -624,6 +624,22 @@ body {
 .boss-drop { display: flex; align-items: baseline; gap: 9px; padding: 3px 0; font-size: 12px; }
 .boss-drop .tl-summary { flex: 1; color: #4a3210; }
 .boss-drop .tl-time { color: #8a6a30; font-size: 11px; }
+/* Settings (going-public, slice 1) */
+.settings-card { max-width: 480px; background: #f6edd4; border: 1px solid #d8c590; border-radius: 8px; padding: 16px 18px; }
+.settings-card-title { font-weight: 800; color: #3a2010; font-size: 14px; margin-bottom: 12px; }
+.settings-field { margin-bottom: 12px; }
+.settings-field label { display: block; font-size: 12px; font-weight: 600; color: #5a4010; margin-bottom: 4px; }
+.settings-opt { font-weight: 400; color: #8a6a30; }
+.settings-input { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 13px; border: 1px solid #c0a85c; border-radius: 5px; background: #fffdf5; color: #2e1c08; }
+.settings-input:focus { outline: none; border-color: #8b6914; }
+.settings-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.settings-save { background: #8b6914; color: #faf4e4; border: 1px solid #5c3c08; border-radius: 5px; padding: 8px 18px; font-weight: 700; cursor: pointer; }
+.settings-save:hover:not(:disabled) { background: #9c7a1e; }
+.settings-save:disabled { opacity: .6; cursor: default; }
+.settings-status { font-size: 12px; font-weight: 600; color: #6a5326; }
+.settings-status.ok { color: #1d6b10; }
+.settings-status.err { color: #9a3010; }
+.settings-note { margin-top: 14px; font-size: 11.5px; line-height: 1.5; color: #6a5326; }
 </style>
 </head>
 <body>
@@ -656,6 +672,7 @@ body {
   <div class="tab"         onclick="switchTab('loot')">🪙 Loot</div>
   <div class="tab"         onclick="switchTab('bosses')">⚔️ Bosses</div>
   <div class="tab"         onclick="switchTab('chat')">💬 Chat</div>
+  <div class="tab"         onclick="switchTab('settings')">⚙️ Settings</div>
 </div>
 
 <!-- DASHBOARD -->
@@ -825,6 +842,29 @@ body {
       <textarea class="chat-input" id="chat-input" rows="2" placeholder="Ask anything… (Enter to send, Shift+Enter for newline)"></textarea>
       <button class="chat-send" id="chat-send" onclick="sendChat()">Send</button>
     </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="tab-settings" class="tab-content">
+  <div class="section-header">Settings <span class="section-sub">Account identity · more coming as the hub goes multi-user</span></div>
+  <div class="settings-card">
+    <div class="settings-card-title">Account</div>
+    <div class="settings-field">
+      <label for="set-displayname">Display name <span class="settings-opt">(optional)</span></label>
+      <input id="set-displayname" class="settings-input" type="text" maxlength="40" placeholder="e.g. Main, Iron, …">
+    </div>
+    <div class="settings-field">
+      <label for="set-rsn">RSN <span class="settings-opt">(OSRS name — drives Hiscores)</span></label>
+      <input id="set-rsn" class="settings-input" type="text" maxlength="12" placeholder="e.g. Nullyn Voyd">
+    </div>
+    <div class="settings-row">
+      <button class="settings-save" id="set-save" onclick="saveAccount()">Save</button>
+      <span class="settings-status" id="set-status"></span>
+    </div>
+    <div class="settings-note">Changing the RSN re-points Hiscores to that name and refreshes your stats. Your tracked
+      history, quests, and diaries stay attached to this account — this edits the current account, it doesn't
+      switch to a separate one (multi-account is coming later).</div>
   </div>
 </div>
 
@@ -1826,6 +1866,7 @@ function switchTab(name) {
   else stopTimelinePolling();
   if (name === 'loot')      loadLoot();
   if (name === 'bosses')    loadBosses();
+  if (name === 'settings')  loadAccount();
   if (name === 'diaries')   renderDiaries();
 }
 
@@ -3192,6 +3233,7 @@ async function loadStats(manual) {
     if (data.history && Array.isArray(data.history.dates) && data.history.dates.length) HISTORY = data.history;
     document.getElementById('cb-level').textContent = combatLevel();
     document.getElementById('total-level').textContent = totalLevel();
+    if (data.rsn) setHeaderName(data.displayName || data.rsn);
     renderSkills(); renderGoals(); populateChartSelect(); renderGains(); renderMoney(); renderDashboard(); recordAccountValue();
     if (document.getElementById('tab-progress').classList.contains('active')) renderChart();
     if (note) note.textContent = '✅ Live from OSRS Hiscores (' + (data.rsn || 'player') + ') · ' + new Date().toLocaleString();
@@ -3199,6 +3241,56 @@ async function loadStats(manual) {
     if (note) note.textContent = '⚠ Hiscores unavailable — showing last embedded stats (June 8, 2026).';
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '⟳ Refresh stats'; }
+  }
+}
+
+// ── ACCOUNT / SETTINGS (going-public, slice 1) ──────────────────────────────────
+let ACCOUNT = { id: null, rsn: null, displayName: null };
+
+function setHeaderName(name) {
+  const el = document.querySelector('.header-rsn');
+  if (el) el.textContent = '⚔️ ' + name;
+}
+
+async function loadAccount() {
+  try {
+    const r = await fetch('/api/account');
+    if (!r.ok) throw new Error('account ' + r.status);
+    ACCOUNT = await r.json();
+  } catch (e) {
+    console.warn('Could not load account.', e);
+    return;
+  }
+  const dn = document.getElementById('set-displayname');
+  const rsn = document.getElementById('set-rsn');
+  if (dn)  dn.value  = ACCOUNT.displayName || '';
+  if (rsn) rsn.value = ACCOUNT.rsn || '';
+  setHeaderName(ACCOUNT.displayName || ACCOUNT.rsn || 'player');
+}
+
+async function saveAccount() {
+  const btn = document.getElementById('set-save');
+  const status = document.getElementById('set-status');
+  const rsn = (document.getElementById('set-rsn').value || '').trim();
+  const displayName = (document.getElementById('set-displayname').value || '').trim();
+  if (status) { status.className = 'settings-status'; status.textContent = 'Saving…'; }
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/account', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rsn, displayName }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || ('save ' + r.status));
+    ACCOUNT = data;
+    setHeaderName(ACCOUNT.displayName || ACCOUNT.rsn);
+    if (status) { status.className = 'settings-status ok'; status.textContent = '✓ Saved — refreshing Hiscores…'; }
+    await loadStats(true);                 // re-pull stats for the (possibly new) RSN
+    if (status) status.textContent = '✓ Saved';
+  } catch (e) {
+    if (status) { status.className = 'settings-status err'; status.textContent = '⚠ ' + String(e.message || e); }
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -3381,6 +3473,7 @@ loadTimeline();              // async: pull telemetry event feed (timeline + das
 loadLoot();                  // async: pull aggregated loot/wealth summary (Loot tab + tile)
 loadMilestones();            // async: pull progression milestones (Collection Log tile + panel)
 loadBosses();                // async: pull per-boss KC + loot summary (Bosses tab)
+loadAccount();               // async: pull account identity (Settings + header name)
 loadMoney();                 // async: pull money methods, auto-bucket vs live stats/quests
 loadGephr();                 // async: compute live GP/hr from current GE prices
 </script>

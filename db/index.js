@@ -37,11 +37,39 @@ function migrate() {
   }
 }
 
-// Upsert + return the single current account (seeded from the RSN env var for now).
+// Return the single current account. Identity is DB-owned and editable in-app; the RSN
+// env var only SEEDS the first account (so a UI rename isn't clobbered on the next request).
 function getCurrentAccount() {
-  const rsn = process.env.RSN || 'Nullyn Voyd';
-  db.prepare('INSERT INTO accounts (rsn) VALUES (?) ON CONFLICT(rsn) DO NOTHING').run(rsn);
-  return db.prepare('SELECT id, rsn FROM accounts WHERE rsn = ?').get(rsn);
+  let acct = db.prepare('SELECT id, rsn, display_name AS displayName FROM accounts ORDER BY id LIMIT 1').get();
+  if (!acct) {
+    const rsn = process.env.RSN || 'Nullyn Voyd';
+    db.prepare('INSERT INTO accounts (rsn) VALUES (?)').run(rsn);
+    acct = db.prepare('SELECT id, rsn, display_name AS displayName FROM accounts ORDER BY id LIMIT 1').get();
+  }
+  return acct;
+}
+
+// OSRS RSNs are 1–12 chars: letters, digits, spaces, hyphens, underscores.
+function normalizeRsn(raw) {
+  const rsn = String(raw == null ? '' : raw).trim();
+  if (rsn.length < 1 || rsn.length > 12) return { error: 'RSN must be 1–12 characters.' };
+  if (!/^[A-Za-z0-9 _-]+$/.test(rsn)) return { error: 'RSN may only contain letters, digits, spaces, hyphens, and underscores.' };
+  return { rsn };
+}
+
+// Edit the current account's identity. Validates the RSN; display name is optional.
+// Returns { account } on success or { error } on bad input / RSN collision.
+function updateAccount(id, { rsn, displayName } = {}) {
+  const norm = normalizeRsn(rsn);
+  if (norm.error) return { error: norm.error };
+  const dn = displayName == null ? null : String(displayName).trim().slice(0, 40) || null;
+  try {
+    db.prepare('UPDATE accounts SET rsn = ?, display_name = ? WHERE id = ?').run(norm.rsn, dn, id);
+  } catch (e) {
+    if (String(e).includes('UNIQUE')) return { error: 'That RSN is already used by another account.' };
+    throw e;
+  }
+  return { account: db.prepare('SELECT id, rsn, display_name AS displayName FROM accounts WHERE id = ?').get(id) };
 }
 
 const snapshots    = require('./snapshots')(db);
@@ -50,4 +78,4 @@ const accountValue = require('./accountValue')(db);
 const checklist    = require('./checklist')(db);
 const events       = require('./events')(db);
 
-module.exports = { db, getCurrentAccount, snapshots, state, accountValue, checklist, events };
+module.exports = { db, getCurrentAccount, updateAccount, snapshots, state, accountValue, checklist, events };
