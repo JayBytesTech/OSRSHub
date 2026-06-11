@@ -30,19 +30,27 @@ module.exports = function makeSnapshots(db) {
     return db.prepare('SELECT COUNT(*) AS c FROM skill_snapshots WHERE account_id = ?').get(accountId).c;
   }
 
-  // Rebuilds the legacy response shape: { dates:[...], skills:{ <name>:[level/date...], Total:[...] } }.
-  // Carries the last known level forward across dates a skill is missing (mirrors prior behavior).
+  // Rebuilds the response shape: { dates:[...], skills:{ <name>:[level/date...], Total:[...] },
+  // xp:{ <name>:[xp/date...], Total:[...] } }. Levels carry the last known value forward across
+  // dates a skill is missing (mirrors prior behavior). XP is null before a skill's first real XP
+  // reading (the legacy vault import stored no XP), then carries forward — so the XP line breaks
+  // rather than drawing a fake floor for the pre-tracking period.
   function getHistory(accountId) {
     const dates = db.prepare(
       'SELECT DISTINCT date FROM skill_snapshots WHERE account_id = ? ORDER BY date'
     ).all(accountId).map(r => r.date);
 
     const rows = db.prepare(
-      'SELECT date, skill, level FROM skill_snapshots WHERE account_id = ?'
+      'SELECT date, skill, level, xp FROM skill_snapshots WHERE account_id = ?'
     ).all(accountId);
 
-    const bySkill = {};
-    for (const r of rows) (bySkill[r.skill] || (bySkill[r.skill] = {}))[r.date] = r.level;
+    const bySkill = {};   // level by date
+    const xpBy = {};      // xp by date (only where recorded)
+    const xpDates = new Set();
+    for (const r of rows) {
+      (bySkill[r.skill] || (bySkill[r.skill] = {}))[r.date] = r.level;
+      if (r.xp != null) { (xpBy[r.skill] || (xpBy[r.skill] = {}))[r.date] = r.xp; xpDates.add(r.date); }
+    }
 
     const skills = {};
     for (const skill in bySkill) {
@@ -59,7 +67,29 @@ module.exports = function makeSnapshots(db) {
       for (const skill in skills) if (skill !== 'Total') sum += skills[skill][i] || 0;
       return sum;
     });
-    return { dates, skills };
+
+    // XP series: null until a skill's first recorded XP, then carry forward.
+    const xp = {};
+    for (const skill in bySkill) {
+      const series = [];
+      let last = null, started = false;
+      for (const d of dates) {
+        if (xpBy[skill] && xpBy[skill][d] != null) { last = xpBy[skill][d]; started = true; }
+        series.push(started ? last : null);
+      }
+      xp[skill] = series;
+    }
+    // Total XP: null until XP tracking begins on any skill, then sum carried-forward XP.
+    let totalStarted = false;
+    xp.Total = dates.map((d, i) => {
+      if (xpDates.has(d)) totalStarted = true;
+      if (!totalStarted) return null;
+      let sum = 0;
+      for (const skill in xp) if (skill !== 'Total') sum += xp[skill][i] || 0;
+      return sum;
+    });
+
+    return { dates, skills, xp };
   }
 
   // One-time seed from the old vault history markdown (the ```json block).

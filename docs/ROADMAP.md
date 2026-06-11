@@ -65,7 +65,11 @@ and the dashboard recommends agreeable next actions.
 ## Phase 4 — Depth & analytics  ⚪
 *Make progress measurable and motivating.*
 
-- ⚪ **F2.1** Money-maker analytics: historical GP/hr, profit per activity, wealth-over-time charts.
+- 🟡 **F2.1** Money-maker analytics: historical GP/hr, profit per activity, wealth-over-time charts.
+  **Trends view live** — the Progress tab charts XP-over-time (per-skill + Total; the line breaks at
+  the XP-tracking start since legacy history is levels-only), Account Value over time, and cumulative
+  Wealth-from-drops, with a Level/XP toggle and XP deltas in the Recent-gains grid (`getHistory()` now
+  returns an `xp` series). Per-activity GP/hr history + bank value still pending (await the custom plugin).
 - 🟢 **F2.2** XP planning: per-skill XP-remaining + time-to-goal per method (curated XP/hr dataset + ad-hoc planner).
 - 🟢 **F2.3** Achievement-diary planner: tier-level requirements for all 12 regions (skill/quest/combat
   gates, "can I do this now?"), completion tracking, dashboard tile. (Per-task drill-down deferred.)

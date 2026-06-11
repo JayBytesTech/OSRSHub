@@ -737,9 +737,15 @@ body {
   <div class="progress-section">
     <div class="chart-controls">
       <label style="font-size:12px;color:#5a3a10;font-weight:600;">Chart:</label>
-      <select class="goal-select" id="chart-skill" style="flex:0 0 auto;min-width:160px" onchange="renderChart()"></select>
+      <select class="goal-select" id="chart-skill" style="flex:0 0 auto;min-width:180px" onchange="renderChart()"></select>
+      <span id="metric-toggle" style="display:inline-flex;gap:4px">
+        <button class="filter-btn active" id="metric-xp"    onclick="setChartMetric('xp')">✨ XP</button>
+        <button class="filter-btn"        id="metric-level" onclick="setChartMetric('level')">📊 Level</button>
+      </span>
     </div>
-    <div class="chart-wrap"><canvas id="progress-chart" height="240"></canvas></div>
+    <div class="chart-wrap"><canvas id="progress-chart" height="240"></canvas>
+      <div id="chart-note" class="section-sub" style="margin-top:8px"></div>
+    </div>
     <div class="section-header" style="font-size:14px;">Recent gains <span class="section-sub" id="gains-window"></span></div>
     <div class="gains-grid" id="gains-grid"></div>
   </div>
@@ -1004,7 +1010,8 @@ let HISTORY = {
     "Construction": [8,14,14,14,14,14,14],
     "Sailing":      [1,1,1,1,1,1,1],
     "Total":        [507,554,594,621,628,657,658],
-  }
+  },
+  xp: {}   // populated from /api/stats; empty before first load (XP tracking began later than levels)
 };
 
 // ── QUESTS ────────────────────────────────────────────────────────────────────
@@ -2798,12 +2805,23 @@ function toggleQuest(name, checked) {
 // ── PROGRESS CHART ────────────────────────────────────────────────────────────
 
 let chartInst = null;
+let chartMetric = 'xp';   // 'xp' | 'level' — applies to skill/Total series only
+
+// Account-wide series live at the top of the dropdown and ignore the Level/XP toggle.
+const CHART_SPECIAL = { __av: 'Account Value', __wealth: 'Wealth from drops' };
 
 function populateChartSelect() {
   const sel = document.getElementById('chart-skill');
+  const prev = sel.value;
   sel.innerHTML = '';
+  const grp = document.createElement('optgroup');
+  grp.label = 'Wealth & Value';
+  [['__av', '💰 Account Value'], ['__wealth', '🪙 Wealth from drops']].forEach(([v, t]) => {
+    const o = document.createElement('option'); o.value = v; o.textContent = t; grp.appendChild(o);
+  });
+  sel.appendChild(grp);
   const optTotal = document.createElement('option');
-  optTotal.value = 'Total'; optTotal.textContent = '📊 Total Level';
+  optTotal.value = 'Total'; optTotal.textContent = '📊 Total';
   sel.appendChild(optTotal);
   SKILL_NAMES.slice(1).forEach(n => {
     if (!HISTORY.skills[n]) return;
@@ -2811,37 +2829,86 @@ function populateChartSelect() {
     o.value = n; o.textContent = `${SKILL_EMOJIS[n]} ${n}`;
     sel.appendChild(o);
   });
+  if (prev) sel.value = prev;
+  if (!sel.value) sel.value = 'Total';
+}
+
+function setChartMetric(m) {
+  chartMetric = m;
+  document.getElementById('metric-xp').classList.toggle('active', m === 'xp');
+  document.getElementById('metric-level').classList.toggle('active', m === 'level');
+  renderChart();
+}
+
+// Compact axis/tooltip number: 12.3M / 84.1k / 1,234.
+function fmtBig(n) {
+  if (n == null) return '';
+  const a = Math.abs(n);
+  if (a >= 1e6) return (n / 1e6).toFixed(2).replace(/\.00$/, '') + 'M';
+  if (a >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
+  return Math.round(n).toLocaleString();
 }
 
 function renderChart() {
   if (typeof Chart === 'undefined') return;
   const sel = document.getElementById('chart-skill');
-  const skill = sel.value || 'Total';
-  const data = HISTORY.skills[skill] || HISTORY.skills['Total'];
+  const key = sel.value || 'Total';
+  const note = document.getElementById('chart-note');
+  const special = CHART_SPECIAL[key];
+
+  // The Level/XP toggle only makes sense for skill/Total series.
+  document.getElementById('metric-toggle').style.display = special ? 'none' : 'inline-flex';
+
+  let labels, data, label, compact = false, yMax, fill = true;
+  if (key === '__av') {
+    labels = AV_TREND.dates || []; data = AV_TREND.score || [];
+    label = 'Account Value (%)'; yMax = 100;
+    note.textContent = data.length < 2 ? 'Account Value trend builds one point per day.' : '';
+  } else if (key === '__wealth') {
+    const w = (LOOT_SUMMARY && LOOT_SUMMARY.wealth) || { dates: [], cumulative: [] };
+    labels = w.dates || []; data = w.cumulative || [];
+    label = 'Wealth from drops (gp)'; compact = true;
+    note.textContent = data.length < 2 ? 'Wealth trend builds as you log drops across more days.' : 'Cumulative GE value of logged drops.';
+  } else if (chartMetric === 'xp') {
+    labels = HISTORY.dates; data = (HISTORY.xp && HISTORY.xp[key]) || [];
+    label = (key === 'Total' ? 'Total' : key) + ' XP'; compact = true;
+    const firstIdx = data.findIndex(v => v != null);
+    note.textContent = firstIdx > 0
+      ? `XP tracked since ${HISTORY.dates[firstIdx]} — earlier history is levels only.`
+      : (firstIdx === -1 ? 'No XP recorded yet — switch to Level, or refresh stats to start XP history.' : '');
+  } else {
+    labels = HISTORY.dates; data = HISTORY.skills[key] || HISTORY.skills['Total'];
+    label = (key === 'Total' ? 'Total' : key) + ' Level';
+    note.textContent = '';
+  }
+
   const ctx = document.getElementById('progress-chart').getContext('2d');
   if (chartInst) chartInst.destroy();
   chartInst = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: HISTORY.dates,
+      labels,
       datasets: [{
-        label: skill === 'Total' ? 'Total Level' : skill + ' Level',
-        data: data,
+        label, data,
         borderColor: '#2e6614',
         backgroundColor: 'rgba(46,102,20,0.12)',
         borderWidth: 2,
         pointRadius: 3,
         pointBackgroundColor: '#8b6914',
         tension: 0.25,
-        fill: true,
+        fill,
+        spanGaps: false,   // break the line across null (pre-tracking) points
       }]
     },
     options: {
       responsive: true,
-      plugins: { legend: { labels: { color: '#3a2010' } } },
+      plugins: {
+        legend: { labels: { color: '#3a2010' } },
+        tooltip: { callbacks: { label: (c) => `${label}: ${compact ? fmtBig(c.parsed.y) : (c.parsed.y == null ? '—' : c.parsed.y.toLocaleString())}` } }
+      },
       scales: {
         x: { ticks: { color: '#6a4a14', callback: function(v){ return String(this.getLabelForValue(v)).slice(5); } }, grid: { color: '#e0d4a8' } },
-        y: { ticks: { color: '#6a4a14' }, grid: { color: '#e0d4a8' }, beginAtZero: false }
+        y: { ticks: { color: '#6a4a14', callback: (v) => compact ? fmtBig(v) : v }, grid: { color: '#e0d4a8' }, beginAtZero: false, max: yMax }
       }
     }
   });
@@ -2850,22 +2917,34 @@ function renderChart() {
 function renderGains() {
   // Compare the last two logged columns in the history.
   const n = HISTORY.dates.length;
-  const from = HISTORY.dates[n-2], to = HISTORY.dates[n-1];
-  document.getElementById('gains-window').textContent = `${String(from).slice(5)} → ${String(to).slice(5)}`;
   const grid = document.getElementById('gains-grid');
   grid.innerHTML = '';
-  // Total card first
+  if (n < 2) { document.getElementById('gains-window').textContent = ''; return; }
+  const from = HISTORY.dates[n-2], to = HISTORY.dates[n-1];
+  document.getElementById('gains-window').textContent = `${String(from).slice(5)} → ${String(to).slice(5)}`;
+  // Total card first. XP delta (when tracked) is the headline — it surfaces grinding that
+  // didn't yield a level; level delta is the sub-line. Falls back to levels for pre-XP history.
   [['Total','Total']].concat(SKILL_NAMES.slice(1).map(s=>[s,s])).forEach(([key,label]) => {
     const arr = HISTORY.skills[key];
     if (!arr) return;
-    const delta = arr[n-1] - arr[n-2];
-    if (key !== 'Total' && delta === 0) return; // only show movers (+ always show total)
+    const lvlDelta = arr[n-1] - arr[n-2];
+    const xpArr = HISTORY.xp && HISTORY.xp[key];
+    const x1 = xpArr ? xpArr[n-2] : null, x2 = xpArr ? xpArr[n-1] : null;
+    const xpDelta = (x1 != null && x2 != null) ? x2 - x1 : null;
+    if (key !== 'Total' && lvlDelta === 0 && !(xpDelta > 0)) return; // movers only (+ always show Total)
+    const moved = lvlDelta > 0 || xpDelta > 0;
+    const big = xpDelta != null
+      ? (xpDelta > 0 ? '+' + fmtBig(xpDelta) + ' XP' : '+0 XP')
+      : (lvlDelta > 0 ? '+' + lvlDelta + ' lvl' : '+0');
+    const sub = xpDelta != null
+      ? `${lvlDelta > 0 ? '+' + lvlDelta + ' lvl · ' : ''}${arr[n-2]} → ${arr[n-1]}`
+      : `${arr[n-2]} → ${arr[n-1]}`;
     const card = document.createElement('div');
     card.className = 'gain-card';
     card.innerHTML = `
       <div class="gain-skill">${key==='Total'?'📊':(SKILL_EMOJIS[key]||'')} ${label}</div>
-      <div class="gain-val ${delta>0?'':'flat'}">${delta>0?'+'+delta:'+0'}</div>
-      <div class="gain-sub">${arr[n-2]} → ${arr[n-1]}</div>`;
+      <div class="gain-val ${moved?'':'flat'}">${big}</div>
+      <div class="gain-sub">${sub}</div>`;
     grid.appendChild(card);
   });
   if (grid.children.length === 1) {
