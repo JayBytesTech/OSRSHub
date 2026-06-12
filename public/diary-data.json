@@ -2,7 +2,7 @@
   "_meta": {
     "about": "Tier-level aggregate Achievement Diary requirements (Phase 4 / F2.3). Static, non-account-scoped reference data served from /public like quest-data.json. Entry shape per tier: s = aggregate skill levels (the highest level any task in that tier needs, per skill), cb = combat-level gate (Western Provinces only), q = quests that must be COMPLETED (verifiable against your ticked quest completions), reward = the unlock, note = extra caveats. The engine marks a tier 'ready' when every s/cb gate is met and every q quest is complete; 'locked' otherwise; 'done' when you've toggled it complete.",
     "caveats": "Skill levels are best-effort aggregates from oldschool.runescape.wiki and many are boostable. The q list only contains standard quests the hub can verify; miniquests (e.g. Enter the Abyss, Mage Arena I, Alfred Grimhand's Barcrawl) and quests that only need to be STARTED are listed in `note` instead of `q`, so they never falsely lock a tier. Completion itself is all-or-nothing per tier and tracked by you ticking it — the hub answers 'can I do this now?', not 'which individual tasks have I done?'.",
-    "tasks": "Each tier may carry an optional `tasks` array for per-task drill-down: { id (globally-unique stable key, used for completion ticks), t (task text), s? (notable per-task skill gate), q? (full quests required for that task), cb? (combat-level gate), note? (started/partial quests, miniquests, items, or other caveats not auto-verified) }. Per-task completion is a manual checklist (the game/Dink report only whole-tier completion). Curated regions so far: Lumbridge & Draynor, Varrock, Falador, Ardougne — the rest follow iteratively and show tier-level only until then.",
+    "tasks": "Each tier may carry an optional `tasks` array for per-task drill-down: { id (globally-unique stable key, used for completion ticks), t (task text), s? (notable per-task skill gate), q? (full quests required for that task), cb? (combat-level gate), note? (started/partial quests, miniquests, items, or other caveats not auto-verified) }. Per-task completion is a manual checklist (the game/Dink report only whole-tier completion). Curated regions so far: Lumbridge & Draynor, Varrock, Falador, Ardougne, Desert, Karamja — the rest follow iteratively and show tier-level only until then.",
     "source": "Curated from oldschool.runescape.wiki diary pages (per-region requirement summaries + per-task tables)."
   },
   "diaries": {
@@ -59,10 +59,53 @@
       ] }
     },
     "Desert": {
-      "Easy":   { "s": { "Hunter": 5, "Thieving": 21 }, "q": [], "note": "One task starts Icthlarin's Little Helper.", "reward": "Desert amulet 1" },
-      "Medium": { "s": { "Agility": 30, "Herblore": 36, "Hunter": 47, "Thieving": 25, "Woodcutting": 35 }, "q": ["The Golem", "Eagle's Peak", "Spirits of the Elid", "Enakhra's Lament"], "reward": "Desert amulet 2" },
-      "Hard":   { "s": { "Attack": 50, "Mining": 45, "Thieving": 65, "Firemaking": 60, "Smithing": 68, "Magic": 68, "Agility": 70, "Slayer": 65 }, "q": ["The Feud", "Desert Treasure I", "Dream Mentor", "Contact!"], "reward": "Desert amulet 3" },
-      "Elite":  { "s": { "Cooking": 85, "Magic": 94, "Fletching": 95, "Thieving": 91, "Prayer": 85, "Construction": 78 }, "q": ["Contact!", "Desert Treasure I", "Dream Mentor", "Eagle's Peak", "Enakhra's Lament", "The Feud", "The Golem", "Spirits of the Elid"], "reward": "Desert amulet 4" }
+      "Easy":   { "s": { "Hunter": 5, "Thieving": 21 }, "q": [], "note": "One task starts Icthlarin's Little Helper.", "reward": "Desert amulet 1", "tasks": [
+        { "id": "desert-easy-1", "t": "Catch a golden warbler", "s": { "Hunter": 5 } },
+        { "id": "desert-easy-2", "t": "Mine 5 clay in the north-eastern desert" },
+        { "id": "desert-easy-3", "t": "Enter the Kalphite Hive" },
+        { "id": "desert-easy-4", "t": "Enter the desert with a set of desert robes equipped" },
+        { "id": "desert-easy-5", "t": "Kill a vulture" },
+        { "id": "desert-easy-6", "t": "Have the Nardah herbalist clean a herb for you" },
+        { "id": "desert-easy-7", "t": "Collect 5 potato cactus from the Kalphite Hive" },
+        { "id": "desert-easy-8", "t": "Sell some artefacts to Simon Templeton", "note": "Requires starting Icthlarin's Little Helper." },
+        { "id": "desert-easy-9", "t": "Open the sarcophagus in the first room of Pyramid Plunder", "s": { "Thieving": 21 }, "note": "Requires starting Icthlarin's Little Helper." },
+        { "id": "desert-easy-10", "t": "Cut open a desert cactus to fill a waterskin" },
+        { "id": "desert-easy-11", "t": "Travel from the Shantay Pass to Pollnivneach by magic carpet" }
+      ] },
+      "Medium": { "s": { "Agility": 30, "Herblore": 36, "Hunter": 47, "Thieving": 25, "Woodcutting": 35, "Slayer": 22, "Construction": 20 }, "q": ["The Golem", "Eagle's Peak", "Spirits of the Elid", "Enakhra's Lament"], "reward": "Desert amulet 2", "tasks": [
+        { "id": "desert-medium-1", "t": "Climb to the summit of the Agility Pyramid", "s": { "Agility": 30 } },
+        { "id": "desert-medium-2", "t": "Slay a desert lizard", "s": { "Slayer": 22 }, "note": "Requires an ice cooler." },
+        { "id": "desert-medium-3", "t": "Catch an orange salamander", "s": { "Hunter": 47 } },
+        { "id": "desert-medium-4", "t": "Steal a feather from the Desert Phoenix", "s": { "Thieving": 25 } },
+        { "id": "desert-medium-5", "t": "Travel to Uzer via the magic carpet", "q": ["The Golem"] },
+        { "id": "desert-medium-6", "t": "Travel to the desert via the eagle transport system", "q": ["Eagle's Peak"] },
+        { "id": "desert-medium-7", "t": "Pray at the Elidinis Statuette in Nardah", "q": ["Spirits of the Elid"] },
+        { "id": "desert-medium-8", "t": "Create a combat potion in the desert", "s": { "Herblore": 36 } },
+        { "id": "desert-medium-9", "t": "Teleport to Enakhra's Temple with the Camulet", "q": ["Enakhra's Lament"] },
+        { "id": "desert-medium-10", "t": "Visit the Genie", "note": "Requires starting Spirits of the Elid; bring a light source." },
+        { "id": "desert-medium-11", "t": "Teleport to Pollnivneach with a redirected Teleport to House tablet", "s": { "Construction": 20 } },
+        { "id": "desert-medium-12", "t": "Chop some teak logs near Uzer", "s": { "Woodcutting": 35 } }
+      ] },
+      "Hard":   { "s": { "Attack": 50, "Mining": 45, "Thieving": 65, "Firemaking": 60, "Smithing": 68, "Magic": 68, "Agility": 70, "Slayer": 65 }, "q": ["The Feud", "Desert Treasure I", "Dream Mentor", "Contact!"], "reward": "Desert amulet 3", "tasks": [
+        { "id": "desert-hard-1", "t": "Knock out and pickpocket a Menaphite Thug", "s": { "Thieving": 65 }, "note": "Requires partial completion of The Feud; bring a blackjack." },
+        { "id": "desert-hard-2", "t": "Mine some granite", "s": { "Mining": 45 } },
+        { "id": "desert-hard-3", "t": "Refill your waterskins using the Lunar spell Humidify", "s": { "Magic": 68 }, "q": ["Dream Mentor"], "note": "Needs the Lunar spellbook." },
+        { "id": "desert-hard-4", "t": "Kill the Kalphite Queen" },
+        { "id": "desert-hard-5", "t": "Complete a lap of the Pollnivneach Rooftop Course", "s": { "Agility": 70 } },
+        { "id": "desert-hard-6", "t": "Slay a dust devil in the desert cave with a Slayer helmet equipped", "s": { "Slayer": 65 }, "note": "Requires starting Desert Treasure I." },
+        { "id": "desert-hard-7", "t": "Activate the Ancient Magicks altar in the Jaldraocht Pyramid", "q": ["Desert Treasure I"] },
+        { "id": "desert-hard-8", "t": "Defeat a Locust Rider with Keris", "s": { "Attack": 50 }, "note": "Requires partial completion of Contact!; wield Keris." },
+        { "id": "desert-hard-9", "t": "Burn some yew logs on the Nardah Mayor's balcony", "s": { "Firemaking": 60 } },
+        { "id": "desert-hard-10", "t": "Smith a mithril platebody in Nardah", "s": { "Smithing": 68 } }
+      ] },
+      "Elite":  { "s": { "Cooking": 85, "Magic": 94, "Fletching": 95, "Thieving": 91, "Prayer": 85, "Construction": 78 }, "q": ["Contact!", "Desert Treasure I", "Dream Mentor", "Eagle's Peak", "Enakhra's Lament", "The Feud", "The Golem", "Spirits of the Elid"], "reward": "Desert amulet 4", "tasks": [
+        { "id": "desert-elite-1", "t": "Bake a wild pie at the Nardah clay oven", "s": { "Cooking": 85 } },
+        { "id": "desert-elite-2", "t": "Cast Ice Barrage against a foe in the desert", "s": { "Magic": 94 }, "q": ["Desert Treasure I"] },
+        { "id": "desert-elite-3", "t": "Fletch some dragon darts at the Bedabin Camp", "s": { "Fletching": 95 } },
+        { "id": "desert-elite-4", "t": "Mount a Kalphite Queen head in your player-owned house and speak to it", "s": { "Construction": 78 } },
+        { "id": "desert-elite-5", "t": "Steal from the Grand Gold Chest in the final room of Pyramid Plunder", "s": { "Thieving": 91 }, "note": "Requires starting Icthlarin's Little Helper." },
+        { "id": "desert-elite-6", "t": "Restore at least 85 Prayer points at the altar in Sophanem", "s": { "Prayer": 85 }, "note": "Requires starting Icthlarin's Little Helper." }
+      ] }
     },
     "Falador": {
       "Easy":   { "s": { "Mining": 10, "Agility": 5, "Smithing": 13, "Construction": 16 }, "q": ["Doric's Quest", "The Knight's Sword"], "reward": "Falador shield 1", "tasks": [
@@ -129,10 +172,58 @@
       "Elite":  { "s": { "Cooking": 80, "Crafting": 85, "Farming": 79, "Firemaking": 85, "Fishing": 76, "Herblore": 86, "Magic": 87, "Smithing": 90 }, "q": ["Family Crest", "Lunar Diplomacy"], "reward": "Kandarin headgear 4" }
     },
     "Karamja": {
-      "Easy":   { "s": { "Mining": 40, "Agility": 15 }, "q": [], "reward": "Karamja gloves 1" },
-      "Medium": { "s": { "Woodcutting": 50, "Fishing": 65, "Agility": 40, "Cooking": 16, "Crafting": 20, "Farming": 27, "Hunter": 41 }, "q": ["The Grand Tree", "Shilo Village", "Jungle Potion"], "reward": "Karamja gloves 2" },
-      "Hard":   { "s": { "Mining": 52, "Strength": 50, "Agility": 53, "Smithing": 40, "Herblore": 25, "Fishing": 65, "Ranged": 42, "Thieving": 50, "Cooking": 53, "Crafting": 50, "Magic": 59, "Woodcutting": 50, "Runecraft": 44, "Slayer": 50, "Farming": 27, "Hunter": 41 }, "q": ["The Grand Tree", "Tai Bwo Wannai Trio"], "reward": "Karamja gloves 3 (free Fairy ring teleports on Karamja)" },
-      "Elite":  { "s": { "Mining": 52, "Strength": 50, "Agility": 53, "Smithing": 40, "Herblore": 87, "Fishing": 65, "Ranged": 42, "Thieving": 50, "Cooking": 53, "Crafting": 50, "Magic": 59, "Woodcutting": 50, "Runecraft": 91, "Slayer": 50, "Farming": 72, "Hunter": 41 }, "q": ["The Grand Tree", "Tai Bwo Wannai Trio"], "reward": "Karamja gloves 4" }
+      "Easy":   { "s": { "Mining": 40, "Agility": 15 }, "q": [], "reward": "Karamja gloves 1", "tasks": [
+        { "id": "karamja-easy-1", "t": "Pick 5 bananas from the plantation east of the volcano" },
+        { "id": "karamja-easy-2", "t": "Use the rope swing to travel to the Moss Giant island", "s": { "Agility": 10 } },
+        { "id": "karamja-easy-3", "t": "Mine some gold ore on the north-west peninsula of Karamja", "s": { "Mining": 40 } },
+        { "id": "karamja-easy-4", "t": "Travel to Port Sarim via the dock east of Musa Point" },
+        { "id": "karamja-easy-5", "t": "Travel to Ardougne via the port near Brimhaven" },
+        { "id": "karamja-easy-6", "t": "Explore Cairn Island to the west of Karamja", "s": { "Agility": 15 } },
+        { "id": "karamja-easy-7", "t": "Use the fishing spots north of the banana plantation" },
+        { "id": "karamja-easy-8", "t": "Collect 5 seaweed from anywhere on Karamja" },
+        { "id": "karamja-easy-9", "t": "Attempt the TzHaar Fight Pit or Fight Cave" },
+        { "id": "karamja-easy-10", "t": "Kill a jogre in the Pothole Dungeon" }
+      ] },
+      "Medium": { "s": { "Woodcutting": 50, "Fishing": 65, "Agility": 40, "Cooking": 16, "Crafting": 20, "Farming": 27, "Hunter": 41, "Mining": 40 }, "q": ["The Grand Tree", "Shilo Village", "Jungle Potion"], "reward": "Karamja gloves 2", "tasks": [
+        { "id": "karamja-medium-1", "t": "Claim a ticket from the Brimhaven Agility Arena", "s": { "Agility": 40 } },
+        { "id": "karamja-medium-2", "t": "Discover the hidden wall in the dungeon below the volcano", "note": "Requires starting Dragon Slayer I." },
+        { "id": "karamja-medium-3", "t": "Visit the Isle of Crandor via the dungeon below the volcano", "note": "Requires starting Dragon Slayer I." },
+        { "id": "karamja-medium-4", "t": "Use Vigroy and Hajedy's cart service", "q": ["Shilo Village"] },
+        { "id": "karamja-medium-5", "t": "Earn 100% favour in the village of Tai Bwo Wannai", "s": { "Woodcutting": 10 }, "q": ["Jungle Potion"] },
+        { "id": "karamja-medium-6", "t": "Cook a spider on a stick", "s": { "Cooking": 16 } },
+        { "id": "karamja-medium-7", "t": "Charter the Lady of the Waves from Cairn Isle to Port Khazard", "q": ["Shilo Village"] },
+        { "id": "karamja-medium-8", "t": "Cut a log from a teak tree", "s": { "Woodcutting": 35 }, "q": ["Jungle Potion"] },
+        { "id": "karamja-medium-9", "t": "Cut a log from a mahogany tree", "s": { "Woodcutting": 50 }, "q": ["Jungle Potion"] },
+        { "id": "karamja-medium-10", "t": "Catch a karambwan", "s": { "Fishing": 65 }, "note": "Requires partial completion of Tai Bwo Wannai Trio." },
+        { "id": "karamja-medium-11", "t": "Exchange gems for a machete", "q": ["Jungle Potion"] },
+        { "id": "karamja-medium-12", "t": "Use the gnome glider to travel to Karamja", "q": ["The Grand Tree"] },
+        { "id": "karamja-medium-13", "t": "Grow a healthy fruit tree in the patch near Brimhaven", "s": { "Farming": 27 } },
+        { "id": "karamja-medium-14", "t": "Trap a horned graahk", "s": { "Hunter": 41 } },
+        { "id": "karamja-medium-15", "t": "Chop the vines to gain deeper access to Brimhaven Dungeon", "s": { "Woodcutting": 10 } },
+        { "id": "karamja-medium-16", "t": "Cross the lava using the stepping stones in Brimhaven Dungeon", "s": { "Woodcutting": 10, "Agility": 12 } },
+        { "id": "karamja-medium-17", "t": "Climb the stairs within Brimhaven Dungeon", "s": { "Woodcutting": 10 } },
+        { "id": "karamja-medium-18", "t": "Charter a ship from the shipyard in the far east of Karamja", "note": "Requires partial completion of The Grand Tree." },
+        { "id": "karamja-medium-19", "t": "Mine a red topaz from a gem rock", "s": { "Mining": 40 }, "q": ["Jungle Potion"] }
+      ] },
+      "Hard":   { "s": { "Mining": 52, "Strength": 50, "Agility": 53, "Smithing": 40, "Herblore": 25, "Fishing": 65, "Ranged": 42, "Thieving": 50, "Cooking": 53, "Crafting": 50, "Magic": 59, "Woodcutting": 50, "Runecraft": 44, "Slayer": 50, "Farming": 27, "Hunter": 41 }, "q": ["The Grand Tree", "Tai Bwo Wannai Trio", "Shilo Village"], "reward": "Karamja gloves 3 (free Fairy ring teleports on Karamja)", "tasks": [
+        { "id": "karamja-hard-1", "t": "Become the champion of the Fight Pits" },
+        { "id": "karamja-hard-2", "t": "Kill a Ket-Zek in the Fight Caves (reach wave 31)" },
+        { "id": "karamja-hard-3", "t": "Eat an oomlie wrap", "s": { "Cooking": 50 } },
+        { "id": "karamja-hard-4", "t": "Craft some nature runes from pure essence", "s": { "Runecraft": 44 } },
+        { "id": "karamja-hard-5", "t": "Cook a karambwan thoroughly", "s": { "Cooking": 30 }, "q": ["Tai Bwo Wannai Trio"] },
+        { "id": "karamja-hard-6", "t": "Kill a deathwing in the dungeon under the Kharazi Jungle", "s": { "Mining": 52, "Strength": 50, "Agility": 50, "Thieving": 50 }, "note": "Requires partial completion of Legends' Quest." },
+        { "id": "karamja-hard-7", "t": "Use the crossbow shortcut south of the volcano", "s": { "Agility": 53, "Ranged": 42, "Strength": 21 }, "note": "Requires a mith grapple and a crossbow." },
+        { "id": "karamja-hard-8", "t": "Collect 5 palm leaves", "note": "Requires partial completion of Legends' Quest." },
+        { "id": "karamja-hard-9", "t": "Be assigned a slayer task by the Slayer Master in Shilo Village", "s": { "Slayer": 50 }, "cb": 100, "q": ["Shilo Village"], "note": "Requires 100 Combat and 50 Slayer (or 99 Slayer)." },
+        { "id": "karamja-hard-10", "t": "Kill a metal dragon in Brimhaven Dungeon", "note": "Requires dragonfire protection." }
+      ] },
+      "Elite":  { "s": { "Mining": 52, "Strength": 50, "Agility": 53, "Smithing": 40, "Herblore": 87, "Fishing": 65, "Ranged": 42, "Thieving": 50, "Cooking": 53, "Crafting": 50, "Magic": 59, "Woodcutting": 50, "Runecraft": 91, "Slayer": 50, "Farming": 72, "Hunter": 41 }, "q": ["The Grand Tree", "Tai Bwo Wannai Trio"], "reward": "Karamja gloves 4", "tasks": [
+        { "id": "karamja-elite-1", "t": "Craft 56 nature runes at once from pure essence (without using extracts)", "s": { "Runecraft": 91 } },
+        { "id": "karamja-elite-2", "t": "Equip a fire cape or infernal cape in Mor Ul Rek", "note": "Requires completing the TzHaar Fight Cave." },
+        { "id": "karamja-elite-3", "t": "Check the health of a palm tree in Brimhaven", "s": { "Farming": 68 } },
+        { "id": "karamja-elite-4", "t": "Create an antivenom potion while standing in the Horseshoe Mine", "s": { "Herblore": 87 } },
+        { "id": "karamja-elite-5", "t": "Check the health of your Calquat tree", "s": { "Farming": 72 } }
+      ] }
     },
     "Kourend & Kebos": {
       "Easy":   { "s": { "Mining": 15, "Thieving": 25, "Construction": 25, "Herblore": 12, "Fishing": 20 }, "q": ["Druidic Ritual"], "reward": "Rada's blessing 1" },
