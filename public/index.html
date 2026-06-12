@@ -2188,6 +2188,52 @@ function bestDiaryAction() {
   return null;
 }
 
+// Opportunity intelligence (goal-independent): among incomplete quests whose quest-prereqs
+// and QP gate are already met, find the skill that is the SOLE remaining blocker for the most
+// quests, and the nearest level that unlocks them. Gives a high-leverage "train this" answer
+// even with no goals set. Returns one action object or null. `skip` = skills to ignore
+// (e.g. ones the player already has an explicit goal for, to avoid a redundant nudge).
+function skillUnlockLeverage(completed, skip) {
+  const sole = {};                                  // skill -> [{quest, need}] (sole blocker only)
+  for (const q of QUESTS) {
+    if (completed[q.name]) continue;
+    const req = REQS[q.name];
+    if (!req || !req.s) continue;
+    const prereqsDone = !req.q || req.q.every(p => !TRACKED.has(p) || completed[p]);
+    if (!prereqsDone) continue;                     // a quest prereq still blocks it — not skill-gated
+    if (req.qp && earnedQP(completed) < req.qp) continue;
+    const missing = [];
+    for (const sk in req.s) {
+      const have = STATS[sk] ? STATS[sk][1] : 1;
+      if (have < req.s[sk]) missing.push({ skill: sk, need: req.s[sk] });
+    }
+    if (missing.length === 1) {                     // exactly one skill stands between you and this quest
+      const m = missing[0];
+      (sole[m.skill] = sole[m.skill] || []).push({ quest: q.name, need: m.need });
+    }
+  }
+  let best = null;
+  for (const sk in sole) {
+    if (skip && skip.has(sk)) continue;
+    const have = STATS[sk] ? STATS[sk][1] : 1;
+    for (const t of new Set(sole[sk].map(x => x.need))) {   // candidate target levels
+      const unlocked = sole[sk].filter(x => x.need <= t);
+      const gap = t - have;
+      if (!best || unlocked.length > best.count || (unlocked.length === best.count && gap < best.gap)) {
+        best = { skill: sk, target: t, count: unlocked.length, gap, quests: unlocked.map(x => x.quest) };
+      }
+    }
+  }
+  if (!best || best.count < 1) return null;
+  const names = best.quests.slice(0, 3).join(', ') + (best.quests.length > 3 ? `, +${best.quests.length - 3} more` : '');
+  const curXP = STATS[best.skill] ? STATS[best.skill][2] : 0;
+  const bm = bestMethod(best.skill, STATS[best.skill] ? STATS[best.skill][1] : 1);
+  const eta = bm ? ` · ~${fmtHours(Math.max(0, xpForLevel(best.target) - curXP) / bm.xphr)}` : '';
+  return { icon: '🔑', title: `Train ${best.skill} to ${best.target}`,
+           reason: `Unlocks ${best.count} quest${best.count === 1 ? '' : 's'}: ${names}${eta}`,
+           onclick: `switchTab('skills')`, _soft: true };
+}
+
 function nextActions() {
   const MAX = 6;
   const completed = getCompleted();
@@ -2267,6 +2313,24 @@ function nextActions() {
                      onclick: `switchTab('goals')`, _pct: pct });
   }
   skillRows.sort((a, b) => b._pct - a._pct).forEach(r => out.push(r));
+
+  // Tier 2b — goal-independent: if no quest goal/preset is driving suggestions, surface the
+  // single best startable quest by reward so a fresh account still gets a concrete quest to do.
+  if (!getQuestGoals().length && !getPresetGoals().includes('quest_cape')) {
+    const ready = QUESTS.filter(q => !completed[q.name] && questStatus(q, completed).state === 'ready').map(q => q.name);
+    const pick = bestReadyQuestName(ready);
+    if (pick && !suggestedQuests.has(pick)) {
+      const reward = REQS[pick] && REQS[pick].r ? ` · 🎁 ${REQS[pick].r}` : '';
+      suggestedQuests.set(pick, out.length);
+      out.push({ icon: '▶', title: `Start ${pick}`, reason: `A solid quest you can start now${reward}`,
+                 onclick: `goToQuest('${pick.replace(/'/g, "\\'")}')` });
+    }
+  }
+
+  // Tier 2c — highest-leverage skill to train (unlocks the most currently-blocked quests).
+  // Skip skills the player already has an explicit goal for (those are covered by Tier 2).
+  const leverage = skillUnlockLeverage(completed, new Set(getGoals().map(g => g.skill)));
+  if (leverage) out.push(leverage);
 
   // Tier 3 — top money method available now (opportunity).
   let best = null, bestGp = -1;

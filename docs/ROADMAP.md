@@ -66,8 +66,13 @@ account record; no feature code assumes a single global player.
   **excluded unreleased/future quests** (The Blood Moon Rises, The Graveyard, Fallen From Grace), and
   fixed name/skill-key bugs (Vampyre Slayer, The Hand in the Sand, Runecraft→Runecrafting) that were
   silently breaking gates. Non-quest **unlocks** (items, area access, skill unlocks) still pending.
-- ⚪ **F1.3** "What should I do next?" engine — ranked, prerequisite-aware suggestions on the dashboard.
-  (A `bestReadyQuestName` heuristic already feeds the Quest Cape preset; full dashboard ranker pending.)
+- 🟡 **F1.3** "What should I do next?" engine — ranked, prerequisite-aware suggestions on the dashboard.
+  **Live** as the "🧭 What to do next" panel: `nextActions()` ranks across tiers — quest-goal next
+  steps, Quest Cape, skill goals, **goal-independent opportunity quests**, a **high-leverage
+  skill-to-train nudge** (`skillUnlockLeverage` — the skill that solely-blocks the most startable
+  quests, with the nearest unlock level + ETA), top money method, and the best diary opportunity.
+  Works even with no goals set. Remaining: smarter quest ranking by reward *magnitude* (the current
+  `bestReadyQuestName` weights reward-presence + QP, not XP value), and acting inline vs. linking out.
 
 **Exit criteria:** adding a high-level goal yields an accurate outstanding-requirements list,
 and the dashboard recommends agreeable next actions.
