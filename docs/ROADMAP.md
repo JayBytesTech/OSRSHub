@@ -76,8 +76,9 @@ and the dashboard recommends agreeable next actions.
   gates, "can I do this now?"), completion tracking, dashboard tile. **Per-task drill-down live** —
   expand a tier to a checklist of its individual tasks, each with its own requirement gating (ready/
   locked) and a tickable checkbox (synced via `diaryTasks` in `/api/state`, stored in
-  `diary_task_completions`); tier head shows `n/m tasks`. First 4 regions curated (Lumbridge & Draynor,
-  Varrock, Falador, Ardougne — 167 tasks); the other 8 show tier-level only and follow iteratively.
+  `diary_task_completions`); tier head shows `n/m tasks`. **All 12 regions curated** (492 tasks);
+  per-task gates validated against the frontend `QUESTS` master list so quest requirements the hub
+  can't verify are surfaced as notes rather than false-locking gates.
 - 🟢 **F2.4** Daily/weekly checklist with reset timers.
 - 🟢 **F2.5** Account Value score, trended over time.
 - ⚪ Frontend modularization if/when `index.html` interactivity outgrows hand-editing (ADR first).
