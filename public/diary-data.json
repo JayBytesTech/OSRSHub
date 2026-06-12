@@ -2,7 +2,7 @@
   "_meta": {
     "about": "Tier-level aggregate Achievement Diary requirements (Phase 4 / F2.3). Static, non-account-scoped reference data served from /public like quest-data.json. Entry shape per tier: s = aggregate skill levels (the highest level any task in that tier needs, per skill), cb = combat-level gate (Western Provinces only), q = quests that must be COMPLETED (verifiable against your ticked quest completions), reward = the unlock, note = extra caveats. The engine marks a tier 'ready' when every s/cb gate is met and every q quest is complete; 'locked' otherwise; 'done' when you've toggled it complete.",
     "caveats": "Skill levels are best-effort aggregates from oldschool.runescape.wiki and many are boostable. The q list only contains standard quests the hub can verify; miniquests (e.g. Enter the Abyss, Mage Arena I, Alfred Grimhand's Barcrawl) and quests that only need to be STARTED are listed in `note` instead of `q`, so they never falsely lock a tier. Completion itself is all-or-nothing per tier and tracked by you ticking it — the hub answers 'can I do this now?', not 'which individual tasks have I done?'.",
-    "tasks": "Each tier may carry an optional `tasks` array for per-task drill-down: { id (globally-unique stable key, used for completion ticks), t (task text), s? (notable per-task skill gate), q? (full quests required for that task), cb? (combat-level gate), note? (started/partial quests, miniquests, items, or other caveats not auto-verified) }. Per-task completion is a manual checklist (the game/Dink report only whole-tier completion). Curated regions so far: Lumbridge & Draynor, Varrock, Falador, Ardougne, Desert, Karamja, Fremennik, Kourend & Kebos, Wilderness — the rest follow iteratively and show tier-level only until then.",
+    "tasks": "Each tier may carry an optional `tasks` array for per-task drill-down: { id (globally-unique stable key, used for completion ticks), t (task text), s? (notable per-task skill gate), q? (full quests required for that task), cb? (combat-level gate), note? (started/partial quests, miniquests, items, or other caveats not auto-verified) }. Per-task completion is a manual checklist (the game/Dink report only whole-tier completion). All 12 regions are now curated with per-task drill-down.",
     "source": "Curated from oldschool.runescape.wiki diary pages (per-region requirement summaries + per-task tables)."
   },
   "diaries": {
@@ -79,7 +79,7 @@
         { "id": "desert-medium-4", "t": "Steal a feather from the Desert Phoenix", "s": { "Thieving": 25 } },
         { "id": "desert-medium-5", "t": "Travel to Uzer via the magic carpet", "q": ["The Golem"] },
         { "id": "desert-medium-6", "t": "Travel to the desert via the eagle transport system", "q": ["Eagle's Peak"] },
-        { "id": "desert-medium-7", "t": "Pray at the Elidinis Statuette in Nardah", "q": ["Spirits of the Elid"] },
+        { "id": "desert-medium-7", "t": "Pray at the Elidinis Statuette in Nardah", "note": "Requires completing Spirits of the Elid." },
         { "id": "desert-medium-8", "t": "Create a combat potion in the desert", "s": { "Herblore": 36 } },
         { "id": "desert-medium-9", "t": "Teleport to Enakhra's Temple with the Camulet", "q": ["Enakhra's Lament"] },
         { "id": "desert-medium-10", "t": "Visit the Genie", "note": "Requires starting Spirits of the Elid; bring a light source." },
@@ -204,10 +204,57 @@
       ] }
     },
     "Kandarin": {
-      "Easy":   { "s": { "Agility": 20, "Farming": 13, "Fishing": 16 }, "q": ["Elemental Workshop I"], "reward": "Kandarin headgear 1" },
-      "Medium": { "s": { "Agility": 36, "Farming": 26, "Fishing": 46, "Herblore": 48, "Magic": 45, "Ranged": 40, "Thieving": 47, "Fletching": 50, "Mining": 30, "Cooking": 43 }, "q": ["Waterfall Quest", "Fairy Tale II - Cure a Queen", "Elemental Workshop II"], "note": "Also needs Alfred Grimhand's Barcrawl (miniquest).", "reward": "Kandarin headgear 2" },
-      "Hard":   { "s": { "Agility": 60, "Firemaking": 65, "Fishing": 70, "Fletching": 70, "Magic": 56, "Smithing": 75, "Thieving": 53, "Woodcutting": 60 }, "q": ["Desert Treasure I", "Elemental Workshop II", "Fairy Tale II - Cure a Queen"], "reward": "Kandarin headgear 3" },
-      "Elite":  { "s": { "Cooking": 80, "Crafting": 85, "Farming": 79, "Firemaking": 85, "Fishing": 76, "Herblore": 86, "Magic": 87, "Smithing": 90 }, "q": ["Family Crest", "Lunar Diplomacy"], "reward": "Kandarin headgear 4" }
+      "Easy":   { "s": { "Agility": 20, "Farming": 13, "Fishing": 16 }, "q": ["Elemental Workshop I"], "reward": "Kandarin headgear 1", "tasks": [
+        { "id": "kandarin-easy-1", "t": "Catch a mackerel at Catherby", "s": { "Fishing": 16 } },
+        { "id": "kandarin-easy-2", "t": "Buy a candle from the Chandler in Catherby" },
+        { "id": "kandarin-easy-3", "t": "Collect 5 flax from the Seers' flax fields" },
+        { "id": "kandarin-easy-4", "t": "Play the organ in the Seers' Village church" },
+        { "id": "kandarin-easy-5", "t": "Plant some jute seeds in the patch north of McGrubor's Wood", "s": { "Farming": 13 } },
+        { "id": "kandarin-easy-6", "t": "Have Galahad make you a cup of tea" },
+        { "id": "kandarin-easy-7", "t": "Defeat one of each elemental in the Elemental Workshop", "note": "Requires starting Elemental Workshop I." },
+        { "id": "kandarin-easy-8", "t": "Get a pet fish from Harry in Catherby" },
+        { "id": "kandarin-easy-9", "t": "Buy a stew from the Seers' Village pub" },
+        { "id": "kandarin-easy-10", "t": "Speak to Sherlock" },
+        { "id": "kandarin-easy-11", "t": "Cross the coal truck log shortcut", "s": { "Agility": 20 } }
+      ] },
+      "Medium": { "s": { "Agility": 36, "Farming": 26, "Fishing": 46, "Herblore": 48, "Magic": 45, "Ranged": 40, "Thieving": 47, "Fletching": 50, "Mining": 30, "Cooking": 43 }, "q": ["Waterfall Quest", "Fairy Tale II - Cure a Queen", "Elemental Workshop II"], "note": "Also needs Alfred Grimhand's Barcrawl (miniquest).", "reward": "Kandarin headgear 2", "tasks": [
+        { "id": "kandarin-medium-1", "t": "Complete a lap of the Barbarian Outpost agility course", "s": { "Agility": 35 }, "note": "Requires the Alfred Grimhand's Barcrawl miniquest." },
+        { "id": "kandarin-medium-2", "t": "Create a super antipoison from scratch in the Seers'/Catherby area", "s": { "Herblore": 48 } },
+        { "id": "kandarin-medium-3", "t": "Enter the Ranging Guild", "s": { "Ranged": 40 } },
+        { "id": "kandarin-medium-4", "t": "Use the grapple shortcut from the water obelisk to Catherby shore", "s": { "Agility": 36, "Strength": 22, "Ranged": 39 } },
+        { "id": "kandarin-medium-5", "t": "Catch and cook a bass in Catherby", "s": { "Fishing": 46, "Cooking": 43 } },
+        { "id": "kandarin-medium-6", "t": "Teleport to Camelot", "s": { "Magic": 45 } },
+        { "id": "kandarin-medium-7", "t": "String a maple shortbow in the Seers' Village bank", "s": { "Fletching": 50 } },
+        { "id": "kandarin-medium-8", "t": "Pick some limpwurt root from the farming patch in Catherby", "s": { "Farming": 26 } },
+        { "id": "kandarin-medium-9", "t": "Create a mind helmet", "note": "Requires partial completion of Elemental Workshop II." },
+        { "id": "kandarin-medium-10", "t": "Kill a fire giant inside Baxtorian Waterfall", "note": "Requires starting Waterfall Quest." },
+        { "id": "kandarin-medium-11", "t": "Complete a wave of Barbarian Assault" },
+        { "id": "kandarin-medium-12", "t": "Steal from the chest in Hemenster", "s": { "Thieving": 47 } },
+        { "id": "kandarin-medium-13", "t": "Travel to McGrubor's Wood by fairy ring", "note": "Requires starting Fairy Tale II - Cure a Queen." },
+        { "id": "kandarin-medium-14", "t": "Mine some coal near the coal trucks", "s": { "Mining": 30 } }
+      ] },
+      "Hard":   { "s": { "Agility": 60, "Firemaking": 65, "Fishing": 70, "Fletching": 70, "Magic": 56, "Smithing": 75, "Thieving": 53, "Woodcutting": 60, "Construction": 50 }, "q": ["Desert Treasure I", "Elemental Workshop II", "Fairy Tale II - Cure a Queen"], "reward": "Kandarin headgear 3", "tasks": [
+        { "id": "kandarin-hard-1", "t": "Catch a leaping sturgeon at Otto's Grotto", "s": { "Fishing": 70, "Agility": 45, "Strength": 45 } },
+        { "id": "kandarin-hard-2", "t": "Complete a lap of the Seers' Village Rooftop Course", "s": { "Agility": 60 } },
+        { "id": "kandarin-hard-3", "t": "Create a yew longbow from scratch around Seers' Village", "s": { "Fletching": 70, "Woodcutting": 60 } },
+        { "id": "kandarin-hard-4", "t": "Enter the Seers' Village courthouse with Piety turned on", "s": { "Prayer": 70, "Defence": 70 }, "note": "Requires King's Ransom and the Knight Waves Training Grounds." },
+        { "id": "kandarin-hard-5", "t": "Charge a water orb", "s": { "Magic": 56 } },
+        { "id": "kandarin-hard-6", "t": "Burn some maple logs with a bow in Seers' Village", "s": { "Firemaking": 65 } },
+        { "id": "kandarin-hard-7", "t": "Kill a shadow hound in the Shadow Dungeon", "s": { "Thieving": 53 }, "note": "Requires starting Desert Treasure I." },
+        { "id": "kandarin-hard-8", "t": "Kill a mithril dragon" },
+        { "id": "kandarin-hard-9", "t": "Purchase and equip a granite body from Barbarian Assault", "s": { "Strength": 50, "Defence": 50 } },
+        { "id": "kandarin-hard-10", "t": "Have the Seers' Village estate agent decorate your house with Fancy Stone", "s": { "Construction": 50 } },
+        { "id": "kandarin-hard-11", "t": "Smith an adamant spear at Otto's Grotto", "s": { "Smithing": 75 } }
+      ] },
+      "Elite":  { "s": { "Cooking": 80, "Crafting": 85, "Farming": 79, "Firemaking": 85, "Fishing": 76, "Herblore": 86, "Magic": 87, "Smithing": 90 }, "q": ["Family Crest", "Lunar Diplomacy"], "reward": "Kandarin headgear 4", "tasks": [
+        { "id": "kandarin-elite-1", "t": "Read the blackboard at Barbarian Assault after reaching level 5 in every role" },
+        { "id": "kandarin-elite-2", "t": "Pick some dwarf weed from the herb patch at Catherby", "s": { "Farming": 79 } },
+        { "id": "kandarin-elite-3", "t": "Fish and cook 5 sharks in Catherby using cooking gauntlets", "s": { "Fishing": 76, "Cooking": 80 }, "q": ["Family Crest"] },
+        { "id": "kandarin-elite-4", "t": "Mix a stamina mix on top of the Seers' Village bank", "s": { "Herblore": 86, "Agility": 60 } },
+        { "id": "kandarin-elite-5", "t": "Smith a rune hasta at Otto's Grotto", "s": { "Smithing": 90 } },
+        { "id": "kandarin-elite-6", "t": "Construct a pyre ship from magic logs", "s": { "Firemaking": 85, "Crafting": 85 } },
+        { "id": "kandarin-elite-7", "t": "Teleport to Catherby", "s": { "Magic": 87 }, "q": ["Lunar Diplomacy"] }
+      ] }
     },
     "Karamja": {
       "Easy":   { "s": { "Mining": 40, "Agility": 15 }, "q": [], "reward": "Karamja gloves 1", "tasks": [
@@ -368,10 +415,52 @@
       ] }
     },
     "Morytania": {
-      "Easy":   { "s": { "Crafting": 15, "Cooking": 12, "Slayer": 15, "Farming": 23 }, "q": ["Nature Spirit"], "reward": "Morytania legs 1" },
-      "Medium": { "s": { "Hunter": 29, "Agility": 40, "Woodcutting": 45, "Slayer": 42, "Cooking": 40, "Smithing": 35, "Herblore": 22 }, "q": ["Cabin Fever", "Dwarf Cannon", "Ghosts Ahoy"], "note": "Also needs Lair of Tarn Razorlor (miniquest) and In Aid of the Myreque at least started.", "reward": "Morytania legs 2" },
-      "Hard":   { "s": { "Magic": 66, "Construction": 50, "Agility": 71, "Woodcutting": 50, "Firemaking": 50, "Farming": 53, "Mining": 55, "Slayer": 58 }, "q": ["Desert Treasure I", "Dwarf Cannon", "Ghosts Ahoy", "In Aid of the Myreque"], "note": "Also needs Lair of Tarn Razorlor (miniquest), Knight Waves (needs King's Ransom), and The Great Brain Robbery at least started.", "reward": "Morytania legs 3" },
-      "Elite":  { "s": { "Fishing": 96, "Strength": 76, "Firemaking": 80, "Magic": 83, "Crafting": 84, "Slayer": 85 }, "q": ["In Aid of the Myreque", "Lunar Diplomacy", "Shades of Mort'ton", "Desert Treasure I", "Dwarf Cannon", "Ghosts Ahoy"], "note": "Also needs Lair of Tarn Razorlor (miniquest) and The Great Brain Robbery at least started.", "reward": "Morytania legs 4" }
+      "Easy":   { "s": { "Crafting": 15, "Cooking": 12, "Slayer": 15, "Farming": 23 }, "q": ["Nature Spirit"], "reward": "Morytania legs 1", "tasks": [
+        { "id": "morytania-easy-1", "t": "Craft any snelm from scratch in Morytania", "s": { "Crafting": 15 } },
+        { "id": "morytania-easy-2", "t": "Cook a thin snail on the Port Phasmatys range", "s": { "Cooking": 12 } },
+        { "id": "morytania-easy-3", "t": "Get a slayer task from the Slayer Master in Canifis", "cb": 20 },
+        { "id": "morytania-easy-4", "t": "Kill a banshee in the Slayer Tower", "s": { "Slayer": 15 } },
+        { "id": "morytania-easy-5", "t": "Have Sbott in Canifis tan something for you" },
+        { "id": "morytania-easy-6", "t": "Enter Mort Myre Swamp" },
+        { "id": "morytania-easy-7", "t": "Kill a ghoul" },
+        { "id": "morytania-easy-8", "t": "Place a scarecrow in the Morytania flower patch", "s": { "Farming": 23 } },
+        { "id": "morytania-easy-9", "t": "Offer some bonemeal at the Ectofuntus" },
+        { "id": "morytania-easy-10", "t": "Kill a werewolf in its human form using the Wolfbane dagger" },
+        { "id": "morytania-easy-11", "t": "Restore your prayer points at the Nature altar", "q": ["Nature Spirit"] }
+      ] },
+      "Medium": { "s": { "Hunter": 29, "Agility": 40, "Woodcutting": 45, "Slayer": 42, "Cooking": 40, "Smithing": 35, "Herblore": 22 }, "q": ["Cabin Fever", "Dwarf Cannon", "Ghosts Ahoy"], "note": "Also needs Lair of Tarn Razorlor (miniquest) and In Aid of the Myreque at least started.", "reward": "Morytania legs 2", "tasks": [
+        { "id": "morytania-medium-1", "t": "Catch a swamp lizard", "s": { "Hunter": 29 } },
+        { "id": "morytania-medium-2", "t": "Complete a lap of the Canifis Rooftop Course", "s": { "Agility": 40 } },
+        { "id": "morytania-medium-3", "t": "Obtain some bark from a hollow tree", "s": { "Woodcutting": 45 } },
+        { "id": "morytania-medium-4", "t": "Travel to Dragontooth Isle", "q": ["Ghosts Ahoy"] },
+        { "id": "morytania-medium-5", "t": "Kill a terror dog", "s": { "Slayer": 40 }, "note": "Requires the Lair of Tarn Razorlor miniquest." },
+        { "id": "morytania-medium-6", "t": "Complete a game of Trouble Brewing", "s": { "Cooking": 40 }, "note": "Requires completing Cabin Fever." },
+        { "id": "morytania-medium-7", "t": "Board the swampy boat at the Hollows", "note": "Requires starting Nature Spirit." },
+        { "id": "morytania-medium-8", "t": "Make a batch of cannonballs at the Port Phasmatys furnace", "s": { "Smithing": 35 }, "note": "Requires completing Dwarf Cannon." },
+        { "id": "morytania-medium-9", "t": "Kill a fever spider on Braindeath Island", "s": { "Slayer": 42 }, "note": "Requires starting Rum Deal." },
+        { "id": "morytania-medium-10", "t": "Use an ectophial to return to Port Phasmatys", "q": ["Ghosts Ahoy"] },
+        { "id": "morytania-medium-11", "t": "Mix a Guthix balance potion while in Morytania", "s": { "Herblore": 22 }, "note": "Requires partial completion of In Aid of the Myreque." }
+      ] },
+      "Hard":   { "s": { "Magic": 66, "Construction": 50, "Agility": 71, "Woodcutting": 50, "Firemaking": 50, "Farming": 53, "Mining": 55, "Slayer": 58, "Prayer": 70, "Defence": 70 }, "q": ["Desert Treasure I", "Dwarf Cannon", "Ghosts Ahoy", "In Aid of the Myreque"], "note": "Also needs Lair of Tarn Razorlor (miniquest), Knight Waves (needs King's Ransom), and The Great Brain Robbery at least started.", "reward": "Morytania legs 3", "tasks": [
+        { "id": "morytania-hard-1", "t": "Enter the Kharyrll Portal in your POH", "s": { "Magic": 66, "Construction": 50 }, "q": ["Desert Treasure I"] },
+        { "id": "morytania-hard-2", "t": "Climb up the advanced spike chain within the Slayer Tower", "s": { "Agility": 71 } },
+        { "id": "morytania-hard-3", "t": "Harvest some watermelon from the allotment on Harmony Island", "s": { "Farming": 47 }, "note": "Requires starting The Great Brain Robbery." },
+        { "id": "morytania-hard-4", "t": "Chop and burn some mahogany logs on Mos Le'Harmless", "s": { "Woodcutting": 50, "Firemaking": 50 }, "note": "Requires completing Cabin Fever." },
+        { "id": "morytania-hard-5", "t": "Complete a Temple Trek with a hard companion", "q": ["In Aid of the Myreque"] },
+        { "id": "morytania-hard-6", "t": "Kill a cave horror", "s": { "Slayer": 58 }, "note": "Requires completing Cabin Fever." },
+        { "id": "morytania-hard-7", "t": "Harvest some bittercap mushrooms from the patch in Canifis", "s": { "Farming": 53 } },
+        { "id": "morytania-hard-8", "t": "Pray at the Altar of Nature with Piety activated", "s": { "Prayer": 70, "Defence": 70 }, "q": ["Nature Spirit"], "note": "Also needs the Knight Waves Training Grounds (requires King's Ransom)." },
+        { "id": "morytania-hard-9", "t": "Use the shortcut to get to the bridge over the Salve", "s": { "Agility": 65 } },
+        { "id": "morytania-hard-10", "t": "Mine some mithril ore in the Abandoned Mine", "s": { "Mining": 55 }, "note": "Requires completing Haunted Mine." }
+      ] },
+      "Elite":  { "s": { "Fishing": 96, "Strength": 76, "Firemaking": 80, "Magic": 83, "Crafting": 84, "Slayer": 85 }, "q": ["In Aid of the Myreque", "Lunar Diplomacy", "Shades of Mort'ton", "Desert Treasure I", "Dwarf Cannon", "Ghosts Ahoy"], "note": "Also needs Lair of Tarn Razorlor (miniquest) and The Great Brain Robbery at least started.", "reward": "Morytania legs 4", "tasks": [
+        { "id": "morytania-elite-1", "t": "Catch a shark in Burgh de Rott with your bare hands", "s": { "Fishing": 96, "Strength": 76 }, "q": ["In Aid of the Myreque"] },
+        { "id": "morytania-elite-2", "t": "Cremate any shade remains on a magic or redwood pyre", "s": { "Firemaking": 80 }, "note": "Requires completing Shades of Mort'ton." },
+        { "id": "morytania-elite-3", "t": "Fertilise the Morytania herb patch using Lunar magic", "s": { "Magic": 83 }, "q": ["Lunar Diplomacy"] },
+        { "id": "morytania-elite-4", "t": "Craft a black dragonhide body in the Canifis bank", "s": { "Crafting": 84 } },
+        { "id": "morytania-elite-5", "t": "Kill an abyssal demon in the Slayer Tower", "s": { "Slayer": 85 } },
+        { "id": "morytania-elite-6", "t": "Loot the Barrows chest while wearing any complete Barrows set", "s": { "Defence": 70 }, "note": "Plus level 70 in the set's attack style (unboostable)." }
+      ] }
     },
     "Varrock": {
       "Easy":   { "s": { "Mining": 15, "Agility": 13, "Crafting": 8, "Runecraft": 9, "Fishing": 20, "Thieving": 5 }, "q": ["Rune Mysteries"], "reward": "Varrock armour 1", "tasks": [
@@ -426,10 +515,58 @@
       ] }
     },
     "Western Provinces": {
-      "Easy":   { "s": { "Mining": 15, "Fletching": 20, "Hunter": 9 }, "cb": 40, "q": ["Big Chompy Bird Hunting", "Rune Mysteries"], "reward": "Western banner 1" },
-      "Medium": { "s": { "Agility": 37, "Cooking": 42, "Fishing": 46, "Woodcutting": 35, "Firemaking": 35, "Hunter": 31, "Mining": 40 }, "cb": 70, "q": ["Tree Gnome Village", "The Grand Tree", "The Eyes of Glouphrie", "Big Chompy Bird Hunting", "Eagle's Peak"], "note": "Also needs One Small Favour partially.", "reward": "Western banner 2" },
-      "Hard":   { "s": { "Ranged": 70, "Fishing": 62, "Cooking": 62, "Agility": 48, "Woodcutting": 50, "Firemaking": 50, "Hunter": 69, "Mining": 70, "Farming": 68, "Construction": 65, "Magic": 64, "Thieving": 75 }, "cb": 100, "q": ["Roving Elves", "Swan Song"], "note": "Also needs Regicide and Mourning's End Part I started, plus the Awowogei subquest of Recipe for Disaster.", "reward": "Western banner 3" },
-      "Elite":  { "s": { "Fletching": 85, "Slayer": 93, "Farming": 75, "Agility": 85, "Thieving": 85 }, "cb": 100, "q": ["Underground Pass"], "note": "Also needs Regicide and Mourning's End Part I at least started.", "reward": "Western banner 4" }
+      "Easy":   { "s": { "Mining": 15, "Fletching": 20, "Hunter": 9 }, "cb": 40, "q": ["Big Chompy Bird Hunting", "Rune Mysteries"], "reward": "Western banner 1", "tasks": [
+        { "id": "western-easy-1", "t": "Catch a copper longtail", "s": { "Hunter": 9 } },
+        { "id": "western-easy-2", "t": "Complete a novice game of Pest Control", "cb": 40 },
+        { "id": "western-easy-3", "t": "Mine some iron ore near Piscatoris", "s": { "Mining": 15 } },
+        { "id": "western-easy-4", "t": "Complete a lap of the Gnome Stronghold agility course" },
+        { "id": "western-easy-5", "t": "Score a goal in a gnomeball match" },
+        { "id": "western-easy-6", "t": "Claim any chompy bird hat from Rantz", "note": "Requires completing Big Chompy Bird Hunting and 30 chompy/jubbly kills." },
+        { "id": "western-easy-7", "t": "Teleport to Pest Control using the Minigame Teleport", "cb": 40 },
+        { "id": "western-easy-8", "t": "Collect a swamp toad at the Gnome Stronghold" },
+        { "id": "western-easy-9", "t": "Have Brimstail teleport you to the Essence Mine", "q": ["Rune Mysteries"] },
+        { "id": "western-easy-10", "t": "Fletch an oak shortbow in the Gnome Stronghold", "s": { "Fletching": 20 } },
+        { "id": "western-easy-11", "t": "Kill a terrorbird in the terrorbird enclosure" }
+      ] },
+      "Medium": { "s": { "Agility": 37, "Cooking": 42, "Fishing": 46, "Woodcutting": 35, "Firemaking": 35, "Hunter": 31, "Mining": 40 }, "cb": 70, "q": ["Tree Gnome Village", "The Grand Tree", "The Eyes of Glouphrie", "Big Chompy Bird Hunting", "Eagle's Peak"], "note": "Also needs One Small Favour partially.", "reward": "Western banner 2", "tasks": [
+        { "id": "western-medium-1", "t": "Take the agility shortcut from the Grand Tree to Otto's Grotto", "s": { "Agility": 37 }, "q": ["Tree Gnome Village", "The Grand Tree"] },
+        { "id": "western-medium-2", "t": "Travel to the Gnome Stronghold by spirit tree", "q": ["Tree Gnome Village"] },
+        { "id": "western-medium-3", "t": "Trap a spined larupia", "s": { "Hunter": 31 } },
+        { "id": "western-medium-4", "t": "Fish some bass on Ape Atoll", "s": { "Fishing": 46 }, "note": "Requires starting Monkey Madness I." },
+        { "id": "western-medium-5", "t": "Chop and burn some teak logs on Ape Atoll", "s": { "Woodcutting": 35, "Firemaking": 35 }, "note": "Requires starting Monkey Madness I." },
+        { "id": "western-medium-6", "t": "Complete an intermediate game of Pest Control", "cb": 70 },
+        { "id": "western-medium-7", "t": "Travel to the Feldip Hills by gnome glider", "q": ["The Grand Tree"], "note": "Requires starting One Small Favour." },
+        { "id": "western-medium-8", "t": "Claim a chompy bird hat from Rantz after 125 kills", "note": "Requires completing Big Chompy Bird Hunting and 125 chompy/jubbly kills." },
+        { "id": "western-medium-9", "t": "Travel from Eagles' Peak to the Feldip Hills by eagle", "q": ["Eagle's Peak"] },
+        { "id": "western-medium-10", "t": "Make a chocolate bomb at the Grand Tree", "s": { "Cooking": 42 } },
+        { "id": "western-medium-11", "t": "Complete a delivery for the Gnome Restaurant", "s": { "Cooking": 29 } },
+        { "id": "western-medium-12", "t": "Turn your small crystal seed into a crystal saw", "q": ["The Eyes of Glouphrie"] },
+        { "id": "western-medium-13", "t": "Mine some gold ore underneath the Grand Tree", "s": { "Mining": 40 }, "q": ["The Grand Tree"] }
+      ] },
+      "Hard":   { "s": { "Ranged": 70, "Fishing": 62, "Cooking": 62, "Agility": 48, "Woodcutting": 50, "Firemaking": 50, "Hunter": 69, "Mining": 70, "Farming": 68, "Construction": 65, "Magic": 64, "Thieving": 75 }, "cb": 100, "q": ["Roving Elves", "Swan Song"], "note": "Also needs Regicide and Mourning's End Part I started, plus the Awowogei subquest of Recipe for Disaster.", "reward": "Western banner 3", "tasks": [
+        { "id": "western-hard-1", "t": "Kill an elf with a crystal bow", "s": { "Ranged": 70 }, "q": ["Roving Elves"] },
+        { "id": "western-hard-2", "t": "Catch and cook a monkfish in Piscatoris", "s": { "Fishing": 62, "Cooking": 62 }, "q": ["Swan Song"] },
+        { "id": "western-hard-3", "t": "Complete a veteran game of Pest Control", "cb": 100 },
+        { "id": "western-hard-4", "t": "Catch a dashing kebbit", "s": { "Hunter": 69 } },
+        { "id": "western-hard-5", "t": "Complete a lap of the Ape Atoll agility course", "s": { "Agility": 48 }, "note": "Requires starting Monkey Madness I." },
+        { "id": "western-hard-6", "t": "Chop and burn some mahogany logs on Ape Atoll", "s": { "Woodcutting": 50, "Firemaking": 50 }, "note": "Requires starting Monkey Madness I." },
+        { "id": "western-hard-7", "t": "Mine some adamantite ore in Tirannwn", "s": { "Mining": 70 }, "note": "Requires starting Regicide." },
+        { "id": "western-hard-8", "t": "Check the health of your palm tree in Lletya", "s": { "Farming": 68 }, "note": "Requires starting Mourning's End Part I." },
+        { "id": "western-hard-9", "t": "Claim a chompy bird hat from Rantz after 300 kills", "note": "Requires completing Big Chompy Bird Hunting and 300 chompy/jubbly kills." },
+        { "id": "western-hard-10", "t": "Build an Isafdar painting in your POH quest hall", "s": { "Construction": 65 }, "q": ["Roving Elves"] },
+        { "id": "western-hard-11", "t": "Kill Zulrah", "note": "Requires starting Regicide." },
+        { "id": "western-hard-12", "t": "Teleport to Ape Atoll", "s": { "Magic": 64 }, "note": "Requires the Awowogei subquest of Recipe for Disaster." },
+        { "id": "western-hard-13", "t": "Pickpocket a gnome", "s": { "Thieving": 75 } }
+      ] },
+      "Elite":  { "s": { "Fletching": 85, "Slayer": 93, "Farming": 75, "Agility": 85, "Thieving": 85 }, "cb": 100, "q": ["Underground Pass"], "note": "Also needs Regicide and Mourning's End Part I at least started.", "reward": "Western banner 4", "tasks": [
+        { "id": "western-elite-1", "t": "Fletch a magic longbow in Tirannwn", "s": { "Fletching": 85 }, "note": "Requires starting Regicide." },
+        { "id": "western-elite-2", "t": "Kill the Thermonuclear Smoke Devil", "s": { "Slayer": 93 } },
+        { "id": "western-elite-3", "t": "Have Prissy Scilla protect your magic tree", "s": { "Farming": 75 } },
+        { "id": "western-elite-4", "t": "Use the Elven Overpass advanced cliffside shortcut", "s": { "Agility": 85 }, "q": ["Underground Pass"] },
+        { "id": "western-elite-5", "t": "Equip any complete void set", "cb": 40, "s": { "Prayer": 22, "Attack": 42, "Strength": 42, "Defence": 42, "Hitpoints": 42, "Ranged": 42, "Magic": 42 } },
+        { "id": "western-elite-6", "t": "Claim a chompy bird hat from Rantz after 1,000 kills", "note": "Requires completing Big Chompy Bird Hunting and 1,000 chompy/jubbly kills." },
+        { "id": "western-elite-7", "t": "Pickpocket an elf", "s": { "Thieving": 85 }, "note": "Requires starting Mourning's End Part I." }
+      ] }
     },
     "Wilderness": {
       "Easy":   { "s": { "Mining": 15, "Agility": 15, "Magic": 21 }, "q": [], "note": "Needs Enter the Abyss (miniquest).", "reward": "Wilderness sword 1", "tasks": [
