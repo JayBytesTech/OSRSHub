@@ -66,7 +66,7 @@ account record; no feature code assumes a single global player.
   **excluded unreleased/future quests** (The Blood Moon Rises, The Graveyard, Fallen From Grace), and
   fixed name/skill-key bugs (Vampyre Slayer, The Hand in the Sand, Runecraft→Runecrafting) that were
   silently breaking gates. Non-quest **unlocks** (items, area access, skill unlocks) still pending.
-- 🟡 **F1.3** "What should I do next?" engine — ranked, prerequisite-aware suggestions on the dashboard.
+- 🟢 **F1.3** "What should I do next?" engine — ranked, prerequisite-aware suggestions on the dashboard.
   **Live** as the "🧭 What to do next" panel: `nextActions()` ranks across tiers — quest-goal next
   steps, Quest Cape, skill goals, **goal-independent opportunity quests**, a **high-leverage
   skill-to-train nudge** (`skillUnlockLeverage` — the skill that solely-blocks the most startable
@@ -74,7 +74,9 @@ account record; no feature code assumes a single global player.
   Works even with no goals set. Quest picks rank by **reward XP magnitude** (`questRewardXp` parses
   the free-text reward field; `compareQuestValue` is the shared comparator used by the per-goal next
   step, the goal-independent pick, and the Quest Cape preset) — so e.g. Monkey Madness I (~35k combat
-  XP) is suggested over a trivial quest. Remaining: acting on a suggestion inline vs. linking out.
+  XP) is suggested over a trivial quest. Suggestions are **actionable inline** — quest picks carry a
+  ✓ (mark complete → panel re-ranks live) and ★ (track as a goal); the skill-leverage nudge carries a
+  ★ (add the skill goal) — so the user acts from the dashboard without tab-hopping.
 
 **Exit criteria:** adding a high-level goal yields an accurate outstanding-requirements list,
 and the dashboard recommends agreeable next actions.

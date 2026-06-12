@@ -546,8 +546,19 @@ body {
 .dash-next-item:hover { background: #e4f0d0; border-color: #5aa83a; }
 .dash-next-item.soft { background: #f3eed8; border-color: #d8c79a; }
 .dash-next-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+.dash-next-text { flex: 1 1 auto; min-width: 0; }
 .dash-next-title { font-size: 13px; font-weight: 700; color: #2c1a08; }
 .dash-next-reason { font-size: 11px; color: #6a4a14; margin-top: 1px; }
+.dash-next-actions { display: flex; gap: 5px; flex-shrink: 0; }
+.dash-act {
+  font-size: 13px; line-height: 1; width: 26px; height: 26px; border-radius: 6px;
+  background: #fff; border: 1px solid #b9cf93; color: #3e6b1e; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+  transition: background .12s, border-color .12s, transform .08s;
+}
+.dash-act:hover { background: #dcedc4; border-color: #5aa83a; }
+.dash-act:active { transform: scale(.9); }
+.dash-act.star:hover { color: #8b6914; border-color: #c8a32a; background: #faf3da; }
 .dash-momentum-big { font-size: 30px; font-weight: bold; color: #2e6614; line-height: 1.1; }
 .dash-momentum-flat, .dash-momentum-note { font-size: 12px; color: #8a6030; }
 .dash-goal { margin-bottom: 10px; }
@@ -2264,7 +2275,31 @@ function skillUnlockLeverage(completed, skip) {
   const eta = bm ? ` · ~${fmtHours(Math.max(0, xpForLevel(best.target) - curXP) / bm.xphr)}` : '';
   return { icon: '🔑', title: `Train ${best.skill} to ${best.target}`,
            reason: `Unlocks ${best.count} quest${best.count === 1 ? '' : 's'}: ${names}${eta}`,
-           onclick: `switchTab('skills')`, _soft: true };
+           onclick: `switchTab('skills')`, _soft: true, _skill: { skill: best.skill, target: best.target } };
+}
+
+// ── F1.3 inline actions: act on a suggestion without leaving the dashboard ───────
+// Each mutates state, persists, and re-renders the dashboard so the panel re-ranks live.
+function dashCompleteQuest(name) {
+  const c = getCompleted();
+  c[name] = true;
+  saveCompletedLocal(c);
+  renderQuests(); renderMoney(); renderDashboard();
+  scheduleVaultSave();
+}
+function dashTrackQuest(name) {
+  const goals = getQuestGoals();
+  if (!goals.includes(name)) { goals.push(name); saveQuestGoalsLocal(goals); }
+  renderGoals(); populateQuestGoalDatalist(); renderDashboard();
+  scheduleVaultSave();
+}
+function dashTrackSkill(skill, target) {
+  const goals = getGoals();
+  const idx = goals.findIndex(g => g.skill === skill);
+  if (idx >= 0) goals[idx].target = Math.max(goals[idx].target, target); else goals.push({ skill, target });
+  saveGoalsLocal(goals);
+  renderGoals(); renderDashboard();
+  scheduleVaultSave();
 }
 
 function nextActions() {
@@ -2290,7 +2325,8 @@ function nextActions() {
         const reward = REQS[pick] && REQS[pick].r ? ` · 🎁 ${REQS[pick].r}` : '';
         suggestedQuests.set(pick, out.length);
         out.push({ icon: '▶', title: `Start ${pick}`, reason: `Next step toward ${goal}${reward}`,
-                   _goals: [goal], onclick: `goToQuest('${pick.replace(/'/g, "\\'")}')` });
+                   _goals: [goal], _quest: pick, _canTrack: !getQuestGoals().includes(pick),
+                   onclick: `goToQuest('${pick.replace(/'/g, "\\'")}')` });
       }
     } else {
       // nothing startable — surface the nearest gated quest (no train-skill directive).
@@ -2318,7 +2354,8 @@ function nextActions() {
         const reward = REQS[cs.nextBest] && REQS[cs.nextBest].r ? ` · 🎁 ${REQS[cs.nextBest].r}` : '';
         suggestedQuests.set(cs.nextBest, out.length);
         out.push({ icon: '▶', title: `Start ${cs.nextBest}`, reason: `Next step toward Quest Cape${reward}`,
-                   _goals: ['Quest Cape'], onclick: `goToQuest('${cs.nextBest.replace(/'/g, "\\'")}')` });
+                   _goals: ['Quest Cape'], _quest: cs.nextBest, _canTrack: !getQuestGoals().includes(cs.nextBest),
+                   onclick: `goToQuest('${cs.nextBest.replace(/'/g, "\\'")}')` });
       }
     }
   }
@@ -2349,7 +2386,7 @@ function nextActions() {
       const reward = REQS[pick] && REQS[pick].r ? ` · 🎁 ${REQS[pick].r}` : '';
       suggestedQuests.set(pick, out.length);
       out.push({ icon: '▶', title: `Start ${pick}`, reason: `A solid quest you can start now${reward}`,
-                 onclick: `goToQuest('${pick.replace(/'/g, "\\'")}')` });
+                 _quest: pick, _canTrack: true, onclick: `goToQuest('${pick.replace(/'/g, "\\'")}')` });
     }
   }
 
@@ -2475,11 +2512,21 @@ function renderDashboard() {
   }
 
   const next = nextActions();
-  const nextRows = next.actions.map(a =>
-    `<div class="dash-next-item${a._soft ? ' soft' : ''}" onclick="${a.onclick}" title="Go">
+  const nextRows = next.actions.map(a => {
+    let acts = '';
+    if (a._quest) {
+      const qn = a._quest.replace(/'/g, "\\'");
+      acts += `<button class="dash-act" onclick="event.stopPropagation();dashCompleteQuest('${qn}')" title="Mark ${a._quest} complete">✓</button>`;
+      if (a._canTrack) acts += `<button class="dash-act star" onclick="event.stopPropagation();dashTrackQuest('${qn}')" title="Track ${a._quest} as a goal">★</button>`;
+    } else if (a._skill) {
+      acts += `<button class="dash-act star" onclick="event.stopPropagation();dashTrackSkill('${a._skill.skill}',${a._skill.target})" title="Track ${a._skill.skill} ${a._skill.target} as a goal">★</button>`;
+    }
+    return `<div class="dash-next-item${a._soft ? ' soft' : ''}"${a.onclick ? ` onclick="${a.onclick}"` : ''} title="Go">
        <span class="dash-next-icon">${a.icon}</span>
        <div class="dash-next-text"><div class="dash-next-title">${a.title}</div><div class="dash-next-reason">${a.reason}</div></div>
-     </div>`).join('');
+       ${acts ? `<div class="dash-next-actions">${acts}</div>` : ''}
+     </div>`;
+  }).join('');
   const nextBody = (nextRows || '') + (next.prompt
     ? `<div class="dash-sub"${nextRows ? ' style="margin-top:8px"' : ''}>🎯 ${next.prompt}</div>` : '');
   const nextPanel = `
