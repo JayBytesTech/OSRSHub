@@ -2,7 +2,7 @@
   "_meta": {
     "about": "Tier-level aggregate Achievement Diary requirements (Phase 4 / F2.3). Static, non-account-scoped reference data served from /public like quest-data.json. Entry shape per tier: s = aggregate skill levels (the highest level any task in that tier needs, per skill), cb = combat-level gate (Western Provinces only), q = quests that must be COMPLETED (verifiable against your ticked quest completions), reward = the unlock, note = extra caveats. The engine marks a tier 'ready' when every s/cb gate is met and every q quest is complete; 'locked' otherwise; 'done' when you've toggled it complete.",
     "caveats": "Skill levels are best-effort aggregates from oldschool.runescape.wiki and many are boostable. The q list only contains standard quests the hub can verify; miniquests (e.g. Enter the Abyss, Mage Arena I, Alfred Grimhand's Barcrawl) and quests that only need to be STARTED are listed in `note` instead of `q`, so they never falsely lock a tier. Completion itself is all-or-nothing per tier and tracked by you ticking it — the hub answers 'can I do this now?', not 'which individual tasks have I done?'.",
-    "tasks": "Each tier may carry an optional `tasks` array for per-task drill-down: { id (globally-unique stable key, used for completion ticks), t (task text), s? (notable per-task skill gate), q? (full quests required for that task), cb? (combat-level gate), note? (started/partial quests, miniquests, items, or other caveats not auto-verified) }. Per-task completion is a manual checklist (the game/Dink report only whole-tier completion). Curated regions so far: Lumbridge & Draynor, Varrock, Falador, Ardougne, Desert, Karamja — the rest follow iteratively and show tier-level only until then.",
+    "tasks": "Each tier may carry an optional `tasks` array for per-task drill-down: { id (globally-unique stable key, used for completion ticks), t (task text), s? (notable per-task skill gate), q? (full quests required for that task), cb? (combat-level gate), note? (started/partial quests, miniquests, items, or other caveats not auto-verified) }. Per-task completion is a manual checklist (the game/Dink report only whole-tier completion). Curated regions so far: Lumbridge & Draynor, Varrock, Falador, Ardougne, Desert, Karamja, Fremennik, Kourend & Kebos, Wilderness — the rest follow iteratively and show tier-level only until then.",
     "source": "Curated from oldschool.runescape.wiki diary pages (per-region requirement summaries + per-task tables)."
   },
   "diaries": {
@@ -160,10 +160,48 @@
       ] }
     },
     "Fremennik": {
-      "Easy":   { "s": { "Attack": 20, "Hitpoints": 20, "Mining": 20, "Strength": 20, "Agility": 20, "Smithing": 20, "Defence": 20, "Herblore": 20, "Fishing": 20, "Ranged": 20, "Thieving": 5, "Cooking": 20, "Prayer": 20, "Crafting": 23, "Firemaking": 15, "Magic": 20, "Fletching": 20, "Woodcutting": 15, "Runecraft": 20, "Slayer": 20, "Farming": 20, "Construction": 20, "Hunter": 11 }, "q": ["The Fremennik Trials"], "reward": "Fremennik sea boots 1" },
-      "Medium": { "s": { "Attack": 40, "Mining": 40, "Agility": 35, "Smithing": 50, "Defence": 30, "Thieving": 42, "Cooking": 40, "Crafting": 31, "Firemaking": 40, "Woodcutting": 50, "Slayer": 47, "Hunter": 35, "Construction": 37 }, "q": ["Between a Rock...", "Eagle's Peak", "Horror from the Deep"], "reward": "Fremennik sea boots 2" },
-      "Hard":   { "s": { "Attack": 70, "Mining": 70, "Agility": 35, "Smithing": 60, "Defence": 40, "Herblore": 66, "Fishing": 53, "Thieving": 75, "Cooking": 53, "Crafting": 61, "Firemaking": 49, "Magic": 72, "Woodcutting": 56, "Slayer": 47, "Hunter": 55, "Construction": 37 }, "q": ["Between a Rock...", "Eagle's Peak", "Horror from the Deep", "Eadgar's Ruse", "Lunar Diplomacy", "Throne of Miscellania"], "reward": "Fremennik sea boots 3" },
-      "Elite":  { "s": { "Attack": 70, "Hitpoints": 70, "Mining": 70, "Strength": 70, "Agility": 80, "Smithing": 60, "Defence": 40, "Herblore": 66, "Fishing": 53, "Ranged": 70, "Thieving": 75, "Cooking": 53, "Crafting": 80, "Firemaking": 49, "Magic": 72, "Woodcutting": 56, "Runecraft": 82, "Slayer": 83, "Hunter": 55 }, "q": ["Between a Rock...", "Eagle's Peak", "Horror from the Deep", "Eadgar's Ruse", "Lunar Diplomacy", "Throne of Miscellania"], "reward": "Fremennik sea boots 4" }
+      "Easy":   { "s": { "Attack": 20, "Hitpoints": 20, "Mining": 20, "Strength": 20, "Agility": 20, "Smithing": 20, "Defence": 20, "Herblore": 20, "Fishing": 20, "Ranged": 20, "Thieving": 5, "Cooking": 20, "Prayer": 20, "Crafting": 23, "Firemaking": 15, "Magic": 20, "Fletching": 20, "Woodcutting": 15, "Runecraft": 20, "Slayer": 20, "Farming": 20, "Construction": 20, "Hunter": 11 }, "q": ["The Fremennik Trials"], "reward": "Fremennik sea boots 1", "tasks": [
+        { "id": "fremennik-easy-1", "t": "Catch a cerulean twitch", "s": { "Hunter": 11 } },
+        { "id": "fremennik-easy-2", "t": "Change your boots at Yrsa's Shoe Store", "q": ["The Fremennik Trials"] },
+        { "id": "fremennik-easy-3", "t": "Kill 5 rock crabs" },
+        { "id": "fremennik-easy-4", "t": "Craft a tiara from scratch in Rellekka", "s": { "Crafting": 23, "Mining": 20, "Smithing": 20 }, "q": ["The Fremennik Trials"] },
+        { "id": "fremennik-easy-5", "t": "Browse the Stonemason's shop", "note": "Requires starting The Giant Dwarf." },
+        { "id": "fremennik-easy-6", "t": "Collect 5 snape grass on Waterbirth Island" },
+        { "id": "fremennik-easy-7", "t": "Steal from the Keldagrim crafting or baker's stall", "s": { "Thieving": 5 }, "note": "Requires starting The Giant Dwarf." },
+        { "id": "fremennik-easy-8", "t": "Fill a bucket with water at the Rellekka well" },
+        { "id": "fremennik-easy-9", "t": "Enter the Troll Stronghold", "note": "Requires starting Troll Stronghold." },
+        { "id": "fremennik-easy-10", "t": "Chop and burn some oak logs in the Fremennik Province", "s": { "Woodcutting": 15, "Firemaking": 15 } }
+      ] },
+      "Medium": { "s": { "Attack": 40, "Mining": 40, "Agility": 35, "Smithing": 50, "Defence": 30, "Thieving": 42, "Cooking": 40, "Crafting": 31, "Firemaking": 40, "Woodcutting": 50, "Slayer": 47, "Hunter": 35, "Construction": 37 }, "q": ["Between a Rock...", "Eagle's Peak", "Horror from the Deep"], "reward": "Fremennik sea boots 2", "tasks": [
+        { "id": "fremennik-medium-1", "t": "Slay a brine rat", "s": { "Slayer": 47 }, "note": "Requires partial completion of Olaf's Quest." },
+        { "id": "fremennik-medium-2", "t": "Travel to the Snowy Hunter Area via the eagle", "q": ["Eagle's Peak"] },
+        { "id": "fremennik-medium-3", "t": "Mine some coal in Rellekka", "s": { "Mining": 30 }, "q": ["The Fremennik Trials"] },
+        { "id": "fremennik-medium-4", "t": "Steal from the Rellekka fish stalls", "s": { "Thieving": 42 }, "q": ["The Fremennik Trials"] },
+        { "id": "fremennik-medium-5", "t": "Travel to Miscellania by fairy ring", "q": ["The Fremennik Trials"], "note": "Also needs Fairy Tale II - Cure a Queen started (for fairy rings)." },
+        { "id": "fremennik-medium-6", "t": "Catch a snowy knight", "s": { "Hunter": 35 }, "note": "Needs Hunter 45 without the butterfly-net method." },
+        { "id": "fremennik-medium-7", "t": "Pick up your Pet Rock from your POH menagerie", "s": { "Construction": 37 }, "note": "Requires partial completion of The Fremennik Trials." },
+        { "id": "fremennik-medium-8", "t": "Visit the Lighthouse from Waterbirth Island", "note": "Requires completing Horror from the Deep." },
+        { "id": "fremennik-medium-9", "t": "Mine some gold at the Arzinian mine", "s": { "Mining": 40, "Defence": 30 }, "note": "Requires partial completion of Between a Rock..." }
+      ] },
+      "Hard":   { "s": { "Attack": 70, "Mining": 70, "Agility": 35, "Smithing": 60, "Defence": 40, "Herblore": 66, "Fishing": 53, "Thieving": 75, "Cooking": 53, "Crafting": 61, "Firemaking": 49, "Magic": 72, "Woodcutting": 56, "Slayer": 47, "Hunter": 55, "Construction": 37 }, "q": ["Between a Rock...", "Eagle's Peak", "Horror from the Deep", "Eadgar's Ruse", "Lunar Diplomacy", "Throne of Miscellania"], "reward": "Fremennik sea boots 3", "tasks": [
+        { "id": "fremennik-hard-1", "t": "Teleport to Trollheim", "s": { "Magic": 61 }, "q": ["Eadgar's Ruse"] },
+        { "id": "fremennik-hard-2", "t": "Catch a sabre-toothed kyatt", "s": { "Hunter": 55 } },
+        { "id": "fremennik-hard-3", "t": "Mix a super defence potion in the Fremennik Province", "s": { "Herblore": 66 } },
+        { "id": "fremennik-hard-4", "t": "Steal from the Keldagrim gem stall", "s": { "Thieving": 75 }, "note": "Requires starting The Giant Dwarf." },
+        { "id": "fremennik-hard-5", "t": "Craft a Neitiznot shield on Neitiznot", "s": { "Woodcutting": 56 }, "note": "Requires partial completion of The Fremennik Isles." },
+        { "id": "fremennik-hard-6", "t": "Mine 5 adamantite ores on Jatizso", "s": { "Mining": 70 }, "note": "Requires starting The Fremennik Isles." },
+        { "id": "fremennik-hard-7", "t": "Obtain 100% support from your kingdom subjects", "note": "Requires partial completion of Throne of Miscellania." },
+        { "id": "fremennik-hard-8", "t": "Teleport to Waterbirth Island", "s": { "Magic": 72 }, "q": ["Lunar Diplomacy"] },
+        { "id": "fremennik-hard-9", "t": "Obtain the Blast Furnace Foreman's permission to use the Blast Furnace for free", "s": { "Smithing": 60 }, "note": "Requires starting The Giant Dwarf." }
+      ] },
+      "Elite":  { "s": { "Attack": 70, "Hitpoints": 70, "Mining": 70, "Strength": 70, "Agility": 80, "Smithing": 60, "Defence": 40, "Herblore": 66, "Fishing": 53, "Ranged": 70, "Thieving": 75, "Cooking": 53, "Crafting": 80, "Firemaking": 49, "Magic": 72, "Woodcutting": 56, "Runecraft": 82, "Slayer": 83, "Hunter": 55 }, "q": ["Between a Rock...", "Eagle's Peak", "Horror from the Deep", "Eadgar's Ruse", "Lunar Diplomacy", "Throne of Miscellania"], "reward": "Fremennik sea boots 4", "tasks": [
+        { "id": "fremennik-elite-1", "t": "Kill each of the Dagannoth Kings" },
+        { "id": "fremennik-elite-2", "t": "Craft 56 astral runes at once from essence (without using extracts)", "s": { "Runecraft": 82 }, "q": ["Lunar Diplomacy"] },
+        { "id": "fremennik-elite-3", "t": "Create a dragonstone amulet in the Neitiznot furnace", "s": { "Crafting": 80 }, "note": "Requires starting The Fremennik Isles." },
+        { "id": "fremennik-elite-4", "t": "Complete a lap of the Rellekka Rooftop Course", "s": { "Agility": 80 } },
+        { "id": "fremennik-elite-5", "t": "Kill the generals of Armadyl, Bandos, Saradomin and Zamorak in the God Wars Dungeon", "s": { "Agility": 70, "Strength": 70, "Hitpoints": 70, "Ranged": 70 }, "note": "Requires partial completion of Troll Stronghold for access." },
+        { "id": "fremennik-elite-6", "t": "Slay a Spiritual mage within the God Wars Dungeon", "s": { "Slayer": 83 }, "q": ["Troll Stronghold"] }
+      ] }
     },
     "Kandarin": {
       "Easy":   { "s": { "Agility": 20, "Farming": 13, "Fishing": 16 }, "q": ["Elemental Workshop I"], "reward": "Kandarin headgear 1" },
@@ -226,10 +264,57 @@
       ] }
     },
     "Kourend & Kebos": {
-      "Easy":   { "s": { "Mining": 15, "Thieving": 25, "Construction": 25, "Herblore": 12, "Fishing": 20 }, "q": ["Druidic Ritual"], "reward": "Rada's blessing 1" },
-      "Medium": { "s": { "Mining": 42, "Agility": 49, "Fishing": 43, "Thieving": 25, "Crafting": 31, "Firemaking": 50, "Woodcutting": 50, "Farming": 45, "Hunter": 53 }, "q": ["The Depths of Despair", "The Queen of Thieves", "Tale of the Righteous", "The Forsaken Tower", "The Ascent of Arceuus"], "note": "Also needs Fairy Tale II and Eagle's Peak at least started.", "reward": "Rada's blessing 2" },
-      "Hard":   { "s": { "Mining": 65, "Woodcutting": 60, "Smithing": 70, "Fishing": 43, "Magic": 66, "Thieving": 49, "Slayer": 62, "Farming": 74 }, "q": ["Dream Mentor", "The Forsaken Tower", "The Depths of Despair", "The Queen of Thieves", "Tale of the Righteous", "The Ascent of Arceuus"], "note": "Also needs Fairy Tale II and Eagle's Peak at least started.", "reward": "Rada's blessing 3" },
-      "Elite":  { "s": { "Runecraft": 77, "Woodcutting": 90, "Fishing": 82, "Cooking": 84, "Magic": 90, "Slayer": 95, "Farming": 85, "Fletching": 40, "Mining": 38, "Crafting": 38 }, "q": ["Dream Mentor", "The Forsaken Tower", "The Depths of Despair", "The Queen of Thieves", "Tale of the Righteous", "The Ascent of Arceuus"], "note": "Also needs Fairy Tale II and Eagle's Peak at least started.", "reward": "Rada's blessing 4" }
+      "Easy":   { "s": { "Mining": 15, "Thieving": 25, "Construction": 25, "Herblore": 12, "Fishing": 20 }, "q": ["Druidic Ritual"], "reward": "Rada's blessing 1", "tasks": [
+        { "id": "kourend-easy-1", "t": "Mine some iron at the Mount Karuulm mine", "s": { "Mining": 15 } },
+        { "id": "kourend-easy-2", "t": "Kill a sand crab" },
+        { "id": "kourend-easy-3", "t": "Hand in a book at the Arceuus Library" },
+        { "id": "kourend-easy-4", "t": "Steal from a Hosidius food stall", "s": { "Thieving": 25 } },
+        { "id": "kourend-easy-5", "t": "Browse the Warrens General Store" },
+        { "id": "kourend-easy-6", "t": "Take a boat to Land's End" },
+        { "id": "kourend-easy-7", "t": "Pray at the altar in Kourend Castle" },
+        { "id": "kourend-easy-8", "t": "Dig up some saltpetre" },
+        { "id": "kourend-easy-9", "t": "Enter your player-owned house from Hosidius", "s": { "Construction": 25 } },
+        { "id": "kourend-easy-10", "t": "Do a lap of either tier of the Shayzien Agility Course" },
+        { "id": "kourend-easy-11", "t": "Create a strength potion in the Lovakengj pub", "s": { "Herblore": 12 }, "q": ["Druidic Ritual"] },
+        { "id": "kourend-easy-12", "t": "Fish a trout from the River Molch", "s": { "Fishing": 20 } }
+      ] },
+      "Medium": { "s": { "Mining": 42, "Agility": 49, "Fishing": 43, "Thieving": 25, "Crafting": 31, "Firemaking": 50, "Woodcutting": 50, "Farming": 45, "Hunter": 53, "Construction": 30 }, "q": ["The Depths of Despair", "The Queen of Thieves", "Tale of the Righteous", "The Forsaken Tower", "The Ascent of Arceuus"], "note": "Also needs Fairy Tale II and Eagle's Peak at least started.", "reward": "Rada's blessing 2", "tasks": [
+        { "id": "kourend-medium-1", "t": "Travel to the fairy ring south of Mount Karuulm", "note": "Requires starting Fairy Tale II - Cure a Queen; a Dramen or Lunar staff." },
+        { "id": "kourend-medium-2", "t": "Kill a lizardman" },
+        { "id": "kourend-medium-3", "t": "Use Kharedst's memoirs to teleport to all five cities", "q": ["The Depths of Despair", "The Queen of Thieves", "Tale of the Righteous", "The Forsaken Tower"], "note": "Also requires The Ascent of Arceuus." },
+        { "id": "kourend-medium-4", "t": "Mine some volcanic sulphur", "s": { "Mining": 42 } },
+        { "id": "kourend-medium-5", "t": "Enter the Farming Guild", "s": { "Farming": 45 } },
+        { "id": "kourend-medium-6", "t": "Switch to the Arceuus spellbook at Tyss" },
+        { "id": "kourend-medium-7", "t": "Repair a Piscarilius crane", "s": { "Crafting": 30, "Construction": 30 } },
+        { "id": "kourend-medium-8", "t": "Deliver some intelligence to Captain Ginea" },
+        { "id": "kourend-medium-9", "t": "Catch a bluegill on Molch Island", "s": { "Fishing": 43, "Hunter": 35 } },
+        { "id": "kourend-medium-10", "t": "Use the boulder leap shortcut in the Arceuus essence mine", "s": { "Agility": 49 } },
+        { "id": "kourend-medium-11", "t": "Subdue the Wintertodt", "s": { "Firemaking": 50 } },
+        { "id": "kourend-medium-12", "t": "Catch a chinchompa in the Kourend Woodland", "s": { "Hunter": 53 }, "note": "Requires partial completion of Eagle's Peak." },
+        { "id": "kourend-medium-13", "t": "Chop some mahogany logs north of the Farming Guild", "s": { "Woodcutting": 50 } }
+      ] },
+      "Hard":   { "s": { "Mining": 65, "Woodcutting": 60, "Smithing": 70, "Fishing": 43, "Magic": 66, "Thieving": 49, "Slayer": 62, "Farming": 74 }, "q": ["Dream Mentor", "The Forsaken Tower", "The Depths of Despair", "The Queen of Thieves", "Tale of the Righteous", "The Ascent of Arceuus"], "note": "Also needs Fairy Tale II and Eagle's Peak at least started.", "reward": "Rada's blessing 3", "tasks": [
+        { "id": "kourend-hard-1", "t": "Enter the Woodcutting Guild", "s": { "Woodcutting": 60 } },
+        { "id": "kourend-hard-2", "t": "Smelt an adamantite bar in The Forsaken Tower", "s": { "Smithing": 70 }, "q": ["The Forsaken Tower"] },
+        { "id": "kourend-hard-3", "t": "Kill a Lizardman Shaman in the Lizardman Temple" },
+        { "id": "kourend-hard-4", "t": "Mine some lovakite ore", "s": { "Mining": 65 } },
+        { "id": "kourend-hard-5", "t": "Plant some Logavano seeds at the Tithe Farm", "s": { "Farming": 74 } },
+        { "id": "kourend-hard-6", "t": "Kill a zombie in the Shayzien Crypts", "note": "Bring a light source." },
+        { "id": "kourend-hard-7", "t": "Teleport to Xeric's Heart using Xeric's talisman", "note": "Needs a charged Xeric's talisman." },
+        { "id": "kourend-hard-8", "t": "Deliver an artefact to Captain Khaled", "s": { "Thieving": 49 } },
+        { "id": "kourend-hard-9", "t": "Kill a wyrm in the Karuulm Slayer Dungeon", "s": { "Slayer": 62 } },
+        { "id": "kourend-hard-10", "t": "Cast Monster Examine on a troll south of Mount Quidamortem", "s": { "Magic": 66 }, "q": ["Dream Mentor"] }
+      ] },
+      "Elite":  { "s": { "Runecraft": 77, "Woodcutting": 90, "Fishing": 82, "Cooking": 84, "Magic": 90, "Slayer": 95, "Farming": 85, "Fletching": 40, "Mining": 38, "Crafting": 38 }, "q": ["Dream Mentor", "The Forsaken Tower", "The Depths of Despair", "The Queen of Thieves", "Tale of the Righteous", "The Ascent of Arceuus"], "note": "Also needs Fairy Tale II and Eagle's Peak at least started.", "reward": "Rada's blessing 4", "tasks": [
+        { "id": "kourend-elite-1", "t": "Craft one or more blood runes from dark essence", "s": { "Runecraft": 77, "Mining": 38, "Crafting": 38 } },
+        { "id": "kourend-elite-2", "t": "Chop some redwood logs", "s": { "Woodcutting": 90 } },
+        { "id": "kourend-elite-3", "t": "Defeat Skotizo in the Catacombs of Kourend", "note": "Needs a dark totem." },
+        { "id": "kourend-elite-4", "t": "Catch an anglerfish and cook it while in Great Kourend", "s": { "Fishing": 82, "Cooking": 84 } },
+        { "id": "kourend-elite-5", "t": "Kill a hydra in the Karuulm Slayer Dungeon", "s": { "Slayer": 95 } },
+        { "id": "kourend-elite-6", "t": "Create an Ape Atoll teleport tablet", "s": { "Magic": 90 }, "note": "Requires the Arceuus spellbook." },
+        { "id": "kourend-elite-7", "t": "Complete a raid in the Chambers of Xeric" },
+        { "id": "kourend-elite-8", "t": "Create your own battlestaff from scratch within the Farming Guild", "s": { "Farming": 85, "Fletching": 40 } }
+      ] }
     },
     "Lumbridge & Draynor": {
       "Easy":   { "s": { "Runecraft": 5, "Slayer": 7, "Fishing": 15, "Woodcutting": 15, "Firemaking": 15, "Mining": 15 }, "q": ["Cook's Assistant", "Rune Mysteries"], "reward": "Explorer's ring 1", "tasks": [
@@ -347,10 +432,54 @@
       "Elite":  { "s": { "Fletching": 85, "Slayer": 93, "Farming": 75, "Agility": 85, "Thieving": 85 }, "cb": 100, "q": ["Underground Pass"], "note": "Also needs Regicide and Mourning's End Part I at least started.", "reward": "Western banner 4" }
     },
     "Wilderness": {
-      "Easy":   { "s": { "Mining": 15, "Agility": 15, "Magic": 21 }, "q": [], "note": "Needs Enter the Abyss (miniquest).", "reward": "Wilderness sword 1" },
-      "Medium": { "s": { "Mining": 55, "Woodcutting": 61, "Agility": 52, "Magic": 60, "Slayer": 50, "Smithing": 50 }, "q": [], "note": "Needs Enter the Abyss (miniquest).", "reward": "Wilderness sword 2" },
-      "Hard":   { "s": { "Mining": 55, "Agility": 64, "Smithing": 75, "Magic": 66, "Fishing": 53, "Hunter": 67, "Slayer": 68 }, "q": ["Death Plateau"], "note": "Needs Enter the Abyss and Mage Arena I (miniquests).", "reward": "Wilderness sword 3" },
-      "Elite":  { "s": { "Mining": 85, "Smithing": 90, "Magic": 96, "Fishing": 85, "Cooking": 90, "Thieving": 84, "Slayer": 83, "Woodcutting": 75, "Firemaking": 75 }, "q": ["Death Plateau", "Desert Treasure I"], "note": "Needs Enter the Abyss and Mage Arena I (miniquests).", "reward": "Wilderness sword 4" }
+      "Easy":   { "s": { "Mining": 15, "Agility": 15, "Magic": 21 }, "q": [], "note": "Needs Enter the Abyss (miniquest).", "reward": "Wilderness sword 1", "tasks": [
+        { "id": "wilderness-easy-1", "t": "Cast Low Alchemy at the Fountain of Rune", "s": { "Magic": 21 } },
+        { "id": "wilderness-easy-2", "t": "Enter the Wilderness from the Ardougne or Edgeville lever" },
+        { "id": "wilderness-easy-3", "t": "Pray at the Chaos Altar in the western Wilderness" },
+        { "id": "wilderness-easy-4", "t": "Enter the Chaos Runecrafting Temple", "note": "Needs a chaos/catalytic talisman or tiara, or Abyss access." },
+        { "id": "wilderness-easy-5", "t": "Kill a mammoth in the Wilderness" },
+        { "id": "wilderness-easy-6", "t": "Kill an Earth Warrior in the Wilderness beneath Edgeville", "s": { "Agility": 15 } },
+        { "id": "wilderness-easy-7", "t": "Restore your prayer points at the Demonic Ruins" },
+        { "id": "wilderness-easy-8", "t": "Enter the King Black Dragon's lair" },
+        { "id": "wilderness-easy-9", "t": "Collect 5 red spiders' eggs from the Wilderness" },
+        { "id": "wilderness-easy-10", "t": "Mine some iron ore in the Wilderness", "s": { "Mining": 15 } },
+        { "id": "wilderness-easy-11", "t": "Have the Mage of Zamorak teleport you to the Abyss", "note": "Requires the Enter the Abyss miniquest." },
+        { "id": "wilderness-easy-12", "t": "Equip any team cape in the Wilderness" }
+      ] },
+      "Medium": { "s": { "Mining": 55, "Woodcutting": 61, "Agility": 52, "Magic": 60, "Slayer": 50, "Smithing": 50 }, "q": [], "note": "Needs Enter the Abyss (miniquest).", "reward": "Wilderness sword 2", "tasks": [
+        { "id": "wilderness-medium-1", "t": "Mine some mithril ore in the Wilderness", "s": { "Mining": 55 } },
+        { "id": "wilderness-medium-2", "t": "Chop some yew logs from a fallen Ent", "s": { "Woodcutting": 61 } },
+        { "id": "wilderness-medium-3", "t": "Enter the Wilderness God Wars Dungeon", "note": "Requires 60 Agility or 60 Strength." },
+        { "id": "wilderness-medium-4", "t": "Complete a lap of the Wilderness Agility Course", "s": { "Agility": 52 } },
+        { "id": "wilderness-medium-5", "t": "Kill a green dragon in the Wilderness" },
+        { "id": "wilderness-medium-6", "t": "Kill an ankou in the Wilderness" },
+        { "id": "wilderness-medium-7", "t": "Charge an earth orb", "s": { "Magic": 60 } },
+        { "id": "wilderness-medium-8", "t": "Kill a bloodveld in the Wilderness God Wars Dungeon", "s": { "Slayer": 50 }, "note": "Also requires 60 Agility or 60 Strength for access." },
+        { "id": "wilderness-medium-9", "t": "Talk to the Emblem Trader in Edgeville" },
+        { "id": "wilderness-medium-10", "t": "Smith a golden helmet in the Resource Area", "s": { "Smithing": 50 }, "note": "Requires partial completion of Between a Rock..." },
+        { "id": "wilderness-medium-11", "t": "Open the Muddy Chest in the Lava Maze", "note": "Needs a muddy key." }
+      ] },
+      "Hard":   { "s": { "Mining": 55, "Agility": 64, "Smithing": 75, "Magic": 66, "Fishing": 53, "Hunter": 67, "Slayer": 68 }, "q": ["Death Plateau"], "note": "Needs Enter the Abyss and Mage Arena I (miniquests).", "reward": "Wilderness sword 3", "tasks": [
+        { "id": "wilderness-hard-1", "t": "Cast one of the three God spells against another player in the Wilderness", "s": { "Magic": 60 }, "note": "Requires the Mage Arena I miniquest and a god staff." },
+        { "id": "wilderness-hard-2", "t": "Charge an air orb", "s": { "Magic": 66 } },
+        { "id": "wilderness-hard-3", "t": "Catch a black salamander in the Wilderness", "s": { "Hunter": 67 } },
+        { "id": "wilderness-hard-4", "t": "Smith an adamant scimitar in the Resource Area", "s": { "Smithing": 75 } },
+        { "id": "wilderness-hard-5", "t": "Kill a lava dragon" },
+        { "id": "wilderness-hard-6", "t": "Kill the Chaos Elemental" },
+        { "id": "wilderness-hard-7", "t": "Kill the Crazy Archaeologist, Chaos Fanatic, and Scorpia" },
+        { "id": "wilderness-hard-8", "t": "Take the Agility shortcut from Trollheim into the Wilderness", "s": { "Agility": 64 }, "note": "Requires Trollheim access (Death Plateau / partial Troll Stronghold)." },
+        { "id": "wilderness-hard-9", "t": "Kill a spiritual warrior in the Wilderness God Wars Dungeon", "s": { "Slayer": 68 }, "note": "Also requires 60 Agility or 60 Strength for access." },
+        { "id": "wilderness-hard-10", "t": "Fish some raw lava eel in the Wilderness", "s": { "Fishing": 53 }, "note": "Needs an oily fishing rod." }
+      ] },
+      "Elite":  { "s": { "Mining": 85, "Smithing": 90, "Magic": 96, "Fishing": 85, "Cooking": 90, "Thieving": 84, "Slayer": 83, "Woodcutting": 75, "Firemaking": 75 }, "q": ["Death Plateau", "Desert Treasure I"], "note": "Needs Enter the Abyss and Mage Arena I (miniquests).", "reward": "Wilderness sword 4", "tasks": [
+        { "id": "wilderness-elite-1", "t": "Kill Callisto, Venenatis, and Vet'ion", "note": "Requires the Wilderness Medium diary." },
+        { "id": "wilderness-elite-2", "t": "Teleport to Ghorrock", "s": { "Magic": 96 }, "q": ["Desert Treasure I"], "note": "Requires the Ancient spellbook." },
+        { "id": "wilderness-elite-3", "t": "Fish and cook a dark crab in the Resource Area", "s": { "Fishing": 85, "Cooking": 90 } },
+        { "id": "wilderness-elite-4", "t": "Smith a rune scimitar from scratch in the Resource Area", "s": { "Mining": 85, "Smithing": 90 } },
+        { "id": "wilderness-elite-5", "t": "Steal from the Rogues' Chest", "s": { "Thieving": 84 } },
+        { "id": "wilderness-elite-6", "t": "Slay a Spiritual mage inside the Wilderness God Wars Dungeon", "s": { "Slayer": 83 }, "note": "Also requires 60 Agility or 60 Strength for access." },
+        { "id": "wilderness-elite-7", "t": "Cut and burn magic logs in the Resource Area", "s": { "Woodcutting": 75, "Firemaking": 75 } }
+      ] }
     }
   }
 }
