@@ -49,7 +49,7 @@
     "Temple of Ikov": {"s": {"Thieving": 42, "Ranged": 40}, "r": "Boots of lightness; Armadyl pendant access"},
     "Troll Stronghold": {"q": ["Death Plateau"], "s": {"Agility": 15}, "r": "Trollheim access; combat XP"},
     "Eadgar's Ruse": {"q": ["Druidic Ritual", "Troll Stronghold"], "s": {"Herblore": 31}, "r": "Trollheim herb patch; Herblore XP"},
-    "Eagle's Peak": {"s": {"Hunter": 27}, "r": "Falconry; box-trap hunting; eagle transport"},
+    "Eagles' Peak": {"s": {"Hunter": 27}, "r": "Falconry; box-trap hunting; eagle transport"},
     "Bone Voyage": {"q": ["The Dig Site"], "r": "Fossil Island access (Wintertodt/Herbiboar later)"},
     "Client of Kourend": {"r": "Great Kourend access; Kharedst's memoirs start"},
     "Tale of the Righteous": {"q": ["Client of Kourend"], "s": {"Strength": 16, "Mining": 10}, "r": "Shayzien favour; Xeric's talisman charges"},
@@ -109,7 +109,7 @@
     "Wanted!": {"q": ["Recruitment Drive", "The Lost Tribe", "Priest in Peril", "Enter the Abyss"], "qp": 32, "r": "White Knights' armour; 5k Slayer XP", "note": "~combat 15 for a fight"},
     "Children of the Sun": {"r": "Varlamore access; 1 QP (no requirements — Varlamore intro)"},
     "A Porcine of Interest": {"r": "5k coins; 1k Slayer XP; Spria (Slayer master); Sourhog Cave"},
-    "At First Light": {"q": ["Children of the Sun", "Eagle's Peak"], "s": {"Hunter": 46, "Herblore": 30, "Construction": 27}, "r": "4.5k Hunter XP; Master-tier Hunter Rumours"},
+    "At First Light": {"q": ["Children of the Sun", "Eagles' Peak"], "s": {"Hunter": 46, "Herblore": 30, "Construction": 27}, "r": "4.5k Hunter XP; Master-tier Hunter Rumours"},
     "Twilight's Promise": {"q": ["Children of the Sun"], "r": "Quetzal Transport System; Civitas illa Fortis teleport"},
     "Perilous Moons": {"q": ["Twilight's Promise"], "s": {"Slayer": 48, "Hunter": 20, "Fishing": 20, "Runecrafting": 20, "Construction": 10}, "r": "40k Slayer XP; Neypotzli; Moons of Peril boss"},
     "The Heart of Darkness": {"q": ["Twilight's Promise"], "s": {"Mining": 55, "Thieving": 48, "Slayer": 48, "Agility": 46}, "r": "~8k XP in Mining/Thieving/Slayer/Agility; Tapoyauik dungeon"},
@@ -176,6 +176,13 @@
     "The Mage Arena II": {"q": ["The Mage Arena"], "s": {"Magic": 75}, "r": "Imbued god capes (miniquest)"},
     "Natural History Quiz": {"r": "Kudos (Varrock Museum); no requirements (miniquest)"},
     "Skippy and the Mogres": {"s": {"Cooking": 20}, "r": "Unlocks mogre slaying at 32 Slayer (miniquest)"},
-    "X Marks the Spot": {"r": "Antique lamp (300 XP); scroll boxes; 200 coins (no requirements)"}
+    "X Marks the Spot": {"r": "Antique lamp (300 XP); scroll boxes; 200 coins (no requirements)"},
+    "Big Chompy Bird Hunting": {"s": {"Fletching": 5, "Cooking": 30, "Ranged": 30}, "r": "Ogre bow; ogre arrows; chompy bird cooking; bowman hat"},
+    "Garden of Tranquillity": {"q": ["Creature of Fenkenstrain"], "s": {"Farming": 25}, "r": "Ring of charos(a); seeds; white tree fruit"},
+    "Land of the Goblins": {"q": ["Another Slice of H.A.M."], "s": {"Agility": 38, "Fishing": 40, "Thieving": 45, "Herblore": 48}, "r": "8k XP in Agility/Fishing/Thieving/Herblore; Goblin Temple; Yu'biusk", "note": "Fairy ring access (Fairy Tale II) needed for travel"},
+    "The Feud": {"s": {"Thieving": 30}, "r": "15k Thieving XP; blackjacks; desert disguise; Rogue Trader"},
+    "The Giant Dwarf": {"s": {"Crafting": 12, "Firemaking": 16, "Magic": 33, "Thieving": 14}, "r": "Keldagrim minecart access; mixed XP; Rise of the Red Axe series"},
+    "A Soul's Bane": {"r": "500 Defence & Hitpoints XP; Tolna's Rift access"},
+    "Spirits of the Elid": {"s": {"Magic": 33, "Ranged": 37, "Mining": 37, "Thieving": 37}, "r": "Nardah fountain/shrine; Robe of Elidinis"}
   }
 }
