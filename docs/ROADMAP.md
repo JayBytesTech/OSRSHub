@@ -71,8 +71,10 @@ account record; no feature code assumes a single global player.
   steps, Quest Cape, skill goals, **goal-independent opportunity quests**, a **high-leverage
   skill-to-train nudge** (`skillUnlockLeverage` — the skill that solely-blocks the most startable
   quests, with the nearest unlock level + ETA), top money method, and the best diary opportunity.
-  Works even with no goals set. Remaining: smarter quest ranking by reward *magnitude* (the current
-  `bestReadyQuestName` weights reward-presence + QP, not XP value), and acting inline vs. linking out.
+  Works even with no goals set. Quest picks rank by **reward XP magnitude** (`questRewardXp` parses
+  the free-text reward field; `compareQuestValue` is the shared comparator used by the per-goal next
+  step, the goal-independent pick, and the Quest Cape preset) — so e.g. Monkey Madness I (~35k combat
+  XP) is suggested over a trivial quest. Remaining: acting on a suggestion inline vs. linking out.
 
 **Exit criteria:** adding a high-level goal yields an accurate outstanding-requirements list,
 and the dashboard recommends agreeable next actions.

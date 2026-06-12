@@ -2188,6 +2188,39 @@ function bestDiaryAction() {
   return null;
 }
 
+// Approx XP payoff of a quest's reward, parsed from the free-text `r` field, so "best quest
+// to do" suggestions rank by payoff rather than just quest-point count. Best-effort: sums
+// k/m-suffixed XP amounts in XP clauses, ignores coins/QP/level mentions, and honors "xN" lamp
+// multipliers (e.g. "20k XP x4"). Quests with only tiny bare-number XP score ~0, which is fine —
+// the point is to let the big-XP quests rise to the top.
+function questRewardXp(name) {
+  const r = (REQS[name] && REQS[name].r) || '';
+  if (!/xp/i.test(r)) return 0;
+  let total = 0;
+  r.toLowerCase().split(/[;,]/).forEach(clause => {
+    if (!clause.includes('xp') || clause.includes('coin')) return;   // only XP clauses
+    const mult = (clause.match(/x\s*(\d+)/) || [])[1];
+    let sum = 0, m, re = /(\d+(?:\.\d+)?)\s*(k|m)\b/g;
+    while ((m = re.exec(clause))) sum += parseFloat(m[1]) * (m[2] === 'm' ? 1e6 : 1e3);
+    total += sum * (mult ? parseInt(mult, 10) : 1);
+  });
+  return total;
+}
+
+// Shared "which quest is the better pick" comparator: biggest XP reward first, then more quest
+// points, then any reward over none, then name. Used by every "best startable quest" ranking so
+// the F1.3 panel, the per-goal next step, and the Quest Cape preset all agree.
+function compareQuestValue(a, b) {
+  const ax = questRewardXp(a), bx = questRewardXp(b);
+  if (ax !== bx) return bx - ax;
+  const aq = (QUESTS.find(q => q.name === a) || {}).qp || 0;
+  const bq = (QUESTS.find(q => q.name === b) || {}).qp || 0;
+  if (aq !== bq) return bq - aq;
+  const ar = (REQS[a] && REQS[a].r) ? 1 : 0, br = (REQS[b] && REQS[b].r) ? 1 : 0;
+  if (ar !== br) return br - ar;
+  return a.localeCompare(b);
+}
+
 // Opportunity intelligence (goal-independent): among incomplete quests whose quest-prereqs
 // and QP gate are already met, find the skill that is the SOLE remaining blocker for the most
 // quests, and the nearest level that unlocks them. Gives a high-leverage "train this" answer
@@ -2246,15 +2279,8 @@ function nextActions() {
     const info = outstandingFor(goal, completed);
     const ready = info.orderedQuests.filter(n => n.state === 'ready');
     if (ready.length) {
-      // best startable step: reward first, then higher QP, then name.
-      ready.sort((a, b) => {
-        const ar = (REQS[a.name] && REQS[a.name].r) ? 1 : 0, br = (REQS[b.name] && REQS[b.name].r) ? 1 : 0;
-        if (ar !== br) return br - ar;
-        const aq = (QUESTS.find(q => q.name === a.name) || {}).qp || 0;
-        const bq = (QUESTS.find(q => q.name === b.name) || {}).qp || 0;
-        if (aq !== bq) return bq - aq;
-        return a.name.localeCompare(b.name);
-      });
+      // best startable step: biggest XP reward first, then QP, then name (shared comparator).
+      ready.sort((a, b) => compareQuestValue(a.name, b.name));
       const pick = ready[0].name;
       if (suggestedQuests.has(pick)) {
         const row = out[suggestedQuests.get(pick)];
@@ -3438,16 +3464,9 @@ function questGoalCard(name, completed) {
 // ── PRESET GOALS — Quest Cape (complete every quest) ────────────────────────────
 const QUEST_CAPE_KEY = '__quest_cape__';   // sentinel for the shared expandedGoals Set
 
-// Best startable quest by the same heuristic the F1.3 ranker uses (reward, then QP).
+// Best startable quest by the same comparator the F1.3 ranker uses (XP payoff, then QP).
 function bestReadyQuestName(names) {
-  return names.slice().sort((a, b) => {
-    const ar = (REQS[a] && REQS[a].r) ? 1 : 0, br = (REQS[b] && REQS[b].r) ? 1 : 0;
-    if (ar !== br) return br - ar;
-    const aq = (QUESTS.find(q => q.name === a) || {}).qp || 0;
-    const bq = (QUESTS.find(q => q.name === b) || {}).qp || 0;
-    if (aq !== bq) return bq - aq;
-    return a.localeCompare(b);
-  })[0] || null;
+  return names.slice().sort(compareQuestValue)[0] || null;
 }
 
 function questCapeStatus(completed) {
