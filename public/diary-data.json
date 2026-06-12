@@ -19,13 +19,13 @@
         { "id": "ardougne-easy-9", "t": "View Aleck's Hunter Emporium in Yanille" },
         { "id": "ardougne-easy-10", "t": "Check your pet insurance with Probita" }
       ] },
-      "Medium": { "s": { "Magic": 51, "Agility": 39, "Farming": 31, "Thieving": 38, "Firemaking": 50 }, "q": ["Enlightened Journey", "Hand in the Sand", "Rune Mysteries", "Tower of Life", "Underground Pass"], "note": "Also needs Fairy Tale II, Sea Slug, and Watchtower at least started.", "reward": "Ardougne cloak 2", "tasks": [
+      "Medium": { "s": { "Magic": 51, "Agility": 39, "Farming": 31, "Thieving": 38, "Firemaking": 50 }, "q": ["Enlightened Journey", "The Hand in the Sand", "Rune Mysteries", "Tower of Life", "Underground Pass"], "note": "Also needs Fairy Tale II, Sea Slug, and Watchtower at least started.", "reward": "Ardougne cloak 2", "tasks": [
         { "id": "ardougne-medium-1", "t": "Enter the unicorn pen north of Ardougne via fairy ring", "note": "Needs Fairy Tale II started + a dramen/lunar staff." },
         { "id": "ardougne-medium-2", "t": "Grapple over Yanille's south wall", "s": { "Agility": 39, "Strength": 38, "Ranged": 21 } },
         { "id": "ardougne-medium-3", "t": "Harvest strawberries from the Ardougne farm patch", "s": { "Farming": 31 } },
         { "id": "ardougne-medium-4", "t": "Cast the Ardougne Teleport spell", "s": { "Magic": 51 }, "q": ["Plague City"] },
         { "id": "ardougne-medium-5", "t": "Travel to Castle Wars by Ardougne hot air balloon", "s": { "Firemaking": 50 }, "q": ["Enlightened Journey"] },
-        { "id": "ardougne-medium-6", "t": "Claim buckets of sand from Bert in Yanille", "q": ["Hand in the Sand"] },
+        { "id": "ardougne-medium-6", "t": "Claim buckets of sand from Bert in Yanille", "q": ["The Hand in the Sand"] },
         { "id": "ardougne-medium-7", "t": "Catch a fish on the Fishing Platform", "note": "Needs Sea Slug started + a small fishing net." },
         { "id": "ardougne-medium-8", "t": "Pickpocket a Master Farmer north of Ardougne", "s": { "Thieving": 38 } },
         { "id": "ardougne-medium-9", "t": "Collect cave nightshade from the Skavid caves", "note": "Needs Watchtower partially + a light source." },
@@ -33,7 +33,7 @@
         { "id": "ardougne-medium-11", "t": "Equip Iban's staff", "q": ["Underground Pass"] },
         { "id": "ardougne-medium-12", "t": "Visit the island east of the Necromancer's Tower", "note": "Needs Fairy Tale II started + a dramen/lunar staff." }
       ] },
-      "Hard":   { "s": { "Thieving": 72, "Magic": 66, "Farming": 70, "Smithing": 68, "Runecrafting": 65, "Hunter": 59, "Fishing": 53, "Cooking": 53, "Construction": 50 }, "q": ["Enlightened Journey", "Hand in the Sand", "Legends' Quest", "Monkey Madness I", "Mourning's End Part II", "Rune Mysteries", "Tower of Life", "Watchtower"], "note": "Also needs Fairy Tale II and Sea Slug at least started.", "reward": "Ardougne cloak 3", "tasks": [
+      "Hard":   { "s": { "Thieving": 72, "Magic": 66, "Farming": 70, "Smithing": 68, "Runecrafting": 65, "Hunter": 59, "Fishing": 53, "Cooking": 53, "Construction": 50 }, "q": ["Enlightened Journey", "The Hand in the Sand", "Legends' Quest", "Monkey Madness I", "Mourning's End Part II", "Rune Mysteries", "Tower of Life", "Watchtower"], "note": "Also needs Fairy Tale II and Sea Slug at least started.", "reward": "Ardougne cloak 3", "tasks": [
         { "id": "ardougne-hard-1", "t": "Recharge jewellery at the Legends' Guild totem pole", "q": ["Legends' Quest"] },
         { "id": "ardougne-hard-2", "t": "Enter the Magic Guild", "s": { "Magic": 66 } },
         { "id": "ardougne-hard-3", "t": "Steal from a chest in Ardougne Castle", "s": { "Thieving": 72 }, "note": "Needs a lockpick." },
@@ -47,7 +47,7 @@
         { "id": "ardougne-hard-11", "t": "Smith a dragon sq shield in West Ardougne", "s": { "Smithing": 60 }, "note": "Needs Plague City partially + both shield halves." },
         { "id": "ardougne-hard-12", "t": "Craft death runes from essence at the Ourania/Death altar", "s": { "Runecrafting": 65 }, "q": ["Mourning's End Part II"] }
       ] },
-      "Elite":  { "s": { "Magic": 94, "Fishing": 81, "Cooking": 91, "Thieving": 82, "Smithing": 91, "Fletching": 69, "Farming": 85, "Agility": 90 }, "q": ["Desert Treasure I", "Enlightened Journey", "Hand in the Sand", "Haunted Mine", "Legends' Quest", "Monkey Madness I", "Mourning's End Part II", "Rune Mysteries", "Tower of Life", "Watchtower"], "note": "Also needs Fairy Tale II and Sea Slug at least started.", "reward": "Ardougne cloak 4", "tasks": [
+      "Elite":  { "s": { "Magic": 94, "Fishing": 81, "Cooking": 91, "Thieving": 82, "Smithing": 91, "Fletching": 69, "Farming": 85, "Agility": 90 }, "q": ["Desert Treasure I", "Enlightened Journey", "The Hand in the Sand", "Haunted Mine", "Legends' Quest", "Monkey Madness I", "Mourning's End Part II", "Rune Mysteries", "Tower of Life", "Watchtower"], "note": "Also needs Fairy Tale II and Sea Slug at least started.", "reward": "Ardougne cloak 4", "tasks": [
         { "id": "ardougne-elite-1", "t": "Catch a manta ray in the Fishing Trawler and cook it in Port Khazard", "s": { "Fishing": 81, "Cooking": 91 } },
         { "id": "ardougne-elite-2", "t": "Pick the lock in the Yanille Agility dungeon basement", "s": { "Thieving": 82 }, "note": "Needs a lockpick." },
         { "id": "ardougne-elite-3", "t": "Pickpocket a hero in East Ardougne", "s": { "Thieving": 80 } },

@@ -58,11 +58,14 @@ account record; no feature code assumes a single global player.
 - 🟡 **F1.2** Quest **dependency graph** (recursive, "can I start now?") — **engine + full dataset live.**
   `buildRequirementTree`/`outstandingFor` expand the whole transitive prerequisite tree (cycle-guarded,
   diamond-deduped) with an ordered to-do list and aggregated skill summary. The prerequisite dataset
-  (`public/quest-data.json`) now covers **all 178 quests** in the master list — direct prereqs only
+  (`public/quest-data.json`) now covers **every quest in the master list (205)** — direct prereqs only
   (the engine recurses), wiki-verified, with skill/QP gates. Deep chains resolve with no unknown holes.
-  A master-list integrity pass added 7 real quests that were missing, removed a non-OSRS entry
-  (Fairy Tale III), and fixed name/skill-key bugs that were silently breaking gates. Non-quest
-  **unlocks** (items, area access, skill unlocks) as graph nodes still pending.
+  The master list was **audited against the OSRS Wiki's full quest categories** (MediaWiki API): it
+  added the real quests it was missing (incl. grandmasters — Song of the Elves, While Guthix Sleeps,
+  The Path of Glouphrie) and the untracked miniquests, removed a non-OSRS entry (Fairy Tale III),
+  **excluded unreleased/future quests** (The Blood Moon Rises, The Graveyard, Fallen From Grace), and
+  fixed name/skill-key bugs (Vampyre Slayer, The Hand in the Sand, Runecraft→Runecrafting) that were
+  silently breaking gates. Non-quest **unlocks** (items, area access, skill unlocks) still pending.
 - ⚪ **F1.3** "What should I do next?" engine — ranked, prerequisite-aware suggestions on the dashboard.
   (A `bestReadyQuestName` heuristic already feeds the Quest Cape preset; full dashboard ranker pending.)
 
