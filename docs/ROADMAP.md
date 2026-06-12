@@ -52,10 +52,19 @@ account record; no feature code assumes a single global player.
 ## Phase 3 — Differentiators (why this hub is unique)  ⚪
 *The features that make it an assistant, not a tracker.*
 
-- ⚪ **F1.1** Goal system with auto-prerequisites (goals decompose into live requirement trees).
-- ⚪ **F1.2** Quest & unlock dependency graph (recursive, "can I start now?").
-- ⚪ Build/curate the prerequisite dataset (quests, skill reqs, unlocks) as structured data.
+- 🟡 **F1.1** Goal system with auto-prerequisites (goals decompose into live requirement trees).
+  Quest goals + the Quest Cape preset already decompose via the F1.2 engine; broad goal types
+  (diary tiers, skill targets as trees) still pending.
+- 🟡 **F1.2** Quest **dependency graph** (recursive, "can I start now?") — **engine + full dataset live.**
+  `buildRequirementTree`/`outstandingFor` expand the whole transitive prerequisite tree (cycle-guarded,
+  diamond-deduped) with an ordered to-do list and aggregated skill summary. The prerequisite dataset
+  (`public/quest-data.json`) now covers **all 178 quests** in the master list — direct prereqs only
+  (the engine recurses), wiki-verified, with skill/QP gates. Deep chains resolve with no unknown holes.
+  A master-list integrity pass added 7 real quests that were missing, removed a non-OSRS entry
+  (Fairy Tale III), and fixed name/skill-key bugs that were silently breaking gates. Non-quest
+  **unlocks** (items, area access, skill unlocks) as graph nodes still pending.
 - ⚪ **F1.3** "What should I do next?" engine — ranked, prerequisite-aware suggestions on the dashboard.
+  (A `bestReadyQuestName` heuristic already feeds the Quest Cape preset; full dashboard ranker pending.)
 
 **Exit criteria:** adding a high-level goal yields an accurate outstanding-requirements list,
 and the dashboard recommends agreeable next actions.
