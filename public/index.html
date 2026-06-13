@@ -262,6 +262,26 @@ body {
 .ca-task.tdone .ca-task-name { text-decoration: line-through; }
 .ca-task-type { font-size: 10px; color: #8f6fc0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
 .ca-task-desc { font-size: 12px; color: #6a5230; }
+/* Unlocks */
+.unlock-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.unlock-cat { margin-bottom: 14px; }
+.unlock-cat-head { font-weight: 700; color: #4a2c08; font-size: 14px; margin-bottom: 6px; padding-bottom: 3px; border-bottom: 2px solid #d4c080; }
+.unlock-cat-count { font-size: 11px; font-weight: 500; color: #8a6830; background: #ede0b8; border-radius: 10px; padding: 1px 8px; margin-left: 4px; }
+.unlock-item { display: flex; gap: 9px; align-items: flex-start; padding: 8px 10px; border: 1px solid #d4c080; border-radius: 5px; background: #fbf6e6; margin-bottom: 5px; }
+.unlock-item.u-ready { border-left: 4px solid #4a9c2a; }
+.unlock-item.u-locked { border-left: 4px solid #c98a2a; }
+.unlock-item.u-done { border-left: 4px solid #8b6914; opacity: 0.7; }
+.unlock-check { flex-shrink: 0; padding-top: 2px; }
+.unlock-main { min-width: 0; flex: 1; }
+.unlock-row1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.unlock-name { font-weight: 600; color: #3a2606; }
+.unlock-item.u-done .unlock-name { text-decoration: line-through; }
+.unlock-benefit { font-size: 12px; color: #6a5230; margin-top: 1px; }
+.unlock-need { font-size: 12px; color: #9a4810; margin-top: 3px; }
+.unlock-ready { font-size: 12px; color: #1d6b10; margin-top: 3px; }
+.unlock-note { font-size: 11px; color: #8a6030; margin-top: 2px; }
+.unlock-tree { margin-top: 8px; padding: 8px; background: #f3ead2; border-radius: 5px; }
+.unlock-subhead { font-weight: 600; color: #4a2c08; font-size: 12px; margin: 4px 0; }
 .qp-badge {
   background: #2e6614;
   color: white;
@@ -834,6 +854,7 @@ body {
   <div class="tab"         onclick="switchTab('quests')">📜 Quests</div>
   <div class="tab"         onclick="switchTab('diaries')">📖 Diaries</div>
   <div class="tab"         onclick="switchTab('ca')">🏅 Combat Tasks</div>
+  <div class="tab"         onclick="switchTab('unlocks')">🔓 Unlocks</div>
   <div class="tab"         onclick="switchTab('gear')">🛡️ Gear</div>
   <div class="tab"         onclick="switchTab('progress')">📈 Progress</div>
   <div class="tab"         onclick="switchTab('money')">💰 Money</div>
@@ -1001,6 +1022,20 @@ body {
   </div>
   <div class="quest-disclaimer">Combat Achievements aren't gated by the hub (we can't verify combat ability) — tick tasks you've completed. Reward tiers unlock at cumulative point thresholds.</div>
   <div id="ca-body"></div>
+</div>
+
+<!-- UNLOCKS -->
+<div id="tab-unlocks" class="tab-content">
+  <div class="section-header">Unlocks <span class="section-sub" id="unlock-sub">Notable non-quest unlocks · what you can get now and the full path to the rest</span></div>
+  <div class="unlock-filters">
+    <input class="quest-search" id="unlock-search" type="text" placeholder="Search unlocks…" oninput="renderUnlocks()">
+    <button class="filter-btn active" id="unlockfilter-all"    onclick="setUnlockFilter('all')">All</button>
+    <button class="filter-btn"        id="unlockfilter-ready"  onclick="setUnlockFilter('ready')">Can get now</button>
+    <button class="filter-btn"        id="unlockfilter-locked" onclick="setUnlockFilter('locked')">Locked</button>
+    <button class="filter-btn"        id="unlockfilter-done"   onclick="setUnlockFilter('done')">Have it</button>
+  </div>
+  <div class="quest-disclaimer">🟢 Ready · 🟠 Locked (missing reqs shown; expand for the full path) · ✓ tick what you already have. A curated high-value selection — skill reqs are often boostable.</div>
+  <div id="unlock-body"></div>
 </div>
 
 <!-- GEAR -->
@@ -1514,6 +1549,28 @@ async function loadCaData() {
   if (document.getElementById('dash-body')) renderDashboard();
 }
 
+// ── NON-QUEST UNLOCKS (F1.2) ─────────────────────────────────────────────────────
+// Curated catalogue of notable non-quest unlocks (public/unlock-data.json). Each unlock is a
+// generic requirement node gated against the player's state — skills (STATS), quest prereqs
+// (delegated to the quest engine, which recurses the full quest tree), diary prereqs
+// (diaryTierStatus), other unlocks (recurse), and a QP gate. Completion ("have it") is tracked
+// per name via /api/state, mirroring gear ownership / CA tasks.
+let UNLOCK_DATA = null;
+const UNLOCK_CATS = ['Movement & Teleports', 'Magic & Prayer', 'Slayer & Combat', 'Skilling', 'Access & Areas', 'Quality of Life'];
+
+async function loadUnlockData() {
+  try {
+    const r = await fetch('/unlock-data.json', { cache: 'no-cache' });
+    if (!r.ok) throw new Error('unlock-data ' + r.status);
+    UNLOCK_DATA = await r.json();
+  } catch (e) {
+    console.warn('Could not load unlock-data.json — Unlocks catalogue unavailable.', e);
+    UNLOCK_DATA = null;
+  }
+  if (document.getElementById('unlock-body')) renderUnlocks();
+  if (document.getElementById('dash-body')) renderDashboard();
+}
+
 // ── GEAR & UPGRADE PATH ──────────────────────────────────────────────────────────
 // Curated progression ladders (public/gear-data.json). Each item is gated ready/locked
 // against live stats + completed quests (same engine as quests/diaries) and priced via the
@@ -1825,6 +1882,26 @@ function toggleCaTask(id) {
   if (i >= 0) done.splice(i, 1); else done.push(id);
   saveCompletedCATasksLocal(done);
   renderCA();
+  renderDashboard();
+  scheduleVaultSave();
+}
+
+// Non-quest unlocks the player has obtained (Unlocks catalogue) — array of unlock names.
+function getUnlocksDone() {
+  try { const v = JSON.parse(localStorage.getItem('osrs_nullyn_unlocks') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function saveUnlocksDoneLocal(u) {
+  try { localStorage.setItem('osrs_nullyn_unlocks', JSON.stringify(Array.isArray(u) ? u : [])); } catch {}
+}
+function isUnlockDone(name) {
+  return getUnlocksDone().includes(name);
+}
+function toggleUnlock(name) {
+  const done = getUnlocksDone();
+  const i = done.indexOf(name);
+  if (i >= 0) done.splice(i, 1); else done.push(name);
+  saveUnlocksDoneLocal(done);
+  renderUnlocks();
   renderDashboard();
   scheduleVaultSave();
 }
@@ -2377,9 +2454,10 @@ async function loadVaultState() {
     if (Array.isArray(data.diaryGoals)) saveDiaryGoalsLocal(data.diaryGoals);
     if (Array.isArray(data.gearOwned)) saveGearOwnedLocal(data.gearOwned);
     if (Array.isArray(data.caTasks)) saveCompletedCATasksLocal(data.caTasks);
+    if (Array.isArray(data.unlocksDone)) saveUnlocksDoneLocal(data.unlocksDone);
     SYNC.available = true;
     setSyncBadge('ok', '\u2601 Synced to vault');
-    renderQuests(); renderGoals(); populateGoalSelect(); populateQuestGoalDatalist(); renderDiaries(); renderCA(); renderDashboard(); recordAccountValue();
+    renderQuests(); renderGoals(); populateGoalSelect(); populateQuestGoalDatalist(); renderDiaries(); renderCA(); renderUnlocks(); renderDashboard(); recordAccountValue();
   } catch (e) {
     SYNC.available = false; SYNC.lastError = String(e);
     setSyncBadge('warn', '\u26a0 Local only');
@@ -2393,7 +2471,7 @@ function scheduleVaultSave() {
   saveTimer = setTimeout(saveVaultState, 700);
 }
 async function saveVaultState() {
-  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals(), diaries: getCompletedDiaries(), diaryTasks: getCompletedDiaryTasks(), diaryGoals: getDiaryGoals(), gearOwned: getGearOwned(), caTasks: getCompletedCATasks() };
+  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals(), diaries: getCompletedDiaries(), diaryTasks: getCompletedDiaryTasks(), diaryGoals: getDiaryGoals(), gearOwned: getGearOwned(), caTasks: getCompletedCATasks(), unlocksDone: getUnlocksDone() };
   try {
     const r = await fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!r.ok) throw new Error('save ' + r.status);
@@ -2422,6 +2500,7 @@ function switchTab(name) {
   if (name === 'settings')  { loadAccount(); loadAccounts(); }
   if (name === 'diaries')   renderDiaries();
   if (name === 'ca')        renderCA();
+  if (name === 'unlocks')   renderUnlocks();
   if (name === 'gear')      loadGear();
 }
 
@@ -2838,6 +2917,17 @@ function nextActions() {
   const gearAction = bestGearUpgrade();
   if (gearAction) out.push(gearAction);
 
+  // Tier 5b — a notable unlock you can get right now but haven't ticked yet (opportunity).
+  if (UNLOCK_DATA && Array.isArray(UNLOCK_DATA.unlocks)) {
+    const completedU = getCompleted(), doneSet = new Set(getUnlocksDone());
+    const ready = UNLOCK_DATA.unlocks.filter(u => unlockStatus(u, completedU, doneSet).state === 'ready');
+    if (ready.length) {
+      const pick = ready[0];   // dataset is authored in rough priority order within categories
+      out.push({ icon: '🔓', title: `Unlock ${pick.name}`, reason: pick.benefit || 'Available to unlock now',
+                 onclick: `switchTab('unlocks');setUnlockFilter('ready')` });
+    }
+  }
+
   // Tier 6 — Combat Achievement reward progress (only once the player is engaged with CAs, so we
   // don't nag fresh accounts). Surfaces how close the next reward tier is.
   if (CA_DATA && Array.isArray(CA_DATA.tasks)) {
@@ -2897,6 +2987,11 @@ function renderDashboard() {
       return tile('🏅', 'Combat Tasks', `${cs.earned} <span class="dash-frac">/ ${cs.totalPoints}</span>`,
         cs.nextTier ? `${cs.nextTier.need} pts to ${cs.nextTier.tier} →` : 'all tiers unlocked →',
         { cls: 'dash-clickable', onclick: "switchTab('ca')", title: 'Go to Combat Tasks' }); })() +
+    (() => { if (!UNLOCK_DATA || !Array.isArray(UNLOCK_DATA.unlocks)) return stub('🔓', 'Unlocks');
+      const us = unlockSummary();
+      return tile('🔓', 'Unlocks', `${us.done} <span class="dash-frac">/ ${us.total}</span>`,
+        us.ready > 0 ? `${us.ready} you can get now →` : 'browse the catalogue →',
+        { cls: 'dash-clickable', onclick: "switchTab('unlocks')", title: 'Go to Unlocks' }); })() +
     ((MILESTONES.clog && MILESTONES.clog.completed != null)
       ? tile('📒', 'Collection Log', `${MILESTONES.clog.completed}${MILESTONES.clog.total ? ` <span class="dash-frac">/ ${MILESTONES.clog.total}</span>` : ''}`, `${MILESTONES.clog.pct != null ? MILESTONES.clog.pct + '% slots →' : 'slots logged →'}`, { cls: 'dash-clickable', onclick: "switchTab('timeline')", title: 'View in Timeline' })
       : stub('📒', 'Collection Log'));
@@ -3656,6 +3751,143 @@ function renderCA() {
 
   body.innerHTML = `<div class="ca-tiergrid">${tierCards}</div>` +
     (cards ? `<div class="ca-grouplist">${cards}</div>` : `<div class="diary-empty">No tasks match this filter.</div>`);
+}
+
+// ── NON-QUEST UNLOCKS engine + UI ────────────────────────────────────────────────
+let unlockFilter = 'all';        // 'all' | 'ready' | 'locked' | 'done'
+let unlockExpanded = new Set();  // unlock names whose requirement tree is open
+
+function unlockByName(name) {
+  return (UNLOCK_DATA && UNLOCK_DATA.unlocks || []).find(u => u.name === name) || null;
+}
+
+function setUnlockFilter(f) {
+  unlockFilter = f;
+  document.querySelectorAll('.unlock-filters .filter-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('unlockfilter-' + f);
+  if (btn) btn.classList.add('active');
+  renderUnlocks();
+}
+function toggleUnlockExpand(name) {
+  if (unlockExpanded.has(name)) unlockExpanded.delete(name); else unlockExpanded.add(name);
+  renderUnlocks();
+}
+
+// Live status of one unlock against current stats + quests + diaries + sub-unlocks.
+// Returns { state, missingSkills:[{skill,need,have}], missingQuests:[name],
+//           missingDiaries:[{region,tier}], missingUnlocks:[name], missingQP:0|n }.
+function unlockStatus(u, completed, doneSet, stack) {
+  completed = completed || getCompleted();
+  doneSet = doneSet || new Set(getUnlocksDone());
+  stack = stack || new Set();
+  const out = { state: 'locked', missingSkills: [], missingQuests: [], missingDiaries: [], missingUnlocks: [], missingQP: 0 };
+  if (doneSet.has(u.name)) { out.state = 'done'; return out; }
+  if (u.s) for (const sk in u.s) {
+    const have = STATS[sk] ? STATS[sk][1] : 1;
+    if (have < u.s[sk]) out.missingSkills.push({ skill: sk, need: u.s[sk], have });
+  }
+  (u.q || []).forEach(q => { if (TRACKED.has(q) && !completed[q]) out.missingQuests.push(q); });
+  (u.d || []).forEach(d => { const st = diaryTierStatus(d.region, d.tier); if (st.state !== 'done') out.missingDiaries.push(d); });
+  if (!stack.has(u.name)) {
+    stack.add(u.name);
+    (u.u || []).forEach(name => { if (!doneSet.has(name)) out.missingUnlocks.push(name); });
+    stack.delete(u.name);
+  }
+  if (u.qp && earnedQP(completed) < u.qp) out.missingQP = u.qp;
+  const ok = !out.missingSkills.length && !out.missingQuests.length && !out.missingDiaries.length && !out.missingUnlocks.length && !out.missingQP;
+  out.state = ok ? 'ready' : 'locked';
+  return out;
+}
+
+function unlockSummary() {
+  const completed = getCompleted(), doneSet = new Set(getUnlocksDone());
+  let done = 0, ready = 0, locked = 0;
+  for (const u of (UNLOCK_DATA.unlocks || [])) {
+    const st = unlockStatus(u, completed, doneSet);
+    if (st.state === 'done') done++; else if (st.state === 'ready') ready++; else locked++;
+  }
+  return { done, ready, locked, total: (UNLOCK_DATA.unlocks || []).length };
+}
+
+const UNLOCK_ICON = { done: '✓', ready: '○', locked: '✗' };
+
+function renderUnlocks() {
+  const body = document.getElementById('unlock-body');
+  if (!body) return;
+  const sub = document.getElementById('unlock-sub');
+  if (!UNLOCK_DATA || !Array.isArray(UNLOCK_DATA.unlocks)) {
+    body.innerHTML = `<div class="diary-empty">Unlock data unavailable — could not load <code>/unlock-data.json</code>.</div>`;
+    return;
+  }
+
+  const sum = unlockSummary();
+  if (sub) sub.textContent = `${sum.done}/${sum.total} unlocked · ${sum.ready} you can get now · ${sum.locked} locked`;
+
+  const completed = getCompleted(), doneSet = new Set(getUnlocksDone());
+  const search = (document.getElementById('unlock-search').value || '').toLowerCase();
+
+  const cats = [];
+  for (const cat of UNLOCK_CATS) {
+    const items = (UNLOCK_DATA.unlocks || []).filter(u => u.cat === cat).map(u => ({ u, st: unlockStatus(u, completed, doneSet) }));
+    const shown = items.filter(({ u, st }) => {
+      if (unlockFilter !== 'all' && st.state !== unlockFilter) return false;
+      if (search && !(u.name.toLowerCase().includes(search) || (u.benefit || '').toLowerCase().includes(search))) return false;
+      return true;
+    });
+    if (!shown.length) continue;
+    const rows = shown.map(({ u, st }) => {
+      const esc = u.name.replace(/'/g, "\\'");
+      const chip = st.state === 'done' ? '<span class="status-chip done">✓ Have it</span>'
+        : st.state === 'ready' ? '<span class="status-chip ready">Ready</span>'
+        : '<span class="status-chip locked">Locked</span>';
+      const needBits = [];
+      if (st.missingSkills.length) needBits.push(st.missingSkills.map(m => `${m.need} ${m.skill} <span class="rt-have">(have ${m.have})</span>`).join(', '));
+      if (st.missingQuests.length) needBits.push('Quest: ' + st.missingQuests.join(', '));
+      if (st.missingDiaries.length) needBits.push(st.missingDiaries.map(d => `${d.region} ${d.tier} diary`).join(', '));
+      if (st.missingUnlocks.length) needBits.push('Unlock: ' + st.missingUnlocks.join(', '));
+      if (st.missingQP) needBits.push(`${st.missingQP} QP`);
+      const detail = st.state === 'locked' ? `<div class="unlock-need">Needs: ${needBits.join(' · ')}</div>`
+        : st.state === 'ready' ? `<div class="unlock-ready">All requirements met — go get it</div>` : '';
+      const note = u.note ? `<div class="unlock-note">⚠ ${escapeHtml(u.note)}</div>` : '';
+      const hasReqs = (u.q && u.q.length) || (u.u && u.u.length);
+      const expanded = unlockExpanded.has(u.name);
+      const treeBtn = (hasReqs && st.state !== 'done') ? `<button class="quest-expand${expanded ? ' open' : ''}" onclick="toggleUnlockExpand('${esc}')" title="Show the full requirement path">${expanded ? '▾' : '▸'} path</button>` : '';
+      const tree = (expanded && hasReqs) ? unlockTreeHTML(u, completed) : '';
+      return `<div class="unlock-item u-${st.state}">
+        <label class="unlock-check"><input type="checkbox" ${st.state === 'done' ? 'checked' : ''} onchange="toggleUnlock('${esc}')" title="Mark as unlocked"></label>
+        <div class="unlock-main">
+          <div class="unlock-row1">
+            <span class="unlock-name"><a href="${wikiUrl(u.wiki || u.name)}" target="_blank" rel="noopener">${escapeHtml(u.name)}</a></span>
+            ${chip}${treeBtn}
+          </div>
+          <div class="unlock-benefit">${escapeHtml(u.benefit || '')}</div>
+          ${detail}${note}${tree}
+        </div>
+      </div>`;
+    }).join('');
+    cats.push(`<div class="unlock-cat"><div class="unlock-cat-head">${cat} <span class="unlock-cat-count">${shown.length}</span></div>${rows}</div>`);
+  }
+
+  body.innerHTML = cats.length ? cats.join('') : `<div class="diary-empty">No unlocks match this filter.</div>`;
+}
+
+// Full requirement path for an unlock: its missing quest prereqs each get the quest engine's
+// transitive tree, plus any sub-unlock prereqs (recursively). This is the F1.2 differentiator
+// applied beyond quests — "what's the whole path to this unlock?".
+function unlockTreeHTML(u, completed) {
+  const parts = [];
+  (u.u || []).forEach(name => {
+    const sub = unlockByName(name);
+    if (!sub) return;
+    const st = unlockStatus(sub, completed);
+    parts.push(`<div class="unlock-subhead">${UNLOCK_ICON[st.state]} Unlock: <a href="${wikiUrl(sub.wiki || sub.name)}" target="_blank" rel="noopener">${escapeHtml(sub.name)}</a></div>`);
+    if (st.state !== 'done' && ((sub.q && sub.q.length) || (sub.u && sub.u.length))) parts.push(unlockTreeHTML(sub, completed));
+  });
+  (u.q || []).forEach(q => {
+    if (!TRACKED.has(q)) return;
+    parts.push(requirementTreeHTML(q, completed));
+  });
+  return parts.length ? `<div class="unlock-tree">${parts.join('')}</div>` : '';
 }
 
 function renderQuests() {
@@ -4596,7 +4828,7 @@ async function switchAccount(id) {
     // localStorage is a single shared cache of the *previously loaded* account; clear the
     // account-scoped keys so the new account loads from server truth and old data can't bleed across.
     ['osrs_nullyn_completed','osrs_nullyn_goals','osrs_nullyn_questgoals','osrs_nullyn_presetgoals',
-     'osrs_nullyn_diaries','osrs_nullyn_diarytasks','osrs_nullyn_diarygoals','osrs_nullyn_gearowned','osrs_nullyn_catasks','osrs_nullyn_checklist','osrs_nullyn_lastsnap'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
+     'osrs_nullyn_diaries','osrs_nullyn_diarytasks','osrs_nullyn_diarygoals','osrs_nullyn_gearowned','osrs_nullyn_catasks','osrs_nullyn_unlocks','osrs_nullyn_checklist','osrs_nullyn_lastsnap'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
     window.location.reload();          // every view is account-scoped — re-init the whole app
   } catch (e) {
     const status = document.getElementById('add-status');
@@ -4796,6 +5028,7 @@ loadQuestOrder();            // async: pull the OSRS Wiki optimal quest order (Q
 loadXpMethods();             // async: pull XP/hr-per-method data for time-to-goal estimates
 loadDiaryData();             // async: pull achievement-diary requirement data (Diary tab + tile)
 loadCaData();                // async: pull Combat Achievements dataset (Combat Tasks tab + tile)
+loadUnlockData();            // async: pull non-quest unlocks catalogue (Unlocks tab + tile)
 loadGearData();              // async: pull gear progression ladders (Gear tab; prices load on open)
 loadVaultState();            // async: pull durable state from the vault, then re-render
 loadStats();                 // async: pull live levels + progress history from OSRS Hiscores

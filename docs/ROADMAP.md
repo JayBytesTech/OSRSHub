@@ -64,7 +64,7 @@ account record; no feature code assumes a single global player.
   these goal types — Barrows gloves, Fire cape, Base 70/90 combat, All Hard diaries, Song of the
   Elves — skipping anything already met/tracked. Exit criteria met: adding a high-level goal yields
   an accurate outstanding-requirements list.
-- 🟡 **F1.2** Quest **dependency graph** (recursive, "can I start now?") — **engine + full dataset live.**
+- 🟢 **F1.2** Quest **dependency graph** (recursive, "can I start now?") — **engine + full dataset + non-quest unlocks live.**
   `buildRequirementTree`/`outstandingFor` expand the whole transitive prerequisite tree (cycle-guarded,
   diamond-deduped) with an ordered to-do list and aggregated skill summary. The prerequisite dataset
   (`public/quest-data.json`) now covers **every quest in the master list (205)** — direct prereqs only
@@ -74,7 +74,14 @@ account record; no feature code assumes a single global player.
   The Path of Glouphrie) and the untracked miniquests, removed a non-OSRS entry (Fairy Tale III),
   **excluded unreleased/future quests** (The Blood Moon Rises, The Graveyard, Fallen From Grace), and
   fixed name/skill-key bugs (Vampyre Slayer, The Hand in the Sand, Runecraft→Runecrafting) that were
-  silently breaking gates. Non-quest **unlocks** (items, area access, skill unlocks) still pending.
+  silently breaking gates. **Non-quest unlocks now live** — an **Unlocks** tab (`public/unlock-data.json`,
+  45 curated high-value unlocks across 6 categories: teleport networks, spellbooks, item/area access, QoL
+  diary rewards) where each unlock is a generic requirement node gated ready/locked against the player's
+  state — skills, **quest prereqs (delegated to the quest engine, so the full transitive quest tree
+  expands inline)**, diary-tier prereqs (`diaryTierStatus`), sub-unlock prereqs (recursive, cycle-guarded),
+  and a QP gate. "Have it" is tracked per name via a new `unlock_done` table on the `/api/state` path; a
+  dashboard tile and a ranker tier ("Unlock X") surface what you can get now. So "what's the full path to
+  this unlock?" is answered for non-quest goals too. Item *upgrade* unlocks remain covered by the Gear tab.
   **Optimal quest order (baseline) live** — a 🧭 "Optimal order" toggle on the Quests tab re-sorts the
   log into the **OSRS Wiki Optimal quest guide** sequence (`public/quest-order.json`, scraped from the
   guide's `data-rowid` order via the MediaWiki API: 193 of the 205 master-list quests sequenced; RFD
