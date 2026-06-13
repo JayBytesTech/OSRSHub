@@ -347,9 +347,13 @@ body {
 .gear-ladder-name { font-weight: 800; color: #2c1a08; }
 .gear-ladder-sub { font-size: 11px; color: #9a6a16; }
 .gear-ladder-sub.done { color: #2e6614; }
-.gear-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 13px; }
+.gear-row { display: flex; align-items: center; gap: 7px; padding: 3px 0; font-size: 13px; }
+.gear-check { flex: none; display: flex; align-items: center; cursor: pointer; }
+.gear-check input { cursor: pointer; }
 .gear-icon { width: 13px; text-align: center; font-weight: 800; flex: none; }
-.gear-ready .gear-icon { color: #1d6b10; }
+.gear-owned .gear-icon { color: #2e6614; }
+.gear-owned .gear-name a { color: #2c1a08; font-weight: 700; }
+.gear-ready .gear-icon { color: #2a6f97; }
 .gear-locked .gear-icon { color: #9a4810; }
 .gear-locked .gear-name a { color: #6a4a14; }
 .gear-name { flex: 1 1 auto; min-width: 0; }
@@ -1429,6 +1433,28 @@ function gearStatus(item) {
   return { ready: missing.length === 0, missing };
 }
 
+// Mark/unmark a gear item as owned (Gear v2). Re-ranks "next upgrade" + the dashboard ranker.
+function toggleGearOwned(name) {
+  const list = getGearOwned();
+  const i = list.indexOf(name);
+  if (i >= 0) list.splice(i, 1); else list.push(name);
+  saveGearOwnedLocal(list);
+  scheduleVaultSave();
+  renderGear();
+  renderDashboard();
+}
+
+// The next upgrade for one ladder, given ownership: the first un-owned item above your current
+// best (your highest-owned rung). Returns { idx, item, status, highestOwned } or null if maxed.
+function ladderNextUpgrade(items) {
+  let highestOwned = -1;
+  items.forEach((it, i) => { if (isGearOwned(it.name)) highestOwned = i; });
+  for (let i = highestOwned + 1; i < items.length; i++) {
+    if (!isGearOwned(items[i].name)) return { idx: i, item: items[i], status: gearStatus(items[i]), highestOwned };
+  }
+  return null;                                   // owns the top (or everything above current)
+}
+
 function renderGear() {
   const body = document.getElementById('gear-body');
   if (!body) return;
@@ -1438,36 +1464,59 @@ function renderGear() {
 
   const cards = keys.map(key => {
     const items = ladders[key].items || [];
-    const sts = items.map(gearStatus);
-    const firstLocked = sts.findIndex(s => !s.ready);      // your next upgrade target
-    let lastReady = -1; sts.forEach((s, i) => { if (s.ready) lastReady = i; });
+    const next = ladderNextUpgrade(items);
+    let highestOwned = -1; items.forEach((it, i) => { if (isGearOwned(it.name)) highestOwned = i; });
 
     const rows = items.map((it, i) => {
-      const st = sts[i];
+      const st = gearStatus(it), own = isGearOwned(it.name);
+      const stateCls = own ? 'owned' : (st.ready ? 'ready' : 'locked');
+      const icon = own ? '✓' : (st.ready ? '○' : '✗');
       const price = it.ge ? GEAR_PRICES[it.ge] : undefined;
       const priceStr = it.ge
         ? (price != null ? `<span class="gear-price">${fmt(price)}</span>` : `<span class="gear-price muted">—</span>`)
         : `<span class="gear-price muted">untradeable</span>`;
-      const need = st.ready ? '' : `<span class="gear-need">needs ${st.missing.join(', ')}</span>`;
-      const badge = (i === firstLocked) ? `<span class="gear-badge next">🎯 next</span>`
-                  : (i === lastReady ? `<span class="gear-badge cur">best now</span>` : '');
+      const need = (own || st.ready) ? '' : `<span class="gear-need">needs ${st.missing.join(', ')}</span>`;
+      let badge = '';
+      if (i === highestOwned) badge = `<span class="gear-badge cur">current</span>`;
+      else if (next && i === next.idx) badge = `<span class="gear-badge next">🎯 next${st.ready ? '' : ' · locked'}</span>`;
       const note = it.note ? `<span class="gear-note" title="${it.note.replace(/"/g, '&quot;')}">ⓘ</span>` : '';
-      return `<div class="gear-row gear-${st.ready ? 'ready' : 'locked'}">
-        <span class="gear-icon">${st.ready ? '✓' : '✗'}</span>
+      return `<div class="gear-row gear-${stateCls}">
+        <label class="gear-check" title="Mark owned"><input type="checkbox" ${own ? 'checked' : ''} onchange="toggleGearOwned('${it.name.replace(/'/g, "\\'")}')"></label>
+        <span class="gear-icon">${icon}</span>
         <span class="gear-name"><a href="${wikiUrl(it.name)}" target="_blank" rel="noopener">${it.name}</a> ${note}${badge}</span>
         <span class="gear-right">${need}${priceStr}</span>
       </div>`;
     }).join('');
 
-    const sub = firstLocked === -1
-      ? `<span class="gear-ladder-sub done">✓ all unlocked</span>`
-      : `<span class="gear-ladder-sub">next: ${items[firstLocked].name}</span>`;
+    const sub = !next
+      ? `<span class="gear-ladder-sub done">✓ top of ladder</span>`
+      : `<span class="gear-ladder-sub">next: ${next.item.name}${next.status.ready ? ' — ready' : ''}</span>`;
     return `<div class="gear-card">
       <div class="gear-ladder-head"><span class="gear-ladder-name">${key}</span>${sub}</div>
       ${rows}
     </div>`;
   });
   body.innerHTML = `<div class="gear-grid">${cards.join('')}</div>`;
+}
+
+// Best gear upgrade to act on now: a next-rung item you can equip (ready) but don't own. Picks
+// the cheapest such across ladders (most immediately attainable). Returns one action or null.
+function bestGearUpgrade() {
+  if (!GEAR_DATA || !GEAR_DATA.ladders) return null;
+  let best = null;
+  for (const key in GEAR_DATA.ladders) {
+    const items = GEAR_DATA.ladders[key].items || [];
+    const next = ladderNextUpgrade(items);
+    if (!next || !next.status.ready) continue;          // nothing equippable-and-unowned here
+    const price = next.item.ge ? GEAR_PRICES[next.item.ge] : null;
+    const cost = (price == null) ? Infinity : price;    // untradeable/unknown → lowest priority
+    if (!best || cost < best.cost) best = { key, item: next.item, cost, price };
+  }
+  if (!best) return null;
+  const priceStr = best.price != null ? ` · ~${fmt(best.price)} gp` : '';
+  return { icon: '🛡️', title: `Gear upgrade: ${best.item.name}`,
+           reason: `${best.key} — you can equip it now${priceStr}`,
+           onclick: `switchTab('gear')`, _gear: best.item.name };
 }
 
 // ── XP PLANNING (F2.2) ──────────────────────────────────────────────────────────
@@ -1602,6 +1651,17 @@ function saveDiaryGoalsLocal(g) {
 }
 function isDiaryGoal(region, tier) {
   return getDiaryGoals().some(d => d && d.region === region && d.tier === tier);
+}
+// Gear owned: array of gear item names the player has (Gear v2). Drives "next upgrade" from
+// the player's actual current piece + the dashboard ranker's gear suggestion.
+function getGearOwned() {
+  try { const v = JSON.parse(localStorage.getItem('osrs_nullyn_gearowned') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function saveGearOwnedLocal(g) {
+  try { localStorage.setItem('osrs_nullyn_gearowned', JSON.stringify(Array.isArray(g) ? g : [])); } catch {}
+}
+function isGearOwned(name) {
+  return getGearOwned().includes(name);
 }
 function diaryTaskDone(id) {
   return getCompletedDiaryTasks().includes(id);
@@ -2153,6 +2213,7 @@ async function loadVaultState() {
     if (Array.isArray(data.diaries)) saveCompletedDiariesLocal(data.diaries);
     if (Array.isArray(data.diaryTasks)) saveCompletedDiaryTasksLocal(data.diaryTasks);
     if (Array.isArray(data.diaryGoals)) saveDiaryGoalsLocal(data.diaryGoals);
+    if (Array.isArray(data.gearOwned)) saveGearOwnedLocal(data.gearOwned);
     SYNC.available = true;
     setSyncBadge('ok', '\u2601 Synced to vault');
     renderQuests(); renderGoals(); populateGoalSelect(); populateQuestGoalDatalist(); renderDiaries(); renderDashboard(); recordAccountValue();
@@ -2169,7 +2230,7 @@ function scheduleVaultSave() {
   saveTimer = setTimeout(saveVaultState, 700);
 }
 async function saveVaultState() {
-  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals(), diaries: getCompletedDiaries(), diaryTasks: getCompletedDiaryTasks(), diaryGoals: getDiaryGoals() };
+  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals(), diaries: getCompletedDiaries(), diaryTasks: getCompletedDiaryTasks(), diaryGoals: getDiaryGoals(), gearOwned: getGearOwned() };
   try {
     const r = await fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!r.ok) throw new Error('save ' + r.status);
@@ -2588,6 +2649,10 @@ function nextActions() {
   // Tier 4 — best achievement-diary opportunity (claimable now, or nearly so).
   const diaryAction = bestDiaryAction();
   if (diaryAction) out.push(diaryAction);
+
+  // Tier 5 — best gear upgrade you can equip now but don't own (opportunity).
+  const gearAction = bestGearUpgrade();
+  if (gearAction) out.push(gearAction);
 
   const trimmed = out.slice(0, MAX);
   const noGoals = !getQuestGoals().length && !getGoals().length && !getPresetGoals().length && !getDiaryGoals().length;
@@ -4099,7 +4164,7 @@ async function switchAccount(id) {
     // localStorage is a single shared cache of the *previously loaded* account; clear the
     // account-scoped keys so the new account loads from server truth and old data can't bleed across.
     ['osrs_nullyn_completed','osrs_nullyn_goals','osrs_nullyn_questgoals','osrs_nullyn_presetgoals',
-     'osrs_nullyn_diaries','osrs_nullyn_diarytasks','osrs_nullyn_diarygoals','osrs_nullyn_checklist','osrs_nullyn_lastsnap'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
+     'osrs_nullyn_diaries','osrs_nullyn_diarytasks','osrs_nullyn_diarygoals','osrs_nullyn_gearowned','osrs_nullyn_checklist','osrs_nullyn_lastsnap'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
     window.location.reload();          // every view is account-scoped — re-init the whole app
   } catch (e) {
     const status = document.getElementById('add-status');
