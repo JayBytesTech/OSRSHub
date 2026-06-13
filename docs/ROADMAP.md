@@ -62,8 +62,14 @@ account record; no feature code assumes a single global player.
   tier, else the nearest missing skill). Persisted via a new `diary_goals` table on the `/api/state`
   path. **Goal templates** (a Templates row in the Goals tab) one-click-expand curated bundles into
   these goal types — Barrows gloves, Fire cape, Base 70/90 combat, All Hard diaries, Song of the
-  Elves — skipping anything already met/tracked. Exit criteria met: adding a high-level goal yields
-  an accurate outstanding-requirements list.
+  Elves — skipping anything already met/tracked. **Goal system unified** — **unlock goals** and
+  **Combat-Achievement tier goals** are now first-class alongside skill/quest/diary/preset goals:
+  ★ any unlock or CA tier to set it as a goal, each decomposes in the Goals tab (unlock goals via the
+  unlock engine — missing skills/quests/diaries/sub-unlocks with quest chains; CA tier goals into
+  points-to-threshold), shows in the dashboard Active-Goals peek, and drives the "what to do next"
+  ranker with goal-specific next steps. Persisted via new `unlock_goals` + `ca_goals` tables on the
+  `/api/state` path. Exit criteria met: adding any high-level goal yields an accurate
+  outstanding-requirements list.
 - 🟢 **F1.2** Quest **dependency graph** (recursive, "can I start now?") — **engine + full dataset + non-quest unlocks live.**
   `buildRequirementTree`/`outstandingFor` expand the whole transitive prerequisite tree (cycle-guarded,
   diamond-deduped) with an ordered to-do list and aggregated skill summary. The prerequisite dataset

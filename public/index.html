@@ -282,6 +282,12 @@ body {
 .unlock-note { font-size: 11px; color: #8a6030; margin-top: 2px; }
 .unlock-tree { margin-top: 8px; padding: 8px; background: #f3ead2; border-radius: 5px; }
 .unlock-subhead { font-weight: 600; color: #4a2c08; font-size: 12px; margin: 4px 0; }
+/* Shared "set as goal" star toggle (Unlocks rows, CA tier cards) */
+.goal-star { border: 1px solid #c3aee2; background: #ece2f7; color: #8f6fc0; border-radius: 4px; cursor: pointer;
+  font-size: 12px; line-height: 1; padding: 3px 7px; flex-shrink: 0; }
+.goal-star:hover { background: #ddccf2; }
+.goal-star.on { background: #5a3a8a; color: #ffd86b; border-color: #3b2363; }
+.ca-tiercard-head .goal-star { margin-left: auto; }
 .qp-badge {
   background: #2e6614;
   color: white;
@@ -1850,6 +1856,42 @@ function saveDiaryGoalsLocal(g) {
 function isDiaryGoal(region, tier) {
   return getDiaryGoals().some(d => d && d.region === region && d.tier === tier);
 }
+// Unlock goals (F1.1): array of unlock names targeted as goals — decompose via the unlock engine.
+function getUnlockGoals() {
+  try { const v = JSON.parse(localStorage.getItem('osrs_nullyn_unlockgoals') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function saveUnlockGoalsLocal(g) {
+  try { localStorage.setItem('osrs_nullyn_unlockgoals', JSON.stringify(Array.isArray(g) ? g : [])); } catch {}
+}
+function isUnlockGoal(name) {
+  return getUnlockGoals().includes(name);
+}
+function toggleUnlockGoal(name) {
+  const list = getUnlockGoals();
+  const i = list.indexOf(name);
+  if (i >= 0) list.splice(i, 1); else list.push(name);
+  saveUnlockGoalsLocal(list);
+  scheduleVaultSave();
+  renderUnlocks(); renderGoals(); renderDashboard();
+}
+// CA tier goals (F1.1): array of tier names targeted as goals — decompose into points-to-threshold.
+function getCaGoals() {
+  try { const v = JSON.parse(localStorage.getItem('osrs_nullyn_cagoals') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function saveCaGoalsLocal(g) {
+  try { localStorage.setItem('osrs_nullyn_cagoals', JSON.stringify(Array.isArray(g) ? g : [])); } catch {}
+}
+function isCaGoal(tier) {
+  return getCaGoals().includes(tier);
+}
+function toggleCaGoal(tier) {
+  const list = getCaGoals();
+  const i = list.indexOf(tier);
+  if (i >= 0) list.splice(i, 1); else list.push(tier);
+  saveCaGoalsLocal(list);
+  scheduleVaultSave();
+  renderCA(); renderGoals(); renderDashboard();
+}
 // Gear owned: array of gear item names the player has (Gear v2). Drives "next upgrade" from
 // the player's actual current piece + the dashboard ranker's gear suggestion.
 function getGearOwned() {
@@ -2455,6 +2497,8 @@ async function loadVaultState() {
     if (Array.isArray(data.gearOwned)) saveGearOwnedLocal(data.gearOwned);
     if (Array.isArray(data.caTasks)) saveCompletedCATasksLocal(data.caTasks);
     if (Array.isArray(data.unlocksDone)) saveUnlocksDoneLocal(data.unlocksDone);
+    if (Array.isArray(data.unlockGoals)) saveUnlockGoalsLocal(data.unlockGoals);
+    if (Array.isArray(data.caGoals)) saveCaGoalsLocal(data.caGoals);
     SYNC.available = true;
     setSyncBadge('ok', '\u2601 Synced to vault');
     renderQuests(); renderGoals(); populateGoalSelect(); populateQuestGoalDatalist(); renderDiaries(); renderCA(); renderUnlocks(); renderDashboard(); recordAccountValue();
@@ -2471,7 +2515,7 @@ function scheduleVaultSave() {
   saveTimer = setTimeout(saveVaultState, 700);
 }
 async function saveVaultState() {
-  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals(), diaries: getCompletedDiaries(), diaryTasks: getCompletedDiaryTasks(), diaryGoals: getDiaryGoals(), gearOwned: getGearOwned(), caTasks: getCompletedCATasks(), unlocksDone: getUnlocksDone() };
+  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals(), diaries: getCompletedDiaries(), diaryTasks: getCompletedDiaryTasks(), diaryGoals: getDiaryGoals(), gearOwned: getGearOwned(), caTasks: getCompletedCATasks(), unlocksDone: getUnlocksDone(), unlockGoals: getUnlockGoals(), caGoals: getCaGoals() };
   try {
     const r = await fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!r.ok) throw new Error('save ' + r.status);
@@ -2852,6 +2896,56 @@ function nextActions() {
     }
   }
 
+  // Tier 1d — unlock goals (goal-driven): the best next step toward each goaled unlock — unlock it
+  // now if ready, else a startable quest prereq (best by reward), else the nearest missing skill.
+  if (UNLOCK_DATA && Array.isArray(UNLOCK_DATA.unlocks)) {
+    const doneSet = new Set(getUnlocksDone());
+    for (const name of getUnlockGoals()) {
+      const u = unlockByName(name);
+      if (!u) continue;
+      const st = unlockStatus(u, completed, doneSet);
+      if (st.state === 'done') continue;
+      if (st.state === 'ready') {
+        out.push({ icon: '🔓', title: `Unlock ${name}`, reason: 'All requirements met', onclick: `switchTab('unlocks');setUnlockFilter('ready')` });
+        continue;
+      }
+      const readyQuests = st.missingQuests.filter(qn => questStatus(QUESTS.find(q => q.name === qn) || { name: qn }, completed).state === 'ready');
+      if (readyQuests.length) {
+        const pick = readyQuests.slice().sort(compareQuestValue)[0];
+        if (suggestedQuests.has(pick)) {
+          const row = out[suggestedQuests.get(pick)];
+          row._goals = (row._goals || []).concat(name);
+          row.reason = row.reason.replace(/toward .*/, `toward ${row._goals.join(' & ')}`);
+        } else {
+          const reward = REQS[pick] && REQS[pick].r ? ` · 🎁 ${REQS[pick].r}` : '';
+          suggestedQuests.set(pick, out.length);
+          out.push({ icon: '▶', title: `Start ${pick}`, reason: `Next step toward ${name}${reward}`,
+                     _goals: [name], _quest: pick, _canTrack: !getQuestGoals().includes(pick),
+                     onclick: `goToQuest('${pick.replace(/'/g, "\\'")}')` });
+        }
+      } else if (st.missingSkills.length) {
+        const m = st.missingSkills.slice().sort((a, b) => (a.need - a.have) - (b.need - b.have))[0];
+        out.push({ icon: '🔑', title: `Train ${m.skill} to ${m.need}`, reason: `Next step toward ${name}`,
+                   _skill: { skill: m.skill, target: m.need }, onclick: `switchTab('skills')`, _soft: true });
+      } else if (st.missingUnlocks.length || st.missingDiaries.length) {
+        const dep = st.missingUnlocks[0] ? `unlock ${st.missingUnlocks[0]}` : `the ${st.missingDiaries[0].region} ${st.missingDiaries[0].tier} diary`;
+        out.push({ icon: '🔓', title: `Work toward ${name}`, reason: `First get ${dep}`, onclick: `switchTab('unlocks')`, _soft: true });
+      }
+    }
+  }
+
+  // Tier 1e — CA tier goals (goal-driven): points remaining to the targeted reward threshold.
+  if (CA_DATA && Array.isArray(CA_DATA.tasks)) {
+    const sum = caSummary();
+    for (const tier of getCaGoals()) {
+      const ts = sum.tiers[tier];
+      if (!ts || sum.earned >= ts.threshold) continue;
+      out.push({ icon: '🏅', title: `${ts.threshold - sum.earned} pts to ${tier} CA rewards`,
+                 reason: `${sum.earned}/${ts.threshold} points · ${ts.done}/${ts.total} ${tier} tasks done`,
+                 onclick: `switchTab('ca');setCaFilter('todo')` });
+    }
+  }
+
   // Tier 2 — skill goals (goal-driven), closest to done first.
   const skillRows = [];
   for (const g of getGoals()) {
@@ -2940,7 +3034,7 @@ function nextActions() {
   }
 
   const trimmed = out.slice(0, MAX);
-  const noGoals = !getQuestGoals().length && !getGoals().length && !getPresetGoals().length && !getDiaryGoals().length;
+  const noGoals = !getQuestGoals().length && !getGoals().length && !getPresetGoals().length && !getDiaryGoals().length && !getUnlockGoals().length && !getCaGoals().length;
   return { actions: trimmed, prompt: noGoals ? 'Set a skill or quest goal for tailored quest suggestions.' : null };
 }
 
@@ -3005,8 +3099,10 @@ function renderDashboard() {
   const questGoals = getQuestGoals();
   const presetGoals = getPresetGoals();
   const diaryGoals = getDiaryGoals();
+  const unlockGoals = getUnlockGoals();
+  const caGoals = getCaGoals();
   let goalsHtml;
-  if (!goals.length && !questGoals.length && !presetGoals.length && !diaryGoals.length) {
+  if (!goals.length && !questGoals.length && !presetGoals.length && !diaryGoals.length && !unlockGoals.length && !caGoals.length) {
     goalsHtml = `<div class="no-goals">No goals yet — <a class="dash-link" style="margin:0" href="#" onclick="switchTab('goals');return false;">add one</a> to track progress.</div>`;
   } else {
     const skillHtml = goals.map(g => {
@@ -3062,7 +3158,24 @@ function renderDashboard() {
         <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div>
       </div>`;
     }).join('');
-    goalsHtml = skillHtml + questHtml + diaryHtml + presetHtml;
+    const unlockHtml = unlockGoals.map(name => {
+      const u = unlockByName(name);
+      if (!u) return '';
+      const st = unlockStatus(u, completed);
+      if (st.state === 'done') return `<div class="dash-goal"><div class="dash-goal-top"><span>🔓 ${escapeHtml(name)}</span><span class="dash-goal-lvl">✓ done</span></div><div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:100%"></div></div></div>`;
+      const total = (u.s ? Object.keys(u.s).length : 0) + (u.q ? u.q.length : 0) + (u.d ? u.d.length : 0) + (u.u ? u.u.length : 0) + (u.qp ? 1 : 0);
+      const missing = st.missingSkills.length + st.missingQuests.length + st.missingDiaries.length + st.missingUnlocks.length + (st.missingQP ? 1 : 0);
+      const pct = total ? Math.round(((total - missing) / total) * 100) : 100;
+      const lbl = st.state === 'ready' ? 'ready to unlock' : `${missing} req${missing === 1 ? '' : 's'} left · ${pct}%`;
+      return `<div class="dash-goal"><div class="dash-goal-top"><span>🔓 ${escapeHtml(name)}</span><span class="dash-goal-lvl">${lbl}</span></div><div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div></div>`;
+    }).join('');
+    const caHtml = (CA_DATA && Array.isArray(CA_DATA.tasks)) ? (() => { const sum = caSummary(); return caGoals.map(tier => {
+      const ts = sum.tiers[tier]; if (!ts) return '';
+      const met = sum.earned >= ts.threshold;
+      const pct = ts.threshold ? Math.min(100, Math.round((sum.earned / ts.threshold) * 100)) : 100;
+      return `<div class="dash-goal"><div class="dash-goal-top"><span>🏅 ${tier} CAs</span><span class="dash-goal-lvl">${met ? '✓ done' : Math.max(0, ts.threshold - sum.earned) + ' pts · ' + pct + '%'}</span></div><div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div></div>`;
+    }).join(''); })() : '';
+    goalsHtml = skillHtml + questHtml + diaryHtml + unlockHtml + caHtml + presetHtml;
   }
 
   const next = nextActions();
@@ -3703,8 +3816,9 @@ function renderCA() {
     const ts = sum.tiers[t];
     const met = sum.earned >= ts.threshold;
     const pct = ts.total ? Math.round(ts.done / ts.total * 100) : 0;
+    const goalBtn = met ? '' : `<button class="goal-star${isCaGoal(t) ? ' on' : ''}" onclick="toggleCaGoal('${t}')" title="${isCaGoal(t) ? 'Remove goal' : 'Set this tier as a goal'}">★</button>`;
     return `<div class="ca-tiercard ${met ? 'met' : ''}">
-      <div class="ca-tiercard-head">${CA_TIER_ICON[t]} ${t} <span class="ca-tiercard-pts">${ts.pts} pt${ts.pts > 1 ? 's' : ''}/task</span></div>
+      <div class="ca-tiercard-head">${CA_TIER_ICON[t]} ${t} <span class="ca-tiercard-pts">${ts.pts} pt${ts.pts > 1 ? 's' : ''}/task</span>${goalBtn}</div>
       <div class="ca-tiercard-prog">${ts.done}/${ts.total} tasks · ${ts.ptsEarned}/${ts.ptsTotal} pts</div>
       <div class="ca-bar"><div class="ca-bar-fill" style="width:${pct}%"></div></div>
       <div class="ca-tiercard-thresh">${met ? '✓ rewards unlocked' : `reward at ${ts.threshold} pts`}</div>
@@ -3852,13 +3966,14 @@ function renderUnlocks() {
       const hasReqs = (u.q && u.q.length) || (u.u && u.u.length);
       const expanded = unlockExpanded.has(u.name);
       const treeBtn = (hasReqs && st.state !== 'done') ? `<button class="quest-expand${expanded ? ' open' : ''}" onclick="toggleUnlockExpand('${esc}')" title="Show the full requirement path">${expanded ? '▾' : '▸'} path</button>` : '';
+      const goalBtn = st.state !== 'done' ? `<button class="goal-star${isUnlockGoal(u.name) ? ' on' : ''}" onclick="toggleUnlockGoal('${esc}')" title="${isUnlockGoal(u.name) ? 'Remove goal' : 'Set as a goal'}">★</button>` : '';
       const tree = (expanded && hasReqs) ? unlockTreeHTML(u, completed) : '';
       return `<div class="unlock-item u-${st.state}">
         <label class="unlock-check"><input type="checkbox" ${st.state === 'done' ? 'checked' : ''} onchange="toggleUnlock('${esc}')" title="Mark as unlocked"></label>
         <div class="unlock-main">
           <div class="unlock-row1">
             <span class="unlock-name"><a href="${wikiUrl(u.wiki || u.name)}" target="_blank" rel="noopener">${escapeHtml(u.name)}</a></span>
-            ${chip}${treeBtn}
+            ${chip}${goalBtn}${treeBtn}
           </div>
           <div class="unlock-benefit">${escapeHtml(u.benefit || '')}</div>
           ${detail}${note}${tree}
@@ -4580,15 +4695,103 @@ function diaryGoalCard(region, tier, completed) {
   return card;
 }
 
+// An unlock goal (F1.1) decomposes via the unlock engine — missing skills/quests/diaries/sub-unlocks,
+// with quest prereqs expandable into their full chain. Reuses unlockStatus + unlockTreeHTML.
+function unlockGoalCard(name, completed) {
+  const card = document.createElement('div');
+  card.className = 'goal-card unlock-goal-card';
+  const esc = name.replace(/'/g, "\\'");
+  const del = `<button class="goal-delete" onclick="toggleUnlockGoal('${esc}')" title="Remove goal">✕</button>`;
+  const u = unlockByName(name);
+  if (!u) {
+    card.innerHTML = `<div class="goal-header"><span class="goal-emoji">🔓</span><span class="goal-skill-name">${escapeHtml(name)}</span>${del}</div><div class="goal-xp-info"><span>Unlock data unavailable</span></div>`;
+    return card;
+  }
+  const st = unlockStatus(u, completed);
+  if (st.state === 'done') {
+    card.innerHTML = `
+      <div class="goal-header"><span class="goal-emoji">🔓</span><span class="goal-skill-name">${escapeHtml(name)}</span>
+        <span class="goal-levels done">✓ Unlocked</span>${del}</div>
+      <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:100%"></div></div>
+      <div class="goal-xp-info"><span>Have it</span><span>100%</span></div>`;
+    return card;
+  }
+  const totalReqs = (u.s ? Object.keys(u.s).length : 0) + (u.q ? u.q.length : 0) + (u.d ? u.d.length : 0) + (u.u ? u.u.length : 0) + (u.qp ? 1 : 0);
+  const missingCount = st.missingSkills.length + st.missingQuests.length + st.missingDiaries.length + st.missingUnlocks.length + (st.missingQP ? 1 : 0);
+  const metN = Math.max(0, totalReqs - missingCount);
+  const pct = totalReqs ? Math.round((metN / totalReqs) * 100) : 100;
+
+  const skillRows = st.missingSkills.map(m => {
+    const curXP = STATS[m.skill] ? STATS[m.skill][2] : 0;
+    const bm = bestMethod(m.skill, m.have);
+    const eta = bm ? ` · ~${fmtHours(Math.max(0, xpForLevel(m.need) - curXP) / bm.xphr)}` : '';
+    return `<div class="rt-node rt-locked"><span class="rt-icon">✗</span> ${SKILL_EMOJIS[m.skill] || ''} ${m.skill} <span class="rt-need">${m.have} → ${m.need}${eta}</span></div>`;
+  }).join('');
+  const questRows = st.missingQuests.map(qn => {
+    const qs = questStatus(QUESTS.find(q => q.name === qn) || { name: qn }, completed);
+    const ready = qs.state === 'ready';
+    return `<div class="rt-node rt-${ready ? 'ready' : 'locked'}"><span class="rt-icon">${ready ? '○' : '✗'}</span> <a href="#" onclick="goToQuest('${qn.replace(/'/g, "\\'")}');return false;">${qn}</a>${ready ? '' : `<span class="rt-need">${qs.missing.join(', ')}</span>`}</div>`;
+  }).join('');
+  const diaryRows = st.missingDiaries.map(d =>
+    `<div class="rt-node rt-locked"><span class="rt-icon">✗</span> 📖 ${d.region} ${d.tier} diary</div>`).join('');
+  const unlockRows = st.missingUnlocks.map(n =>
+    `<div class="rt-node rt-locked"><span class="rt-icon">✗</span> 🔓 ${escapeHtml(n)}</div>`).join('');
+  const qpRow = st.missingQP ? `<div class="rt-node rt-locked"><span class="rt-icon">✗</span> ${st.missingQP} Quest Points</div>` : '';
+
+  const body = st.state === 'ready'
+    ? `<div class="rt-summary done">✓ All requirements met — go unlock it.</div>`
+    : `${skillRows ? `<div class="rt-tree-label">Skills to train</div>${skillRows}` : ''}
+       ${questRows ? `<div class="rt-tree-label">Quests to finish</div>${questRows}` : ''}
+       ${diaryRows ? `<div class="rt-tree-label">Diaries</div>${diaryRows}` : ''}
+       ${unlockRows ? `<div class="rt-tree-label">Other unlocks</div>${unlockRows}` : ''}
+       ${qpRow}`;
+
+  card.innerHTML = `
+    <div class="goal-header"><span class="goal-emoji">🔓</span>
+      <span class="goal-skill-name">${escapeHtml(name)}</span>
+      <span class="goal-levels">${st.state === 'ready' ? 'ready to unlock' : missingCount + ' requirement' + (missingCount === 1 ? '' : 's') + ' left'}</span>${del}</div>
+    <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div>
+    <div class="goal-xp-info"><span>${metN} / ${totalReqs} met${u.benefit ? ' · ' + escapeHtml(u.benefit.split(/[—(]/)[0].trim()) : ''}</span><span>${pct}%</span></div>
+    <div class="quest-tree">${body}</div>`;
+  return card;
+}
+
+// A CA tier goal (F1.1) decomposes into points-toward-the-reward-threshold (CAs aren't gated, so
+// it's a points/tasks progress target rather than a requirement tree).
+function caGoalCard(tier) {
+  const card = document.createElement('div');
+  card.className = 'goal-card ca-goal-card';
+  const del = `<button class="goal-delete" onclick="toggleCaGoal('${tier}')" title="Remove goal">✕</button>`;
+  if (!CA_DATA || !Array.isArray(CA_DATA.tasks)) {
+    card.innerHTML = `<div class="goal-header"><span class="goal-emoji">🏅</span><span class="goal-skill-name">${tier} CAs</span>${del}</div><div class="goal-xp-info"><span>CA data unavailable</span></div>`;
+    return card;
+  }
+  const sum = caSummary();
+  const ts = sum.tiers[tier] || { threshold: 0, done: 0, total: 0 };
+  const met = sum.earned >= ts.threshold;
+  const pct = ts.threshold ? Math.min(100, Math.round((sum.earned / ts.threshold) * 100)) : 100;
+  const need = Math.max(0, ts.threshold - sum.earned);
+  card.innerHTML = `
+    <div class="goal-header"><span class="goal-emoji">🏅</span>
+      <span class="goal-skill-name">${tier} Combat Achievements</span>
+      <span class="goal-levels${met ? ' done' : ''}">${met ? '✓ rewards unlocked' : need + ' pts to go'}</span>${del}</div>
+    <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div>
+    <div class="goal-xp-info"><span>${sum.earned} / ${ts.threshold} pts · ${ts.done}/${ts.total} ${tier} tasks</span><span>${pct}%</span></div>
+    ${met ? '' : `<div class="quest-tree"><div class="rt-summary">Tick tasks on the <a href="#" onclick="switchTab('ca');return false;">Combat Tasks</a> tab — any tier's tasks count toward this threshold.</div></div>`}`;
+  return card;
+}
+
 function renderGoals() {
   const goals = getGoals();
   const questGoals = getQuestGoals();
   const presetGoals = getPresetGoals();
   const diaryGoals = getDiaryGoals();
+  const unlockGoals = getUnlockGoals();
+  const caGoals = getCaGoals();
   const list = document.getElementById('goals-list');
   refreshPresetButtons();
-  if (!goals.length && !questGoals.length && !presetGoals.length && !diaryGoals.length) {
-    list.innerHTML = '<div class="no-goals">No goals yet — add a skill, quest, or preset goal above to track your progress.</div>';
+  if (!goals.length && !questGoals.length && !presetGoals.length && !diaryGoals.length && !unlockGoals.length && !caGoals.length) {
+    list.innerHTML = '<div class="no-goals">No goals yet — add a skill, quest, or preset goal above, or ★ a diary tier, unlock, or Combat Achievement tier to track it here.</div>';
     return;
   }
   list.innerHTML = '';
@@ -4624,6 +4827,8 @@ function renderGoals() {
   const completed = getCompleted();
   questGoals.forEach(name => list.appendChild(questGoalCard(name, completed)));
   diaryGoals.forEach(d => { if (d && d.region && d.tier) list.appendChild(diaryGoalCard(d.region, d.tier, completed)); });
+  unlockGoals.forEach(name => list.appendChild(unlockGoalCard(name, completed)));
+  caGoals.forEach(tier => list.appendChild(caGoalCard(tier)));
   if (presetGoals.includes('quest_cape')) list.appendChild(questCapeCard());
 }
 
@@ -4828,7 +5033,7 @@ async function switchAccount(id) {
     // localStorage is a single shared cache of the *previously loaded* account; clear the
     // account-scoped keys so the new account loads from server truth and old data can't bleed across.
     ['osrs_nullyn_completed','osrs_nullyn_goals','osrs_nullyn_questgoals','osrs_nullyn_presetgoals',
-     'osrs_nullyn_diaries','osrs_nullyn_diarytasks','osrs_nullyn_diarygoals','osrs_nullyn_gearowned','osrs_nullyn_catasks','osrs_nullyn_unlocks','osrs_nullyn_checklist','osrs_nullyn_lastsnap'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
+     'osrs_nullyn_diaries','osrs_nullyn_diarytasks','osrs_nullyn_diarygoals','osrs_nullyn_gearowned','osrs_nullyn_catasks','osrs_nullyn_unlocks','osrs_nullyn_unlockgoals','osrs_nullyn_cagoals','osrs_nullyn_checklist','osrs_nullyn_lastsnap'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
     window.location.reload();          // every view is account-scoped — re-init the whole app
   } catch (e) {
     const status = document.getElementById('add-status');
