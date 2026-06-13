@@ -48,6 +48,10 @@
       { "name": "Dragon defender", "s": { "Defence": 60 }, "note": "Untradeable — Warriors' Guild" },
       { "name": "Avernic defender", "s": { "Attack": 70, "Defence": 70 }, "note": "Untradeable — Theatre of Blood" }
     ]},
+    "Melee cape": { "style": "melee", "items": [
+      { "name": "Fire cape", "note": "Untradeable — TzTok-Jad (Fight Caves)" },
+      { "name": "Infernal cape", "note": "Untradeable — TzKal-Zuk (Inferno)" }
+    ]},
     "Ranged weapon": { "style": "ranged", "items": [
       { "name": "Rune crossbow", "s": { "Ranged": 61 }, "ge": "Rune crossbow" },
       { "name": "Dragon hunter crossbow", "s": { "Ranged": 65 }, "note": "Best vs dragons", "ge": "Dragon hunter crossbow" },
@@ -93,6 +97,16 @@
       { "name": "Odium ward", "s": { "Defence": 60 }, "ge": "Odium ward" },
       { "name": "Twisted buckler", "s": { "Ranged": 75, "Defence": 75 }, "ge": "Twisted buckler" }
     ]},
+    "Ranged cape": { "style": "ranged", "items": [
+      { "name": "Ava's accumulator", "s": { "Ranged": 50 }, "q": ["Animal Magnetism"], "note": "Untradeable — ammo recovery" },
+      { "name": "Ava's assembler", "s": { "Ranged": 70 }, "q": ["Dragon Slayer II"], "note": "Untradeable — best ammo recovery + ranged dmg" },
+      { "name": "Infernal cape", "note": "Untradeable — max-DPS option (Inferno)" }
+    ]},
+    "Ranged ammo": { "style": "ranged", "items": [
+      { "name": "Rune arrows", "ge": "Rune arrow" },
+      { "name": "Amethyst arrows", "note": "For crossbows, use bolts instead", "ge": "Amethyst arrow" },
+      { "name": "Dragon arrows", "note": "Strongest arrows; crossbows use Dragon/Diamond bolts (e)", "ge": "Dragon arrow" }
+    ]},
     "Magic weapon": { "style": "magic", "items": [
       { "name": "Trident of the seas", "s": { "Magic": 75 }, "note": "Price = uncharged", "ge": "Uncharged trident" },
       { "name": "Trident of the swamp", "s": { "Magic": 75 }, "note": "Stronger trident; price = uncharged", "ge": "Uncharged toxic trident" },
@@ -136,6 +150,10 @@
     "Magic shield": { "style": "magic", "items": [
       { "name": "Tome of fire", "s": { "Magic": 50 }, "note": "Needs burnt pages to use", "ge": "Tome of fire (empty)" },
       { "name": "Arcane spirit shield", "s": { "Defence": 75, "Magic": 65, "Prayer": 70 }, "ge": "Arcane spirit shield" }
+    ]},
+    "Magic cape": { "style": "magic", "items": [
+      { "name": "God cape", "q": ["The Mage Arena"], "note": "Untradeable — Saradomin/Zamorak/Guthix (Mage Arena I)" },
+      { "name": "Imbued god cape", "s": { "Magic": 75 }, "q": ["The Mage Arena II"], "note": "Untradeable — imbued via Mage Arena II" }
     ]}
   }
 }
