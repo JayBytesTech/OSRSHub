@@ -340,6 +340,27 @@ body {
 }
 .diary-goal-btn:hover { filter: none; background: #e6d59f; }
 .diary-goal-btn.on { filter: none; background: #fbeec4; border-color: #c8a32a; }
+/* Gear & upgrade path */
+.gear-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+.gear-card { background: #fffdf5; border: 1px solid #e0d2a6; border-radius: 7px; padding: 9px 11px; }
+.gear-ladder-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; border-bottom: 1px solid #efe4bf; padding-bottom: 5px; }
+.gear-ladder-name { font-weight: 800; color: #2c1a08; }
+.gear-ladder-sub { font-size: 11px; color: #9a6a16; }
+.gear-ladder-sub.done { color: #2e6614; }
+.gear-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 13px; }
+.gear-icon { width: 13px; text-align: center; font-weight: 800; flex: none; }
+.gear-ready .gear-icon { color: #1d6b10; }
+.gear-locked .gear-icon { color: #9a4810; }
+.gear-locked .gear-name a { color: #6a4a14; }
+.gear-name { flex: 1 1 auto; min-width: 0; }
+.gear-right { display: flex; align-items: center; gap: 8px; flex: none; }
+.gear-need { font-size: 10px; color: #9a4810; }
+.gear-price { font-size: 12px; font-weight: 700; color: #2e6614; font-variant-numeric: tabular-nums; }
+.gear-price.muted { color: #b3a37a; font-weight: 400; }
+.gear-badge { font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 8px; margin-left: 4px; vertical-align: middle; }
+.gear-badge.next { background: #fbeec4; color: #8b6914; border: 1px solid #c8a32a; }
+.gear-badge.cur { background: #dcedc4; color: #2e6614; border: 1px solid #8ab86a; }
+.gear-note { cursor: help; color: #b08a2a; font-size: 11px; }
 .diary-gaps { margin: 4px 0 0 20px; }
 .diary-need-quests { margin: 3px 0 0 20px; font-size: 10.5px; color: #6a4a14; }
 .diary-need-quests a { color: #8a4a14; text-decoration: none; }
@@ -752,6 +773,7 @@ body {
   <div class="tab"         onclick="switchTab('skills')">⚔️ Skills</div>
   <div class="tab"         onclick="switchTab('quests')">📜 Quests</div>
   <div class="tab"         onclick="switchTab('diaries')">📖 Diaries</div>
+  <div class="tab"         onclick="switchTab('gear')">🛡️ Gear</div>
   <div class="tab"         onclick="switchTab('progress')">📈 Progress</div>
   <div class="tab"         onclick="switchTab('money')">💰 Money</div>
   <div class="tab"         onclick="switchTab('ai')">🧙 AI Journey</div>
@@ -894,6 +916,14 @@ body {
     <button class="filter-btn"        id="diaryfilter-done"   onclick="setDiaryFilter('done')">Done</button>
   </div>
   <div id="diary-body"></div>
+</div>
+
+<!-- GEAR -->
+<div id="tab-gear" class="tab-content">
+  <div class="section-header">Gear &amp; Upgrade Path <span class="section-sub" id="gear-sub">Next upgrade per style/slot · gated by your stats + quests · live GE prices</span>
+    <button class="refresh-btn" id="gear-refresh-btn" onclick="loadGear(true)">↻ Prices</button>
+  </div>
+  <div id="gear-body"></div>
 </div>
 
 <!-- CHECKLIST -->
@@ -1348,6 +1378,96 @@ async function loadDiaryData() {
   }
   if (document.getElementById('diary-body')) renderDiaries();
   if (document.getElementById('dash-body')) renderDashboard();
+}
+
+// ── GEAR & UPGRADE PATH ──────────────────────────────────────────────────────────
+// Curated progression ladders (public/gear-data.json). Each item is gated ready/locked
+// against live stats + completed quests (same engine as quests/diaries) and priced via the
+// GE (/api/prices). v1 is stat/quest-gated — no ownership tracking yet.
+let GEAR_DATA = null;       // { ladders: { "Melee weapon": { style, items:[...] }, ... } }
+let GEAR_PRICES = {};       // ge item name → mid price (gp) | null
+let GEAR_PRICES_AT = 0;
+
+async function loadGearData() {
+  try {
+    const r = await fetch('/gear-data.json', { cache: 'no-cache' });
+    if (!r.ok) throw new Error('gear-data ' + r.status);
+    GEAR_DATA = await r.json();
+  } catch (e) {
+    console.warn('Could not load gear-data.json — Gear tab unavailable.', e);
+    GEAR_DATA = { ladders: {} };
+  }
+}
+
+// Fetch live GE prices for every priced item (cached ~5 min; force=true refetches).
+async function loadGearPrices(force) {
+  if (!GEAR_DATA) await loadGearData();
+  const names = [];
+  for (const k in (GEAR_DATA.ladders || {})) for (const it of (GEAR_DATA.ladders[k].items || [])) if (it.ge) names.push(it.ge);
+  if (!names.length) return;
+  if (!force && Date.now() - GEAR_PRICES_AT < 300000 && Object.keys(GEAR_PRICES).length) return;
+  try {
+    const r = await fetch('/api/prices?items=' + encodeURIComponent([...new Set(names)].join(',')));
+    if (r.ok) { const d = await r.json(); GEAR_PRICES = d.prices || {}; GEAR_PRICES_AT = Date.now(); }
+  } catch (e) { /* offline — render without prices */ }
+}
+
+// Tab entry: ensure data + prices, then render. force=true (↻) refetches prices.
+async function loadGear(force) {
+  if (!GEAR_DATA) await loadGearData();
+  renderGear();                       // immediate paint (gating works without prices)
+  await loadGearPrices(force);
+  renderGear();                       // repaint with prices
+}
+
+// Can the player equip/obtain this item now? Mirrors quest/diary gating.
+function gearStatus(item) {
+  const completed = getCompleted();
+  const missing = [];
+  if (item.s) for (const sk in item.s) { const have = STATS[sk] ? STATS[sk][1] : 1; if (have < item.s[sk]) missing.push(`${item.s[sk]} ${sk}`); }
+  if (item.q) for (const qn of item.q) { if (TRACKED.has(qn) && !getCompleted()[qn]) missing.push(qn); }
+  return { ready: missing.length === 0, missing };
+}
+
+function renderGear() {
+  const body = document.getElementById('gear-body');
+  if (!body) return;
+  const ladders = (GEAR_DATA && GEAR_DATA.ladders) || {};
+  const keys = Object.keys(ladders);
+  if (!keys.length) { body.innerHTML = '<div class="diary-empty">Gear data unavailable.</div>'; return; }
+
+  const cards = keys.map(key => {
+    const items = ladders[key].items || [];
+    const sts = items.map(gearStatus);
+    const firstLocked = sts.findIndex(s => !s.ready);      // your next upgrade target
+    let lastReady = -1; sts.forEach((s, i) => { if (s.ready) lastReady = i; });
+
+    const rows = items.map((it, i) => {
+      const st = sts[i];
+      const price = it.ge ? GEAR_PRICES[it.ge] : undefined;
+      const priceStr = it.ge
+        ? (price != null ? `<span class="gear-price">${fmt(price)}</span>` : `<span class="gear-price muted">—</span>`)
+        : `<span class="gear-price muted">untradeable</span>`;
+      const need = st.ready ? '' : `<span class="gear-need">needs ${st.missing.join(', ')}</span>`;
+      const badge = (i === firstLocked) ? `<span class="gear-badge next">🎯 next</span>`
+                  : (i === lastReady ? `<span class="gear-badge cur">best now</span>` : '');
+      const note = it.note ? `<span class="gear-note" title="${it.note.replace(/"/g, '&quot;')}">ⓘ</span>` : '';
+      return `<div class="gear-row gear-${st.ready ? 'ready' : 'locked'}">
+        <span class="gear-icon">${st.ready ? '✓' : '✗'}</span>
+        <span class="gear-name"><a href="${wikiUrl(it.name)}" target="_blank" rel="noopener">${it.name}</a> ${note}${badge}</span>
+        <span class="gear-right">${need}${priceStr}</span>
+      </div>`;
+    }).join('');
+
+    const sub = firstLocked === -1
+      ? `<span class="gear-ladder-sub done">✓ all unlocked</span>`
+      : `<span class="gear-ladder-sub">next: ${items[firstLocked].name}</span>`;
+    return `<div class="gear-card">
+      <div class="gear-ladder-head"><span class="gear-ladder-name">${key}</span>${sub}</div>
+      ${rows}
+    </div>`;
+  });
+  body.innerHTML = `<div class="gear-grid">${cards.join('')}</div>`;
 }
 
 // ── XP PLANNING (F2.2) ──────────────────────────────────────────────────────────
@@ -2077,6 +2197,7 @@ function switchTab(name) {
   if (name === 'bosses')    loadBosses();
   if (name === 'settings')  { loadAccount(); loadAccounts(); }
   if (name === 'diaries')   renderDiaries();
+  if (name === 'gear')      loadGear();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
@@ -4175,6 +4296,7 @@ commitSnapshot();            // record current levels for next-visit gain detect
 loadQuestData();             // async: pull structured quest requirement data, then re-render
 loadXpMethods();             // async: pull XP/hr-per-method data for time-to-goal estimates
 loadDiaryData();             // async: pull achievement-diary requirement data (Diary tab + tile)
+loadGearData();              // async: pull gear progression ladders (Gear tab; prices load on open)
 loadVaultState();            // async: pull durable state from the vault, then re-render
 loadStats();                 // async: pull live levels + progress history from OSRS Hiscores
 loadChecklist();             // async: pull daily/weekly checklist from SQLite, then re-render

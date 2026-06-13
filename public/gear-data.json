@@ -1,0 +1,48 @@
+{
+  "_meta": {
+    "about": "Curated OSRS gear progression ladders (Gear & upgrade path feature). Static, non-account-scoped reference data served from /public. Each ladder is an ordered list of upgrades for a style+slot; the hub gates each item ready/locked against live stats + completed quests (same engine as quests/diaries) and prices it via the GE. Entry shape: name, s = equip skill reqs {Skill: level}, q = quests required to obtain/use, note = caveat, ge = exact GE item name for live price (omit for untradeable). Requirements are equip/obtain reqs, best-effort; the newer items were wiki-verified.",
+    "source": "Curated from oldschool.runescape.wiki; newer items (Masori, Virtus, Tumeken's shadow, Bow of faerdhinen, Torva, Zaryte cbow) verified.",
+    "scope": "v1: weapon + body ladders for the three combat styles. Stat/quest-gated (no ownership tracking yet)."
+  },
+  "ladders": {
+    "Melee weapon": { "style": "melee", "items": [
+      { "name": "Dragon scimitar", "s": { "Attack": 60 }, "q": ["Monkey Madness I"], "ge": "Dragon scimitar" },
+      { "name": "Abyssal whip", "s": { "Attack": 70 }, "ge": "Abyssal whip" },
+      { "name": "Abyssal tentacle", "s": { "Attack": 75 }, "ge": "Abyssal tentacle" },
+      { "name": "Ghrazi rapier", "s": { "Attack": 75 }, "note": "Theatre of Blood drop (stab)", "ge": "Ghrazi rapier" },
+      { "name": "Blade of saeldor", "s": { "Attack": 75 }, "q": ["Song of the Elves"], "note": "Crystal; needs Prifddinas access", "ge": "Blade of saeldor (inactive)" },
+      { "name": "Scythe of vitur", "s": { "Attack": 75, "Strength": 75 }, "note": "Theatre of Blood; very high cost to use", "ge": "Scythe of vitur (uncharged)" }
+    ]},
+    "Ranged weapon": { "style": "ranged", "items": [
+      { "name": "Rune crossbow", "s": { "Ranged": 61 }, "ge": "Rune crossbow" },
+      { "name": "Dragon hunter crossbow", "s": { "Ranged": 65 }, "note": "Best vs dragons", "ge": "Dragon hunter crossbow" },
+      { "name": "Armadyl crossbow", "s": { "Ranged": 70 }, "ge": "Armadyl crossbow" },
+      { "name": "Toxic blowpipe", "s": { "Ranged": 75 }, "note": "Needs darts + scales to use", "ge": "Toxic blowpipe (empty)" },
+      { "name": "Zaryte crossbow", "s": { "Ranged": 80 }, "ge": "Zaryte crossbow" },
+      { "name": "Bow of faerdhinen", "s": { "Ranged": 80, "Agility": 70 }, "q": ["Song of the Elves"], "note": "Crystal; needs Prifddinas access", "ge": "Bow of faerdhinen (inactive)" },
+      { "name": "Twisted bow", "s": { "Ranged": 85 }, "note": "BiS vs high-magic targets", "ge": "Twisted bow" }
+    ]},
+    "Magic weapon": { "style": "magic", "items": [
+      { "name": "Trident of the seas", "s": { "Magic": 75 }, "ge": "Trident of the seas (full)" },
+      { "name": "Trident of the swamp", "s": { "Magic": 75 }, "note": "Stronger trident", "ge": "Trident of the swamp (full)" },
+      { "name": "Sanguinesti staff", "s": { "Magic": 75 }, "note": "Theatre of Blood; heals on hit", "ge": "Sanguinesti staff (uncharged)" },
+      { "name": "Tumeken's shadow", "s": { "Magic": 85 }, "note": "Tombs of Amascut; triples magic bonuses", "ge": "Tumeken's shadow (uncharged)" }
+    ]},
+    "Melee body": { "style": "melee", "items": [
+      { "name": "Fighter torso", "note": "Untradeable — Barbarian Assault reward" },
+      { "name": "Bandos chestplate", "s": { "Defence": 65 }, "ge": "Bandos chestplate" },
+      { "name": "Torva platebody", "s": { "Defence": 80 }, "ge": "Torva platebody" }
+    ]},
+    "Ranged body": { "style": "ranged", "items": [
+      { "name": "Black d'hide body", "s": { "Ranged": 70, "Defence": 40 }, "ge": "Black d'hide body" },
+      { "name": "Armadyl chestplate", "s": { "Ranged": 70, "Defence": 70 }, "ge": "Armadyl chestplate" },
+      { "name": "Masori body", "s": { "Ranged": 80, "Defence": 30 }, "ge": "Masori body" }
+    ]},
+    "Magic body": { "style": "magic", "items": [
+      { "name": "Mystic robe top", "s": { "Magic": 40, "Defence": 20 }, "ge": "Mystic robe top (dark)" },
+      { "name": "Ahrim's robetop", "s": { "Magic": 70, "Defence": 70 }, "note": "Barrows", "ge": "Ahrim's robetop" },
+      { "name": "Ancestral robe top", "s": { "Magic": 75 }, "note": "Chambers of Xeric", "ge": "Ancestral robe top" },
+      { "name": "Virtus robe top", "s": { "Magic": 78, "Defence": 75 }, "ge": "Virtus robe top" }
+    ]}
+  }
+}

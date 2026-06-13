@@ -516,6 +516,24 @@ app.get('/api/gephr', async (_req, res) => {
   }
 });
 
+// Live GE mid-prices for an arbitrary set of items, by exact name. Used by the Gear tab to
+// price upgrade items. GET /api/prices?items=Abyssal%20whip,Twisted%20bow → { prices: {name: gp|null} }.
+app.get('/api/prices', async (req, res) => {
+  try {
+    const names = String(req.query.items || '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 200);
+    if (!names.length) return res.json({ updated: new Date().toISOString(), prices: {} });
+    const [mapping, prices] = await Promise.all([getMapping(), getPrices()]);
+    const out = {};
+    for (const name of names) {
+      const id = mapping.get(name.toLowerCase());
+      out[name] = id == null ? null : midPrice(prices, id);
+    }
+    res.json({ updated: new Date().toISOString(), prices: out });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
 // ── Vault tools for the chat agent ────────────────────────────────────────────
 async function walkMarkdown(dir, acc) {
   let entries;
