@@ -86,10 +86,13 @@ account record; no feature code assumes a single global player.
   steps, Quest Cape, skill goals, **goal-independent opportunity quests**, a **high-leverage
   skill-to-train nudge** (`skillUnlockLeverage` — the skill that solely-blocks the most startable
   quests, with the nearest unlock level + ETA), top money method, and the best diary opportunity.
-  Works even with no goals set. Quest picks rank by **reward XP magnitude** (`questRewardXp` parses
-  the free-text reward field; `compareQuestValue` is the shared comparator used by the per-goal next
-  step, the goal-independent pick, and the Quest Cape preset) — so e.g. Monkey Madness I (~35k combat
-  XP) is suggested over a trivial quest. Suggestions are **actionable inline** — quest picks carry a
+  Works even with no goals set. The **goal-independent** quest pick now follows the **OSRS Wiki
+  optimal-order baseline** (`optimalReadyQuestName` — the earliest *startable* quest in the guide
+  sequence, labelled "Next on your optimal quest path #n of 193"), falling back to **reward XP
+  magnitude** when the optimal dataset isn't available or only unsequenced miniquests are startable.
+  Goal-driven and Quest-Cape picks still rank by reward magnitude (`questRewardXp` parses the
+  free-text reward field; `compareQuestValue` is the shared comparator) — so e.g. Monkey Madness I
+  (~35k combat XP) is suggested over a trivial quest. Suggestions are **actionable inline** — quest picks carry a
   ✓ (mark complete → panel re-ranks live) and ★ (track as a goal); the skill-leverage nudge carries a
   ★ (add the skill goal) — so the user acts from the dashboard without tab-hopping.
 

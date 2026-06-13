@@ -2501,6 +2501,19 @@ function compareQuestValue(a, b) {
   return a.localeCompare(b);
 }
 
+// Goal-independent quest pick following the OSRS Wiki optimal-order baseline: among the given
+// startable quests, return the earliest one in the optimal guide sequence. Returns null if none
+// of them are sequenced (or the dataset hasn't loaded), so callers fall back to reward magnitude.
+function optimalReadyQuestName(names) {
+  let best = null, bestIdx = Infinity;
+  for (const n of names) {
+    if (!QUEST_ORDER.has(n)) continue;
+    const i = QUEST_ORDER.get(n);
+    if (i < bestIdx) { bestIdx = i; best = n; }
+  }
+  return best;
+}
+
 // Opportunity intelligence (goal-independent): among incomplete quests whose quest-prereqs
 // and QP gate are already met, find the skill that is the SOLE remaining blocker for the most
 // quests, and the nearest level that unlocks them. Gives a high-leverage "train this" answer
@@ -2682,15 +2695,22 @@ function nextActions() {
   }
   skillRows.sort((a, b) => b._pct - a._pct).forEach(r => out.push(r));
 
-  // Tier 2b — goal-independent: if no quest goal/preset is driving suggestions, surface the
-  // single best startable quest by reward so a fresh account still gets a concrete quest to do.
+  // Tier 2b — goal-independent: if no quest goal/preset is driving suggestions, surface a single
+  // startable quest so a fresh account still gets a concrete quest to do. Default to the OSRS Wiki
+  // optimal-order baseline (the earliest startable quest in the guide sequence); fall back to the
+  // reward-magnitude comparator when the optimal pick isn't available (dataset not loaded, or only
+  // unsequenced miniquests are startable).
   if (!getQuestGoals().length && !getPresetGoals().includes('quest_cape')) {
     const ready = QUESTS.filter(q => !completed[q.name] && questStatus(q, completed).state === 'ready').map(q => q.name);
-    const pick = bestReadyQuestName(ready);
+    const optimal = optimalReadyQuestName(ready);
+    const pick = optimal || bestReadyQuestName(ready);
     if (pick && !suggestedQuests.has(pick)) {
       const reward = REQS[pick] && REQS[pick].r ? ` · 🎁 ${REQS[pick].r}` : '';
+      const reason = optimal
+        ? `Next on your optimal quest path (#${QUEST_ORDER.get(pick) + 1} of ${QUEST_ORDER_LEN})${reward}`
+        : `A solid quest you can start now${reward}`;
       suggestedQuests.set(pick, out.length);
-      out.push({ icon: '▶', title: `Start ${pick}`, reason: `A solid quest you can start now${reward}`,
+      out.push({ icon: '🧭', title: `Start ${pick}`, reason,
                  _quest: pick, _canTrack: true, onclick: `goToQuest('${pick.replace(/'/g, "\\'")}')` });
     }
   }
