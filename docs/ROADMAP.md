@@ -108,12 +108,14 @@ and the dashboard recommends agreeable next actions.
   can't verify are surfaced as notes rather than false-locking gates.
 - 🟢 **F2.4** Daily/weekly checklist with reset timers.
 - 🟢 **F2.5** Account Value score, trended over time.
-- 🟡 **F2.6** Gear & upgrade path — **v1 live.** A Gear tab with curated progression ladders
+- 🟡 **F2.6** Gear & upgrade path — **v1 + v2 live.** A Gear tab with curated progression ladders
   (`public/gear-data.json`: melee/ranged/magic weapons + body armor) where each item is gated
-  ready/locked against live stats + completed quests (`gearStatus` reuses the quest/diary engine),
-  priced via a new `GET /api/prices` (reuses the GE machinery), with a "🎯 next" badge on your next
-  upgrade and "best now" on your current ceiling. Stat/quest-gated only; **ownership marking + feeding
-  the "what to do next" ranker, and more ladders/slots, are the v2.**
+  ready/locked against live stats + completed quests (`gearStatus` reuses the quest/diary engine)
+  and priced via `GET /api/prices` (reuses the GE machinery). **v2 adds ownership tracking** (a
+  per-item owned checkbox → `gear_owned` table on the `/api/state` path): "next upgrade" is now the
+  first un-owned rung above your current best (tagged 🎯 next, "current" on your best owned), and a
+  new ranker tier suggests the cheapest next-rung item you can equip now but don't own — dropping out
+  once owned. Remaining: **more ladders/slots** (helm, legs, accessories, shields).
 - ⚪ Frontend modularization if/when `index.html` interactivity outgrows hand-editing (ADR first).
 
 **Exit criteria:** the hub shows trends over time, not just current state.
