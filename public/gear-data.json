@@ -1,17 +1,39 @@
 {
   "_meta": {
-    "about": "Curated OSRS gear progression ladders (Gear & upgrade path feature). Static, non-account-scoped reference data served from /public. Each ladder is an ordered list of upgrades for a style+slot; the hub gates each item ready/locked against live stats + completed quests (same engine as quests/diaries) and prices it via the GE. Entry shape: name, s = equip skill reqs {Skill: level}, q = quests required to obtain/use, note = caveat, ge = exact GE item name for live price (omit for untradeable). Requirements are equip/obtain reqs, best-effort; the newer items were wiki-verified.",
-    "source": "Curated from oldschool.runescape.wiki; newer items (Masori, Virtus, Tumeken's shadow, Bow of faerdhinen, Torva, Zaryte cbow) verified.",
-    "scope": "v1: weapon + body ladders for the three combat styles. Stat/quest-gated (no ownership tracking yet)."
+    "about": "Curated OSRS gear progression ladders (Gear & upgrade path feature). Static, non-account-scoped reference data served from /public. Each ladder is an ordered list of upgrades for a style+slot; the hub gates each item ready/locked against live stats + completed quests (same engine as quests/diaries), tracks which you own, computes your next upgrade, and prices each via the GE. Entry shape: name, s = equip skill reqs {Skill: level}, q = quests required to obtain/use, note = caveat, ge = exact GE item name for live price (omit for untradeable). Requirements are equip/obtain reqs, best-effort; endgame pieces were wiki-verified.",
+    "source": "Curated from oldschool.runescape.wiki; endgame pieces (Torva, Masori, Virtus, Ancestral, Armadyl, Pegasian/Primordial/Eternal boots, zenyte amulets, Neitiznot faceguard, etc.) verified.",
+    "scope": "weapon + helm + body + legs + boots + amulet ladders for the three combat styles (18 ladders). Stat/quest-gated + ownership-tracked."
   },
   "ladders": {
     "Melee weapon": { "style": "melee", "items": [
       { "name": "Dragon scimitar", "s": { "Attack": 60 }, "q": ["Monkey Madness I"], "ge": "Dragon scimitar" },
       { "name": "Abyssal whip", "s": { "Attack": 70 }, "ge": "Abyssal whip" },
       { "name": "Abyssal tentacle", "s": { "Attack": 75 }, "ge": "Abyssal tentacle" },
-      { "name": "Ghrazi rapier", "s": { "Attack": 75 }, "note": "Theatre of Blood drop (stab)", "ge": "Ghrazi rapier" },
+      { "name": "Ghrazi rapier", "s": { "Attack": 75 }, "note": "Theatre of Blood (stab)", "ge": "Ghrazi rapier" },
       { "name": "Blade of saeldor", "s": { "Attack": 75 }, "q": ["Song of the Elves"], "note": "Crystal; needs Prifddinas access", "ge": "Blade of saeldor (inactive)" },
-      { "name": "Scythe of vitur", "s": { "Attack": 75, "Strength": 75 }, "note": "Theatre of Blood; very high cost to use", "ge": "Scythe of vitur (uncharged)" }
+      { "name": "Scythe of vitur", "s": { "Attack": 75, "Strength": 75 }, "note": "Theatre of Blood; high cost to use", "ge": "Scythe of vitur (uncharged)" }
+    ]},
+    "Melee helm": { "style": "melee", "items": [
+      { "name": "Helm of neitiznot", "s": { "Defence": 55 }, "q": ["The Fremennik Isles"], "ge": "Helm of neitiznot" },
+      { "name": "Neitiznot faceguard", "s": { "Defence": 70 }, "q": ["The Fremennik Exiles"], "note": "Untradeable — combine helm of neitiznot + warped tortoise shell" },
+      { "name": "Torva full helm", "s": { "Defence": 80 }, "ge": "Torva full helm" }
+    ]},
+    "Melee body": { "style": "melee", "items": [
+      { "name": "Fighter torso", "note": "Untradeable — Barbarian Assault reward" },
+      { "name": "Bandos chestplate", "s": { "Defence": 65 }, "ge": "Bandos chestplate" },
+      { "name": "Torva platebody", "s": { "Defence": 80 }, "ge": "Torva platebody" }
+    ]},
+    "Melee legs": { "style": "melee", "items": [
+      { "name": "Bandos tassets", "s": { "Defence": 65 }, "ge": "Bandos tassets" },
+      { "name": "Torva platelegs", "s": { "Defence": 80 }, "ge": "Torva platelegs" }
+    ]},
+    "Melee boots": { "style": "melee", "items": [
+      { "name": "Dragon boots", "ge": "Dragon boots" },
+      { "name": "Primordial boots", "s": { "Strength": 75, "Defence": 75 }, "ge": "Primordial boots" }
+    ]},
+    "Melee amulet": { "style": "melee", "items": [
+      { "name": "Amulet of fury", "ge": "Amulet of fury" },
+      { "name": "Amulet of torture", "s": { "Hitpoints": 75 }, "note": "Zenyte; best melee neck", "ge": "Amulet of torture" }
     ]},
     "Ranged weapon": { "style": "ranged", "items": [
       { "name": "Rune crossbow", "s": { "Ranged": 61 }, "ge": "Rune crossbow" },
@@ -22,27 +44,59 @@
       { "name": "Bow of faerdhinen", "s": { "Ranged": 80, "Agility": 70 }, "q": ["Song of the Elves"], "note": "Crystal; needs Prifddinas access", "ge": "Bow of faerdhinen (inactive)" },
       { "name": "Twisted bow", "s": { "Ranged": 85 }, "note": "BiS vs high-magic targets", "ge": "Twisted bow" }
     ]},
-    "Magic weapon": { "style": "magic", "items": [
-      { "name": "Trident of the seas", "s": { "Magic": 75 }, "ge": "Trident of the seas (full)" },
-      { "name": "Trident of the swamp", "s": { "Magic": 75 }, "note": "Stronger trident", "ge": "Trident of the swamp (full)" },
-      { "name": "Sanguinesti staff", "s": { "Magic": 75 }, "note": "Theatre of Blood; heals on hit", "ge": "Sanguinesti staff (uncharged)" },
-      { "name": "Tumeken's shadow", "s": { "Magic": 85 }, "note": "Tombs of Amascut; triples magic bonuses", "ge": "Tumeken's shadow (uncharged)" }
-    ]},
-    "Melee body": { "style": "melee", "items": [
-      { "name": "Fighter torso", "note": "Untradeable — Barbarian Assault reward" },
-      { "name": "Bandos chestplate", "s": { "Defence": 65 }, "ge": "Bandos chestplate" },
-      { "name": "Torva platebody", "s": { "Defence": 80 }, "ge": "Torva platebody" }
+    "Ranged helm": { "style": "ranged", "items": [
+      { "name": "Coif", "ge": "Coif" },
+      { "name": "Armadyl helmet", "s": { "Ranged": 70, "Defence": 70 }, "ge": "Armadyl helmet" },
+      { "name": "Masori mask", "s": { "Ranged": 80, "Defence": 30 }, "ge": "Masori mask" }
     ]},
     "Ranged body": { "style": "ranged", "items": [
       { "name": "Black d'hide body", "s": { "Ranged": 70, "Defence": 40 }, "ge": "Black d'hide body" },
       { "name": "Armadyl chestplate", "s": { "Ranged": 70, "Defence": 70 }, "ge": "Armadyl chestplate" },
       { "name": "Masori body", "s": { "Ranged": 80, "Defence": 30 }, "ge": "Masori body" }
     ]},
+    "Ranged legs": { "style": "ranged", "items": [
+      { "name": "Black d'hide chaps", "s": { "Ranged": 70 }, "ge": "Black d'hide chaps" },
+      { "name": "Armadyl chainskirt", "s": { "Ranged": 70, "Defence": 70 }, "ge": "Armadyl chainskirt" },
+      { "name": "Masori chaps", "s": { "Ranged": 80, "Defence": 30 }, "ge": "Masori chaps" }
+    ]},
+    "Ranged boots": { "style": "ranged", "items": [
+      { "name": "Snakeskin boots", "s": { "Ranged": 30, "Defence": 30 }, "ge": "Snakeskin boots" },
+      { "name": "Pegasian boots", "s": { "Ranged": 75, "Defence": 75 }, "ge": "Pegasian boots" }
+    ]},
+    "Ranged amulet": { "style": "ranged", "items": [
+      { "name": "Amulet of fury", "ge": "Amulet of fury" },
+      { "name": "Necklace of anguish", "s": { "Hitpoints": 75 }, "note": "Zenyte; best ranged neck", "ge": "Necklace of anguish" }
+    ]},
+    "Magic weapon": { "style": "magic", "items": [
+      { "name": "Trident of the seas", "s": { "Magic": 75 }, "note": "Price = uncharged", "ge": "Uncharged trident" },
+      { "name": "Trident of the swamp", "s": { "Magic": 75 }, "note": "Stronger trident; price = uncharged", "ge": "Uncharged toxic trident" },
+      { "name": "Sanguinesti staff", "s": { "Magic": 75 }, "note": "Theatre of Blood; heals on hit", "ge": "Sanguinesti staff (uncharged)" },
+      { "name": "Tumeken's shadow", "s": { "Magic": 85 }, "note": "Tombs of Amascut; triples magic bonuses", "ge": "Tumeken's shadow (uncharged)" }
+    ]},
+    "Magic helm": { "style": "magic", "items": [
+      { "name": "Ahrim's hood", "s": { "Magic": 70, "Defence": 70 }, "note": "Barrows", "ge": "Ahrim's hood" },
+      { "name": "Ancestral hat", "s": { "Magic": 75, "Defence": 65 }, "note": "Chambers of Xeric", "ge": "Ancestral hat" },
+      { "name": "Virtus mask", "s": { "Magic": 78, "Defence": 75 }, "ge": "Virtus mask" }
+    ]},
     "Magic body": { "style": "magic", "items": [
       { "name": "Mystic robe top", "s": { "Magic": 40, "Defence": 20 }, "ge": "Mystic robe top (dark)" },
       { "name": "Ahrim's robetop", "s": { "Magic": 70, "Defence": 70 }, "note": "Barrows", "ge": "Ahrim's robetop" },
-      { "name": "Ancestral robe top", "s": { "Magic": 75 }, "note": "Chambers of Xeric", "ge": "Ancestral robe top" },
+      { "name": "Ancestral robe top", "s": { "Magic": 75, "Defence": 65 }, "note": "Chambers of Xeric", "ge": "Ancestral robe top" },
       { "name": "Virtus robe top", "s": { "Magic": 78, "Defence": 75 }, "ge": "Virtus robe top" }
+    ]},
+    "Magic legs": { "style": "magic", "items": [
+      { "name": "Mystic robe bottom", "s": { "Magic": 40, "Defence": 20 }, "ge": "Mystic robe bottom (dark)" },
+      { "name": "Ahrim's robeskirt", "s": { "Magic": 70, "Defence": 70 }, "note": "Barrows", "ge": "Ahrim's robeskirt" },
+      { "name": "Ancestral robe bottom", "s": { "Magic": 75, "Defence": 65 }, "note": "Chambers of Xeric", "ge": "Ancestral robe bottom" },
+      { "name": "Virtus robe bottom", "s": { "Magic": 78, "Defence": 75 }, "ge": "Virtus robe bottom" }
+    ]},
+    "Magic boots": { "style": "magic", "items": [
+      { "name": "Infinity boots", "s": { "Magic": 50, "Defence": 25 }, "ge": "Infinity boots" },
+      { "name": "Eternal boots", "s": { "Magic": 75, "Defence": 75 }, "ge": "Eternal boots" }
+    ]},
+    "Magic amulet": { "style": "magic", "items": [
+      { "name": "Amulet of fury", "ge": "Amulet of fury" },
+      { "name": "Occult necklace", "note": "Best magic-damage neck", "ge": "Occult necklace" }
     ]}
   }
 }
