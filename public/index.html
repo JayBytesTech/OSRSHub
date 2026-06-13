@@ -231,6 +231,37 @@ body {
 .optimal-next-do { margin-left: auto; padding: 3px 10px; border: 1px solid #4a9c2a; border-radius: 4px;
   background: #5cb830; color: #fff; cursor: pointer; font-size: 12px; font-weight: 600; }
 .optimal-next-do:hover { background: #4a9c2a; }
+/* Combat Achievements */
+.ca-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.ca-tiergrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.ca-tiercard { border: 1px solid #c9b378; border-radius: 6px; background: #f7efd8; padding: 8px 10px; }
+.ca-tiercard.met { background: #e8f3df; border-color: #9fc888; }
+.ca-tiercard-head { font-weight: 700; font-size: 13px; color: #4a2c08; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.ca-tiercard-pts { font-size: 10px; font-weight: 500; color: #8a6830; }
+.ca-tiercard-prog { font-size: 11px; color: #6a5230; margin: 3px 0; }
+.ca-bar { height: 6px; background: #e0d3a8; border-radius: 3px; overflow: hidden; }
+.ca-bar-fill { height: 100%; background: #8b6914; }
+.ca-tiercard.met .ca-bar-fill { background: #4a9c2a; }
+.ca-tiercard-thresh { font-size: 10px; color: #8a6830; margin-top: 4px; }
+.ca-grouplist { display: flex; flex-direction: column; gap: 4px; }
+.ca-group { border: 1px solid #d4c080; border-radius: 5px; background: #fbf6e6; overflow: hidden; }
+.ca-group-head { display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; }
+.ca-group-head:hover { background: #f3e9c8; }
+.ca-group-toggle { color: #8a6830; font-size: 11px; width: 10px; }
+.ca-group-name { font-weight: 600; color: #4a2c08; flex: 1; }
+.ca-group-count { font-size: 12px; color: #8a6830; background: #ede0b8; border-radius: 10px; padding: 1px 9px; }
+.ca-group-count.all { background: #cfe8bd; color: #2e6614; }
+.ca-tasklist { border-top: 1px solid #e6d6a8; }
+.ca-task { display: flex; align-items: flex-start; gap: 8px; padding: 6px 10px 6px 14px; border-top: 1px solid #f0e6c8; }
+.ca-task:first-child { border-top: none; }
+.ca-task.tdone { opacity: 0.62; }
+.ca-task-check { flex-shrink: 0; padding-top: 1px; }
+.ca-tier-badge { flex-shrink: 0; font-size: 12px; }
+.ca-task-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ca-task-name { font-weight: 600; color: #3a2606; }
+.ca-task.tdone .ca-task-name { text-decoration: line-through; }
+.ca-task-type { font-size: 10px; color: #8f6fc0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+.ca-task-desc { font-size: 12px; color: #6a5230; }
 .qp-badge {
   background: #2e6614;
   color: white;
@@ -802,6 +833,7 @@ body {
   <div class="tab"         onclick="switchTab('skills')">⚔️ Skills</div>
   <div class="tab"         onclick="switchTab('quests')">📜 Quests</div>
   <div class="tab"         onclick="switchTab('diaries')">📖 Diaries</div>
+  <div class="tab"         onclick="switchTab('ca')">🏅 Combat Tasks</div>
   <div class="tab"         onclick="switchTab('gear')">🛡️ Gear</div>
   <div class="tab"         onclick="switchTab('progress')">📈 Progress</div>
   <div class="tab"         onclick="switchTab('money')">💰 Money</div>
@@ -951,6 +983,24 @@ body {
     <button class="filter-btn"        id="diaryfilter-done"   onclick="setDiaryFilter('done')">Done</button>
   </div>
   <div id="diary-body"></div>
+</div>
+
+<!-- COMBAT ACHIEVEMENTS -->
+<div id="tab-ca" class="tab-content">
+  <div class="section-header">Combat Achievements <span class="section-sub" id="ca-sub">Track tasks per boss · points toward each reward tier</span></div>
+  <div class="ca-controls">
+    <input class="quest-search" id="ca-search" type="text" placeholder="Search tasks or bosses…" oninput="renderCA()">
+    <button class="filter-btn active" id="cafilter-all" onclick="setCaFilter('all')">All tiers</button>
+    <button class="filter-btn" id="cafilter-Easy"        onclick="setCaFilter('Easy')">Easy</button>
+    <button class="filter-btn" id="cafilter-Medium"      onclick="setCaFilter('Medium')">Medium</button>
+    <button class="filter-btn" id="cafilter-Hard"        onclick="setCaFilter('Hard')">Hard</button>
+    <button class="filter-btn" id="cafilter-Elite"       onclick="setCaFilter('Elite')">Elite</button>
+    <button class="filter-btn" id="cafilter-Master"      onclick="setCaFilter('Master')">Master</button>
+    <button class="filter-btn" id="cafilter-Grandmaster" onclick="setCaFilter('Grandmaster')">GM</button>
+    <button class="filter-btn" id="cafilter-todo"        onclick="setCaFilter('todo')">To do</button>
+  </div>
+  <div class="quest-disclaimer">Combat Achievements aren't gated by the hub (we can't verify combat ability) — tick tasks you've completed. Reward tiers unlock at cumulative point thresholds.</div>
+  <div id="ca-body"></div>
 </div>
 
 <!-- GEAR -->
@@ -1442,6 +1492,28 @@ async function loadDiaryData() {
   if (document.getElementById('dash-body')) renderDashboard();
 }
 
+// ── COMBAT ACHIEVEMENTS (CA planner) ─────────────────────────────────────────────
+// Curated CA dataset (public/ca-data.json): { tiers:{Tier:{pts,taskCount,rewardThreshold}},
+// tasks:[{id,monster,name,desc,type,tier}], _meta:{tierOrder,totalTasks,totalPoints} }. Completion
+// is tracked per task id (manual ticks → /api/state), grouped by boss. No ready/locked gating —
+// the hub can't verify combat capability — so this is a tracker + points/threshold planner.
+let CA_DATA = null;
+const CA_TIERS = ['Easy', 'Medium', 'Hard', 'Elite', 'Master', 'Grandmaster'];
+const CA_TIER_ICON = { Easy: '🟢', Medium: '🔵', Hard: '🟣', Elite: '🟡', Master: '🔴', Grandmaster: '⚫' };
+
+async function loadCaData() {
+  try {
+    const r = await fetch('/ca-data.json', { cache: 'no-cache' });
+    if (!r.ok) throw new Error('ca-data ' + r.status);
+    CA_DATA = await r.json();
+  } catch (e) {
+    console.warn('Could not load ca-data.json — CA planner unavailable.', e);
+    CA_DATA = null;
+  }
+  if (document.getElementById('ca-body')) renderCA();
+  if (document.getElementById('dash-body')) renderDashboard();
+}
+
 // ── GEAR & UPGRADE PATH ──────────────────────────────────────────────────────────
 // Curated progression ladders (public/gear-data.json). Each item is gated ready/locked
 // against live stats + completed quests (same engine as quests/diaries) and priced via the
@@ -1734,6 +1806,27 @@ function isGearOwned(name) {
 }
 function diaryTaskDone(id) {
   return getCompletedDiaryTasks().includes(id);
+}
+
+// Combat Achievement task completions (CA planner) — array of task ids (numbers), like diary tasks.
+function getCompletedCATasks() {
+  try { const v = JSON.parse(localStorage.getItem('osrs_nullyn_catasks') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function saveCompletedCATasksLocal(t) {
+  try { localStorage.setItem('osrs_nullyn_catasks', JSON.stringify(Array.isArray(t) ? t : [])); } catch {}
+}
+function caTaskDone(id) {
+  return getCompletedCATasks().includes(id);
+}
+function toggleCaTask(id) {
+  id = parseInt(id, 10);
+  const done = getCompletedCATasks();
+  const i = done.indexOf(id);
+  if (i >= 0) done.splice(i, 1); else done.push(id);
+  saveCompletedCATasksLocal(done);
+  renderCA();
+  renderDashboard();
+  scheduleVaultSave();
 }
 
 // ── CHECKLIST ─────────────────────────────────────────────────────────────────
@@ -2283,9 +2376,10 @@ async function loadVaultState() {
     if (Array.isArray(data.diaryTasks)) saveCompletedDiaryTasksLocal(data.diaryTasks);
     if (Array.isArray(data.diaryGoals)) saveDiaryGoalsLocal(data.diaryGoals);
     if (Array.isArray(data.gearOwned)) saveGearOwnedLocal(data.gearOwned);
+    if (Array.isArray(data.caTasks)) saveCompletedCATasksLocal(data.caTasks);
     SYNC.available = true;
     setSyncBadge('ok', '\u2601 Synced to vault');
-    renderQuests(); renderGoals(); populateGoalSelect(); populateQuestGoalDatalist(); renderDiaries(); renderDashboard(); recordAccountValue();
+    renderQuests(); renderGoals(); populateGoalSelect(); populateQuestGoalDatalist(); renderDiaries(); renderCA(); renderDashboard(); recordAccountValue();
   } catch (e) {
     SYNC.available = false; SYNC.lastError = String(e);
     setSyncBadge('warn', '\u26a0 Local only');
@@ -2299,7 +2393,7 @@ function scheduleVaultSave() {
   saveTimer = setTimeout(saveVaultState, 700);
 }
 async function saveVaultState() {
-  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals(), diaries: getCompletedDiaries(), diaryTasks: getCompletedDiaryTasks(), diaryGoals: getDiaryGoals(), gearOwned: getGearOwned() };
+  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals(), diaries: getCompletedDiaries(), diaryTasks: getCompletedDiaryTasks(), diaryGoals: getDiaryGoals(), gearOwned: getGearOwned(), caTasks: getCompletedCATasks() };
   try {
     const r = await fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!r.ok) throw new Error('save ' + r.status);
@@ -2327,6 +2421,7 @@ function switchTab(name) {
   if (name === 'bosses')    loadBosses();
   if (name === 'settings')  { loadAccount(); loadAccounts(); }
   if (name === 'diaries')   renderDiaries();
+  if (name === 'ca')        renderCA();
   if (name === 'gear')      loadGear();
 }
 
@@ -2743,6 +2838,17 @@ function nextActions() {
   const gearAction = bestGearUpgrade();
   if (gearAction) out.push(gearAction);
 
+  // Tier 6 — Combat Achievement reward progress (only once the player is engaged with CAs, so we
+  // don't nag fresh accounts). Surfaces how close the next reward tier is.
+  if (CA_DATA && Array.isArray(CA_DATA.tasks)) {
+    const cs = caSummary();
+    if (cs.earned > 0 && cs.nextTier) {
+      out.push({ icon: '🏅', title: `${cs.nextTier.need} pts to ${cs.nextTier.tier} CA rewards`,
+                 reason: `${cs.earned}/${cs.totalPoints} Combat Achievement points`,
+                 onclick: `switchTab('ca');setCaFilter('todo')` });
+    }
+  }
+
   const trimmed = out.slice(0, MAX);
   const noGoals = !getQuestGoals().length && !getGoals().length && !getPresetGoals().length && !getDiaryGoals().length;
   return { actions: trimmed, prompt: noGoals ? 'Set a skill or quest goal for tailored quest suggestions.' : null };
@@ -2786,6 +2892,11 @@ function renderDashboard() {
     (() => { const ds = diarySummary(); return ds.total > 0
       ? tile('📖', 'Diaries', `${ds.done} <span class="dash-frac">/ ${ds.total}</span>`, `${ds.pct}% · ${ds.ready} ready now →`, { cls: 'dash-clickable', onclick: "switchTab('diaries')", title: 'Go to Diaries' })
       : stub('📖', 'Diaries'); })() +
+    (() => { if (!CA_DATA || !Array.isArray(CA_DATA.tasks)) return stub('🏅', 'Combat Tasks');
+      const cs = caSummary();
+      return tile('🏅', 'Combat Tasks', `${cs.earned} <span class="dash-frac">/ ${cs.totalPoints}</span>`,
+        cs.nextTier ? `${cs.nextTier.need} pts to ${cs.nextTier.tier} →` : 'all tiers unlocked →',
+        { cls: 'dash-clickable', onclick: "switchTab('ca')", title: 'Go to Combat Tasks' }); })() +
     ((MILESTONES.clog && MILESTONES.clog.completed != null)
       ? tile('📒', 'Collection Log', `${MILESTONES.clog.completed}${MILESTONES.clog.total ? ` <span class="dash-frac">/ ${MILESTONES.clog.total}</span>` : ''}`, `${MILESTONES.clog.pct != null ? MILESTONES.clog.pct + '% slots →' : 'slots logged →'}`, { cls: 'dash-clickable', onclick: "switchTab('timeline')", title: 'View in Timeline' })
       : stub('📒', 'Collection Log'));
@@ -3442,6 +3553,109 @@ function renderDiaries() {
   body.innerHTML = cards.length
     ? `<div class="diary-grid">${cards.join('')}</div>`
     : `<div class="diary-empty">No tiers match this filter.</div>`;
+}
+
+// ── COMBAT ACHIEVEMENTS render ───────────────────────────────────────────────────
+let caFilter = 'all';          // 'all' | tier name | 'todo'
+let caExpanded = new Set();    // monster names whose task list is open
+
+function setCaFilter(f) {
+  caFilter = f;
+  document.querySelectorAll('.ca-controls .filter-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('cafilter-' + f);
+  if (btn) btn.classList.add('active');
+  renderCA();
+}
+function toggleCaExpand(monster) {
+  if (caExpanded.has(monster)) caExpanded.delete(monster); else caExpanded.add(monster);
+  renderCA();
+}
+
+// Per-tier and overall progress from tracked completions.
+function caSummary() {
+  const done = new Set(getCompletedCATasks());
+  const tiers = {};
+  CA_TIERS.forEach(t => { const tt = (CA_DATA.tiers || {})[t] || { pts: 0, taskCount: 0, rewardThreshold: 0 };
+    tiers[t] = { done: 0, total: tt.taskCount, pts: tt.pts, ptsEarned: 0, ptsTotal: tt.taskCount * tt.pts, threshold: tt.rewardThreshold }; });
+  let earned = 0;
+  for (const task of (CA_DATA.tasks || [])) {
+    if (!done.has(task.id)) continue;
+    const t = tiers[task.tier]; if (!t) continue;
+    t.done++; t.ptsEarned += t.pts; earned += t.pts;
+  }
+  const totalPoints = (CA_DATA._meta && CA_DATA._meta.totalPoints) || 0;
+  // nearest reward tier still locked (cumulative threshold not yet reached)
+  let nextTier = null;
+  for (const t of CA_TIERS) { if (earned < tiers[t].threshold) { nextTier = { tier: t, need: tiers[t].threshold - earned, threshold: tiers[t].threshold }; break; } }
+  return { tiers, earned, totalPoints, nextTier, doneCount: done.size, totalCount: (CA_DATA.tasks || []).length };
+}
+
+function renderCA() {
+  const body = document.getElementById('ca-body');
+  if (!body) return;
+  const sub = document.getElementById('ca-sub');
+  if (!CA_DATA || !Array.isArray(CA_DATA.tasks)) {
+    body.innerHTML = `<div class="diary-empty">Combat Achievement data unavailable — could not load <code>/ca-data.json</code>.</div>`;
+    return;
+  }
+
+  const sum = caSummary();
+  if (sub) sub.textContent = `${sum.doneCount}/${sum.totalCount} tasks · ${sum.earned}/${sum.totalPoints} pts` +
+    (sum.nextTier ? ` · ${sum.nextTier.need} pts to ${sum.nextTier.tier} rewards` : ' · all reward tiers unlocked 🎉');
+
+  // Tier summary cards
+  const tierCards = CA_TIERS.map(t => {
+    const ts = sum.tiers[t];
+    const met = sum.earned >= ts.threshold;
+    const pct = ts.total ? Math.round(ts.done / ts.total * 100) : 0;
+    return `<div class="ca-tiercard ${met ? 'met' : ''}">
+      <div class="ca-tiercard-head">${CA_TIER_ICON[t]} ${t} <span class="ca-tiercard-pts">${ts.pts} pt${ts.pts > 1 ? 's' : ''}/task</span></div>
+      <div class="ca-tiercard-prog">${ts.done}/${ts.total} tasks · ${ts.ptsEarned}/${ts.ptsTotal} pts</div>
+      <div class="ca-bar"><div class="ca-bar-fill" style="width:${pct}%"></div></div>
+      <div class="ca-tiercard-thresh">${met ? '✓ rewards unlocked' : `reward at ${ts.threshold} pts`}</div>
+    </div>`;
+  }).join('');
+
+  // Group tasks by monster, applying the tier/search/todo filter.
+  const search = (document.getElementById('ca-search').value || '').toLowerCase();
+  const done = new Set(getCompletedCATasks());
+  const groups = new Map();   // monster -> {tasks:[], done, total}
+  for (const task of CA_DATA.tasks) {
+    if (caFilter !== 'all' && caFilter !== 'todo' && task.tier !== caFilter) continue;
+    if (caFilter === 'todo' && done.has(task.id)) continue;
+    if (search && !(task.name.toLowerCase().includes(search) || task.monster.toLowerCase().includes(search) || (task.desc || '').toLowerCase().includes(search))) continue;
+    if (!groups.has(task.monster)) groups.set(task.monster, { tasks: [], done: 0 });
+    const g = groups.get(task.monster);
+    g.tasks.push(task);
+    if (done.has(task.id)) g.done++;
+  }
+
+  const searching = !!search || caFilter !== 'all';
+  const monsters = [...groups.keys()].sort();
+  const cards = monsters.map(m => {
+    const g = groups.get(m);
+    const open = caExpanded.has(m) || searching;   // auto-expand when filtering/searching
+    const tierOrderIdx = t => CA_TIERS.indexOf(t);
+    const rows = open ? g.tasks.slice().sort((a, b) => tierOrderIdx(a.tier) - tierOrderIdx(b.tier) || a.name.localeCompare(b.name)).map(task => {
+      const tdone = done.has(task.id);
+      return `<div class="ca-task ${tdone ? 'tdone' : ''}">
+        <label class="ca-task-check"><input type="checkbox" ${tdone ? 'checked' : ''} onchange="toggleCaTask(${task.id})"></label>
+        <span class="ca-tier-badge ca-tier-${task.tier}" title="${task.tier} · ${sum.tiers[task.tier].pts} pt${sum.tiers[task.tier].pts > 1 ? 's' : ''}">${CA_TIER_ICON[task.tier]}</span>
+        <span class="ca-task-text"><a href="${wikiUrl(task.name)}" target="_blank" rel="noopener" class="ca-task-name">${escapeHtml(task.name)}</a><span class="ca-task-type">${task.type}</span><span class="ca-task-desc">${escapeHtml(task.desc || '')}</span></span>
+      </div>`;
+    }).join('') : '';
+    return `<div class="ca-group">
+      <div class="ca-group-head" onclick="toggleCaExpand('${m.replace(/'/g, "\\'")}')">
+        <span class="ca-group-toggle">${open ? '▾' : '▸'}</span>
+        <a href="${wikiUrl(m)}" target="_blank" rel="noopener" class="ca-group-name" onclick="event.stopPropagation()">${escapeHtml(m)}</a>
+        <span class="ca-group-count ${g.done === g.tasks.length ? 'all' : ''}">${g.done}/${g.tasks.length}</span>
+      </div>
+      ${open ? `<div class="ca-tasklist">${rows}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  body.innerHTML = `<div class="ca-tiergrid">${tierCards}</div>` +
+    (cards ? `<div class="ca-grouplist">${cards}</div>` : `<div class="diary-empty">No tasks match this filter.</div>`);
 }
 
 function renderQuests() {
@@ -4382,7 +4596,7 @@ async function switchAccount(id) {
     // localStorage is a single shared cache of the *previously loaded* account; clear the
     // account-scoped keys so the new account loads from server truth and old data can't bleed across.
     ['osrs_nullyn_completed','osrs_nullyn_goals','osrs_nullyn_questgoals','osrs_nullyn_presetgoals',
-     'osrs_nullyn_diaries','osrs_nullyn_diarytasks','osrs_nullyn_diarygoals','osrs_nullyn_gearowned','osrs_nullyn_checklist','osrs_nullyn_lastsnap'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
+     'osrs_nullyn_diaries','osrs_nullyn_diarytasks','osrs_nullyn_diarygoals','osrs_nullyn_gearowned','osrs_nullyn_catasks','osrs_nullyn_checklist','osrs_nullyn_lastsnap'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
     window.location.reload();          // every view is account-scoped — re-init the whole app
   } catch (e) {
     const status = document.getElementById('add-status');
@@ -4581,6 +4795,7 @@ loadQuestData();             // async: pull structured quest requirement data, t
 loadQuestOrder();            // async: pull the OSRS Wiki optimal quest order (Quests tab "Optimal order")
 loadXpMethods();             // async: pull XP/hr-per-method data for time-to-goal estimates
 loadDiaryData();             // async: pull achievement-diary requirement data (Diary tab + tile)
+loadCaData();                // async: pull Combat Achievements dataset (Combat Tasks tab + tile)
 loadGearData();              // async: pull gear progression ladders (Gear tab; prices load on open)
 loadVaultState();            // async: pull durable state from the vault, then re-render
 loadStats();                 // async: pull live levels + progress history from OSRS Hiscores

@@ -131,6 +131,17 @@ and the dashboard recommends agreeable next actions.
   / 88 items**, grouped by ⚔️/🏹/🔮). Endgame reqs wiki-verified. Optional future: **style-aware
   prioritisation** (lead with your main style) and "next *affordable* upgrade" once bank value lands
   from the custom plugin.
+- 🟢 **F2.7** Combat Achievements planner. A "Combat Tasks" tab tracking all **637 CA tasks**
+  (`public/ca-data.json`, scraped from the Wiki's `Combat_Achievements/All_tasks` rendered table —
+  stable `data-ca-task-id`, monster, name, desc, type, tier) **grouped by boss** (89 groups), with a
+  tier filter (Easy→GM), a To-do filter, and task/boss search. Six **tier summary cards** show
+  tasks-done and points-earned per tier with a progress bar and the cumulative **reward-unlock point
+  threshold** (Easy 41 → Medium 161 → Hard 416 → Elite 1064 → Master 1904 → Grandmaster 2630).
+  Completion is tracked **per task id** (manual ticks; the hub can't verify combat capability so there's
+  no ready/locked gating), persisted via a new `ca_completions` table on the `/api/state` path. A
+  **dashboard tile** (points + pts-to-next-tier) and a **ranker tier** ("N pts to <tier> CA rewards",
+  shown once the player is engaged) round it out. Optional future: auto-tick from the existing Dink
+  `COMBAT_ACHIEVEMENT` telemetry events, and CA tier **goals** that decompose like diary goals.
 - ⚪ Frontend modularization if/when `index.html` interactivity outgrows hand-editing (ADR first).
 
 **Exit criteria:** the hub shows trends over time, not just current state.
