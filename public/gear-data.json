@@ -35,6 +35,19 @@
       { "name": "Amulet of fury", "ge": "Amulet of fury" },
       { "name": "Amulet of torture", "s": { "Hitpoints": 75 }, "note": "Zenyte; best melee neck", "ge": "Amulet of torture" }
     ]},
+    "Melee ring": { "style": "melee", "items": [
+      { "name": "Berserker ring", "note": "Imbue (i) at NMZ/Soul Wars for +stats", "ge": "Berserker ring" },
+      { "name": "Ring of suffering", "s": { "Hitpoints": 75 }, "note": "Zenyte; imbue (i) for the best defensive ring", "ge": "Ring of suffering" },
+      { "name": "Ultor ring", "q": ["Desert Treasure II - The Fallen Empire"], "note": "Vardorvis drop (DT2)", "ge": "Ultor ring" }
+    ]},
+    "Melee gloves": { "style": "melee", "items": [
+      { "name": "Barrows gloves", "q": ["Recipe for Disaster"], "note": "Untradeable — RFD reward" },
+      { "name": "Ferocious gloves", "s": { "Attack": 80, "Defence": 80 }, "q": ["Dragon Slayer II"], "note": "Untradeable — crafted in the DS2 vault" }
+    ]},
+    "Melee shield": { "style": "melee", "items": [
+      { "name": "Dragon defender", "s": { "Defence": 60 }, "note": "Untradeable — Warriors' Guild" },
+      { "name": "Avernic defender", "s": { "Attack": 70, "Defence": 70 }, "note": "Untradeable — Theatre of Blood" }
+    ]},
     "Ranged weapon": { "style": "ranged", "items": [
       { "name": "Rune crossbow", "s": { "Ranged": 61 }, "ge": "Rune crossbow" },
       { "name": "Dragon hunter crossbow", "s": { "Ranged": 65 }, "note": "Best vs dragons", "ge": "Dragon hunter crossbow" },
@@ -67,6 +80,19 @@
       { "name": "Amulet of fury", "ge": "Amulet of fury" },
       { "name": "Necklace of anguish", "s": { "Hitpoints": 75 }, "note": "Zenyte; best ranged neck", "ge": "Necklace of anguish" }
     ]},
+    "Ranged ring": { "style": "ranged", "items": [
+      { "name": "Archers ring", "note": "Imbue (i) for +stats", "ge": "Archers ring" },
+      { "name": "Ring of suffering", "s": { "Hitpoints": 75 }, "note": "Zenyte; defensive", "ge": "Ring of suffering" },
+      { "name": "Venator ring", "q": ["Desert Treasure II - The Fallen Empire"], "note": "Leviathan drop (DT2)", "ge": "Venator ring" }
+    ]},
+    "Ranged gloves": { "style": "ranged", "items": [
+      { "name": "Barrows gloves", "q": ["Recipe for Disaster"], "note": "Untradeable — RFD reward" },
+      { "name": "Zaryte vambraces", "s": { "Ranged": 80, "Defence": 45 }, "ge": "Zaryte vambraces" }
+    ]},
+    "Ranged shield": { "style": "ranged", "items": [
+      { "name": "Odium ward", "s": { "Defence": 60 }, "ge": "Odium ward" },
+      { "name": "Twisted buckler", "s": { "Ranged": 75, "Defence": 75 }, "ge": "Twisted buckler" }
+    ]},
     "Magic weapon": { "style": "magic", "items": [
       { "name": "Trident of the seas", "s": { "Magic": 75 }, "note": "Price = uncharged", "ge": "Uncharged trident" },
       { "name": "Trident of the swamp", "s": { "Magic": 75 }, "note": "Stronger trident; price = uncharged", "ge": "Uncharged toxic trident" },
@@ -97,6 +123,19 @@
     "Magic amulet": { "style": "magic", "items": [
       { "name": "Amulet of fury", "ge": "Amulet of fury" },
       { "name": "Occult necklace", "note": "Best magic-damage neck", "ge": "Occult necklace" }
+    ]},
+    "Magic ring": { "style": "magic", "items": [
+      { "name": "Seers ring", "note": "Imbue (i) for +stats", "ge": "Seers ring" },
+      { "name": "Ring of suffering", "s": { "Hitpoints": 75 }, "note": "Zenyte; defensive", "ge": "Ring of suffering" },
+      { "name": "Magus ring", "q": ["Desert Treasure II - The Fallen Empire"], "note": "Duke Sucellus drop (DT2)", "ge": "Magus ring" }
+    ]},
+    "Magic gloves": { "style": "magic", "items": [
+      { "name": "Barrows gloves", "q": ["Recipe for Disaster"], "note": "Untradeable — RFD reward" },
+      { "name": "Tormented bracelet", "s": { "Hitpoints": 75 }, "note": "Zenyte; magic damage", "ge": "Tormented bracelet" }
+    ]},
+    "Magic shield": { "style": "magic", "items": [
+      { "name": "Tome of fire", "s": { "Magic": 50 }, "note": "Needs burnt pages to use", "ge": "Tome of fire (empty)" },
+      { "name": "Arcane spirit shield", "s": { "Defence": 75, "Magic": 65, "Prayer": 70 }, "ge": "Arcane spirit shield" }
     ]}
   }
 }
