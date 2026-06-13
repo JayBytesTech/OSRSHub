@@ -115,7 +115,9 @@ and the dashboard recommends agreeable next actions.
   per-item owned checkbox → `gear_owned` table on the `/api/state` path): "next upgrade" is now the
   first un-owned rung above your current best (tagged 🎯 next, "current" on your best owned), and a
   new ranker tier suggests the cheapest next-rung item you can equip now but don't own — dropping out
-  once owned. Remaining: **more ladders/slots** (helm, legs, accessories, shields).
+  once owned. **Now covers the full armour set** — weapon, helm, body, legs, boots, and amulet
+  ladders per style (18 ladders, grouped by ⚔️/🏹/🔮 in the tab). Remaining: rings/gloves/shields,
+  and optionally style-aware prioritisation once bank value lands.
 - ⚪ Frontend modularization if/when `index.html` interactivity outgrows hand-editing (ADR first).
 
 **Exit criteria:** the hub shows trends over time, not just current state.
