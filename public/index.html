@@ -334,6 +334,12 @@ body {
 }
 .diary-toggle:hover { background: #e6d59f; }
 .diary-toggle.on { background: #d9ecc6; border-color: #8ab86a; color: #1d6b10; }
+.diary-goal-btn {
+  flex: none; font-size: 11px; line-height: 1; cursor: pointer; border-radius: 4px;
+  border: 1px solid #c0a85c; background: #efe4bf; padding: 2px 5px; filter: grayscale(1) opacity(.55);
+}
+.diary-goal-btn:hover { filter: none; background: #e6d59f; }
+.diary-goal-btn.on { filter: none; background: #fbeec4; border-color: #c8a32a; }
 .diary-gaps { margin: 4px 0 0 20px; }
 .diary-need-quests { margin: 3px 0 0 20px; font-size: 10.5px; color: #6a4a14; }
 .diary-need-quests a { color: #8a4a14; text-decoration: none; }
@@ -1466,6 +1472,17 @@ function getCompletedDiaryTasks() {
 function saveCompletedDiaryTasksLocal(t) {
   try { localStorage.setItem('osrs_nullyn_diarytasks', JSON.stringify(Array.isArray(t) ? t : [])); } catch {}
 }
+// Diary-tier goals: array of { region, tier } the player is working toward (F1.1). A diary
+// goal decomposes live into its missing skills + quests via diaryTierStatus + the quest engine.
+function getDiaryGoals() {
+  try { const v = JSON.parse(localStorage.getItem('osrs_nullyn_diarygoals') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function saveDiaryGoalsLocal(g) {
+  try { localStorage.setItem('osrs_nullyn_diarygoals', JSON.stringify(Array.isArray(g) ? g : [])); } catch {}
+}
+function isDiaryGoal(region, tier) {
+  return getDiaryGoals().some(d => d && d.region === region && d.tier === tier);
+}
 function diaryTaskDone(id) {
   return getCompletedDiaryTasks().includes(id);
 }
@@ -2015,6 +2032,7 @@ async function loadVaultState() {
     if (Array.isArray(data.presetGoals)) savePresetGoalsLocal(data.presetGoals);
     if (Array.isArray(data.diaries)) saveCompletedDiariesLocal(data.diaries);
     if (Array.isArray(data.diaryTasks)) saveCompletedDiaryTasksLocal(data.diaryTasks);
+    if (Array.isArray(data.diaryGoals)) saveDiaryGoalsLocal(data.diaryGoals);
     SYNC.available = true;
     setSyncBadge('ok', '\u2601 Synced to vault');
     renderQuests(); renderGoals(); populateGoalSelect(); populateQuestGoalDatalist(); renderDiaries(); renderDashboard(); recordAccountValue();
@@ -2031,7 +2049,7 @@ function scheduleVaultSave() {
   saveTimer = setTimeout(saveVaultState, 700);
 }
 async function saveVaultState() {
-  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals(), diaries: getCompletedDiaries(), diaryTasks: getCompletedDiaryTasks() };
+  const payload = { version: 1, updated: new Date().toISOString().slice(0,10), completed: getCompleted(), goals: getGoals(), questGoals: getQuestGoals(), presetGoals: getPresetGoals(), diaries: getCompletedDiaries(), diaryTasks: getCompletedDiaryTasks(), diaryGoals: getDiaryGoals() };
   try {
     const r = await fetch('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!r.ok) throw new Error('save ' + r.status);
@@ -2360,6 +2378,42 @@ function nextActions() {
     }
   }
 
+  // Tier 1c — diary-tier goals (goal-driven): the best next step toward each goaled tier —
+  // a startable quest in its requirement list (best by reward), else the nearest missing skill.
+  for (const dg of getDiaryGoals()) {
+    if (!dg || !dg.region || !dg.tier) continue;
+    const dst = diaryTierStatus(dg.region, dg.tier);
+    if (dst.state === 'done') continue;
+    const label = `${dg.region} ${dg.tier} diary`;
+    if (dst.state === 'ready') {
+      out.push({ icon: '📖', title: `Claim the ${label}`, reason: 'All requirements met',
+                 onclick: `switchTab('diaries');setDiaryFilter('ready')` });
+      continue;
+    }
+    const readyQuests = dst.missingQuests.filter(qn => questStatus(QUESTS.find(q => q.name === qn) || { name: qn }, completed).state === 'ready');
+    if (readyQuests.length) {
+      const pick = readyQuests.slice().sort(compareQuestValue)[0];
+      if (suggestedQuests.has(pick)) {
+        const row = out[suggestedQuests.get(pick)];
+        row._goals = (row._goals || []).concat(label);
+        row.reason = row.reason.replace(/toward .*/, `toward ${row._goals.join(' & ')}`);
+      } else {
+        const reward = REQS[pick] && REQS[pick].r ? ` · 🎁 ${REQS[pick].r}` : '';
+        suggestedQuests.set(pick, out.length);
+        out.push({ icon: '▶', title: `Start ${pick}`, reason: `Next step toward ${label}${reward}`,
+                   _goals: [label], _quest: pick, _canTrack: !getQuestGoals().includes(pick),
+                   onclick: `goToQuest('${pick.replace(/'/g, "\\'")}')` });
+      }
+    } else if (dst.missingSkills.length) {
+      const m = dst.missingSkills.slice().sort((a, b) => (a.need - a.have) - (b.need - b.have))[0];
+      out.push({ icon: '🔑', title: `Train ${m.skill} to ${m.need}`, reason: `Next step toward ${label}`,
+                 _skill: { skill: m.skill, target: m.need }, onclick: `switchTab('skills')`, _soft: true });
+    } else if (dst.missingCombat) {
+      out.push({ icon: '⚔️', title: `Raise Combat to ${dst.missingCombat.need}`, reason: `Next step toward ${label}`,
+                 onclick: `switchTab('skills')`, _soft: true });
+    }
+  }
+
   // Tier 2 — skill goals (goal-driven), closest to done first.
   const skillRows = [];
   for (const g of getGoals()) {
@@ -2415,7 +2469,7 @@ function nextActions() {
   if (diaryAction) out.push(diaryAction);
 
   const trimmed = out.slice(0, MAX);
-  const noGoals = !getQuestGoals().length && !getGoals().length && !getPresetGoals().length;
+  const noGoals = !getQuestGoals().length && !getGoals().length && !getPresetGoals().length && !getDiaryGoals().length;
   return { actions: trimmed, prompt: noGoals ? 'Set a skill or quest goal for tailored quest suggestions.' : null };
 }
 
@@ -2469,8 +2523,9 @@ function renderDashboard() {
 
   const questGoals = getQuestGoals();
   const presetGoals = getPresetGoals();
+  const diaryGoals = getDiaryGoals();
   let goalsHtml;
-  if (!goals.length && !questGoals.length && !presetGoals.length) {
+  if (!goals.length && !questGoals.length && !presetGoals.length && !diaryGoals.length) {
     goalsHtml = `<div class="no-goals">No goals yet — <a class="dash-link" style="margin:0" href="#" onclick="switchTab('goals');return false;">add one</a> to track progress.</div>`;
   } else {
     const skillHtml = goals.map(g => {
@@ -2508,7 +2563,25 @@ function renderDashboard() {
         <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${cs.pct}%"></div></div>
       </div>`;
     }
-    goalsHtml = skillHtml + questHtml + presetHtml;
+    const diaryHtml = diaryGoals.map(d => {
+      if (!d || !d.region || !d.tier) return '';
+      const dn = `${d.region} ${d.tier}`;
+      if (diaryDone(d.region, d.tier)) {
+        return `<div class="dash-goal">
+          <div class="dash-goal-top"><span>📖 ${dn}</span><span class="dash-goal-lvl">✓ done</span></div>
+          <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:100%"></div></div>
+        </div>`;
+      }
+      const st = diaryTierStatus(d.region, d.tier), e = st.entry || {};
+      const total = (e.s ? Object.keys(e.s).length : 0) + (e.cb ? 1 : 0) + (e.q ? e.q.length : 0);
+      const missing = st.missingSkills.length + (st.missingCombat ? 1 : 0) + st.missingQuests.length;
+      const pct = total ? Math.round(((total - missing) / total) * 100) : 100;
+      return `<div class="dash-goal">
+        <div class="dash-goal-top"><span>📖 ${dn}</span><span class="dash-goal-lvl">${missing} req${missing === 1 ? '' : 's'} left · ${pct}%</span></div>
+        <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('');
+    goalsHtml = skillHtml + questHtml + diaryHtml + presetHtml;
   }
 
   const next = nextActions();
@@ -2930,6 +3003,19 @@ function toggleDiary(region, tier) {
   renderDashboard();
 }
 
+// Add/remove a diary tier as a goal (F1.1). It then decomposes in the Goals tab and drives
+// the dashboard "what to do next" ranker, like quest goals.
+function toggleDiaryGoal(region, tier) {
+  const list = getDiaryGoals();
+  const i = list.findIndex(d => d && d.region === region && d.tier === tier);
+  if (i >= 0) list.splice(i, 1); else list.push({ region, tier });
+  saveDiaryGoalsLocal(list);
+  scheduleVaultSave();
+  renderDiaries();
+  renderGoals();
+  renderDashboard();
+}
+
 // The requirement-gap line for a locked tier (reuses the quest tree's chip styling).
 function diaryGapsHTML(st) {
   const bits = [];
@@ -3054,6 +3140,7 @@ function renderDiaries() {
             <span class="diary-tier-name">${tier}</span>
             <span class="diary-reward">${entry.reward || ''}</span>
             ${progCtl}
+            ${isDone ? '' : `<button class="diary-goal-btn${isDiaryGoal(region, tier) ? ' on' : ''}" onclick="toggleDiaryGoal('${rEsc}','${tier}')" title="${isDiaryGoal(region, tier) ? 'Remove from goals' : 'Set as a goal'}">🎯</button>`}
             <button class="diary-toggle${isDone ? ' on' : ''}" onclick="toggleDiary('${rEsc}','${tier}')">${isDone ? '✓ Done' : 'Mark done'}</button>
           </div>
           ${gaps}${note}${tasklist}
@@ -3585,13 +3672,72 @@ function questCapeCard() {
   return card;
 }
 
+// A diary-tier goal (F1.1) decomposes into its missing skills (with time-to-go) + missing
+// quests (each startable-now or locked), via diaryTierStatus + the quest engine. Live.
+function diaryGoalCard(region, tier, completed) {
+  const card = document.createElement('div');
+  card.className = 'goal-card diary-goal-card';
+  const rEsc = region.replace(/'/g, "\\'");
+  const del = `<button class="goal-delete" onclick="toggleDiaryGoal('${rEsc}','${tier}')" title="Remove goal">✕</button>`;
+  const reward = (DIARY_DATA[region] && DIARY_DATA[region][tier] && DIARY_DATA[region][tier].reward) || '';
+
+  if (diaryDone(region, tier)) {
+    card.innerHTML = `
+      <div class="goal-header"><span class="goal-emoji">📖</span>
+        <span class="goal-skill-name">${region} ${tier} diary</span>
+        <span class="goal-levels done">✓ Claimed</span>${del}</div>
+      <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:100%"></div></div>
+      <div class="goal-xp-info"><span>Diary complete</span><span>100%</span></div>`;
+    return card;
+  }
+
+  const st = diaryTierStatus(region, tier);
+  const entry = st.entry || {};
+  const totalReqs = (entry.s ? Object.keys(entry.s).length : 0) + (entry.cb ? 1 : 0) + (entry.q ? entry.q.length : 0);
+  const missingCount = st.missingSkills.length + (st.missingCombat ? 1 : 0) + st.missingQuests.length;
+  const met = Math.max(0, totalReqs - missingCount);
+  const pct = totalReqs ? Math.round((met / totalReqs) * 100) : 100;
+
+  // Missing skills, with time-to-go via the best unlocked method (reuses the XP planner).
+  const skillRows = st.missingSkills.map(m => {
+    const curXP = STATS[m.skill] ? STATS[m.skill][2] : 0;
+    const bm = bestMethod(m.skill, m.have);
+    const eta = bm ? ` · ~${fmtHours(Math.max(0, xpForLevel(m.need) - curXP) / bm.xphr)}` : '';
+    return `<div class="rt-node rt-locked"><span class="rt-icon">✗</span> ${SKILL_EMOJIS[m.skill] || ''} ${m.skill} <span class="rt-need">${m.have} → ${m.need}${eta}</span></div>`;
+  }).join('');
+  const combatRow = st.missingCombat
+    ? `<div class="rt-node rt-locked"><span class="rt-icon">✗</span> ⚔️ Combat <span class="rt-need">${st.missingCombat.have} → ${st.missingCombat.need}</span></div>` : '';
+  // Missing quests, each marked startable-now (○) or blocked (✗); click to jump to it.
+  const questRows = st.missingQuests.map(qn => {
+    const qs = questStatus(QUESTS.find(q => q.name === qn) || { name: qn }, completed);
+    const ready = qs.state === 'ready';
+    return `<div class="rt-node rt-${ready ? 'ready' : 'locked'}"><span class="rt-icon">${ready ? '○' : '✗'}</span> <a href="#" onclick="goToQuest('${qn.replace(/'/g, "\\'")}');return false;">${qn}</a>${ready ? '' : `<span class="rt-need">${qs.missing.join(', ')}</span>`}</div>`;
+  }).join('');
+
+  const body = st.state === 'ready'
+    ? `<div class="rt-summary done">✓ All requirements met — claim it in-game.</div>`
+    : `${skillRows ? `<div class="rt-tree-label">Skills to train</div>${skillRows}` : ''}
+       ${combatRow}
+       ${questRows ? `<div class="rt-tree-label">Quests to finish</div>${questRows}` : ''}`;
+
+  card.innerHTML = `
+    <div class="goal-header"><span class="goal-emoji">📖</span>
+      <span class="goal-skill-name">${region} ${tier} diary</span>
+      <span class="goal-levels">${missingCount} requirement${missingCount === 1 ? '' : 's'} left</span>${del}</div>
+    <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div>
+    <div class="goal-xp-info"><span>${met} / ${totalReqs} met${reward ? ' · 🎁 ' + reward.split(' — ')[0] : ''}</span><span>${pct}%</span></div>
+    <div class="quest-tree">${body}</div>`;
+  return card;
+}
+
 function renderGoals() {
   const goals = getGoals();
   const questGoals = getQuestGoals();
   const presetGoals = getPresetGoals();
+  const diaryGoals = getDiaryGoals();
   const list = document.getElementById('goals-list');
   refreshPresetButtons();
-  if (!goals.length && !questGoals.length && !presetGoals.length) {
+  if (!goals.length && !questGoals.length && !presetGoals.length && !diaryGoals.length) {
     list.innerHTML = '<div class="no-goals">No goals yet — add a skill, quest, or preset goal above to track your progress.</div>';
     return;
   }
@@ -3627,6 +3773,7 @@ function renderGoals() {
 
   const completed = getCompleted();
   questGoals.forEach(name => list.appendChild(questGoalCard(name, completed)));
+  diaryGoals.forEach(d => { if (d && d.region && d.tier) list.appendChild(diaryGoalCard(d.region, d.tier, completed)); });
   if (presetGoals.includes('quest_cape')) list.appendChild(questCapeCard());
 }
 
@@ -3831,7 +3978,7 @@ async function switchAccount(id) {
     // localStorage is a single shared cache of the *previously loaded* account; clear the
     // account-scoped keys so the new account loads from server truth and old data can't bleed across.
     ['osrs_nullyn_completed','osrs_nullyn_goals','osrs_nullyn_questgoals','osrs_nullyn_presetgoals',
-     'osrs_nullyn_diaries','osrs_nullyn_diarytasks','osrs_nullyn_checklist','osrs_nullyn_lastsnap'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
+     'osrs_nullyn_diaries','osrs_nullyn_diarytasks','osrs_nullyn_diarygoals','osrs_nullyn_checklist','osrs_nullyn_lastsnap'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
     window.location.reload();          // every view is account-scoped — re-init the whole app
   } catch (e) {
     const status = document.getElementById('add-status');

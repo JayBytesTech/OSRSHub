@@ -49,12 +49,18 @@ account record; no feature code assumes a single global player.
 
 ---
 
-## Phase 3 — Differentiators (why this hub is unique)  ⚪
+## Phase 3 — Differentiators (why this hub is unique)  🟢
 *The features that make it an assistant, not a tracker.*
 
-- 🟡 **F1.1** Goal system with auto-prerequisites (goals decompose into live requirement trees).
-  Quest goals + the Quest Cape preset already decompose via the F1.2 engine; broad goal types
-  (diary tiers, skill targets as trees) still pending.
+- 🟢 **F1.1** Goal system with auto-prerequisites (goals decompose into live requirement trees).
+  Every goal type now decomposes: **quest goals** + the **Quest Cape** preset via the F1.2 engine
+  (full transitive requirement tree); **skill goals** into XP-remaining + time-to-go per method
+  (the XP planner); and **diary-tier goals** (new) into their missing skills (with ETA) + missing
+  quests (each startable-now or blocked), via `diaryTierStatus` + the quest engine. Set a diary
+  goal with the 🎯 toggle on any Diaries tier; it shows a decomposition card in Goals, a row in the
+  dashboard Active-Goals peek, and drives the "what to do next" ranker (best startable quest in the
+  tier, else the nearest missing skill). Persisted via a new `diary_goals` table on the `/api/state`
+  path. Exit criteria met: adding a high-level goal yields an accurate outstanding-requirements list.
 - 🟡 **F1.2** Quest **dependency graph** (recursive, "can I start now?") — **engine + full dataset live.**
   `buildRequirementTree`/`outstandingFor` expand the whole transitive prerequisite tree (cycle-guarded,
   diamond-deduped) with an ordered to-do list and aggregated skill summary. The prerequisite dataset
