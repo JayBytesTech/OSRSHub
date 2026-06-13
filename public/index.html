@@ -213,6 +213,24 @@ body {
 }
 .filter-btn.active { background: #8b6914; color: #faf4e4; border-color: #5c3c08; }
 .filter-btn:hover:not(.active) { background: #d4c080; }
+.sort-btn { background: #e7dcf2; border-color: #8f6fc0; color: #3b2363; }
+.sort-btn.active { background: #5a3a8a; color: #faf4e4; border-color: #3b2363; }
+.sort-btn:hover:not(.active) { background: #d6c4ee; }
+/* Optimal quest order */
+.order-badge { font-size: 10px; font-weight: 700; color: #5a3a8a; background: #ece2f7; border: 1px solid #c3aee2;
+  border-radius: 3px; padding: 1px 5px; flex-shrink: 0; min-width: 26px; text-align: center; }
+.order-badge.unseq { color: #9a8a70; background: #f0ead9; border-color: #d4c080; }
+.optimal-next { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 9px 12px; margin-bottom: 8px;
+  border-radius: 6px; background: #efe7f8; border: 1px solid #c3aee2; border-left: 4px solid #8f6fc0; }
+.optimal-next.ready { background: #e8f3df; border-color: #9fc888; border-left-color: #4a9c2a; }
+.optimal-next-tag { font-size: 11px; font-weight: 700; color: #5a3a8a; }
+.optimal-next.ready .optimal-next-tag { color: #2e6614; }
+.optimal-next-name { font-weight: 700; }
+.optimal-next-pos { font-size: 11px; color: #6a5a40; background: #fff7e6; border: 1px solid #d4c080; border-radius: 3px; padding: 1px 6px; }
+.optimal-next-sub { font-size: 12px; color: #6a5230; }
+.optimal-next-do { margin-left: auto; padding: 3px 10px; border: 1px solid #4a9c2a; border-radius: 4px;
+  background: #5cb830; color: #fff; cursor: pointer; font-size: 12px; font-weight: 600; }
+.optimal-next-do:hover { background: #4a9c2a; }
 .qp-badge {
   background: #2e6614;
   color: white;
@@ -835,6 +853,7 @@ body {
     <button class="filter-btn"        id="filter-f2p"        onclick="setFilter('f2p')">F2P</button>
     <button class="filter-btn"        id="filter-p2p"        onclick="setFilter('p2p')">P2P</button>
     <button class="filter-btn"        id="filter-mini"       onclick="setFilter('mini')">Mini</button>
+    <button class="filter-btn sort-btn" id="sort-optimal"    onclick="toggleOptimalSort()" title="Sort by the OSRS Wiki Optimal quest guide order">🧭 Optimal order</button>
     <span class="qp-badge" id="qp-counter">0 QP</span>
   </div>
   <div class="quest-disclaimer">🟢 Ready · 🟠 Locked (missing reqs shown) · ⚪ Reqs not listed — verify on the wiki (quest names link out). Many skill reqs are <b>boostable</b>, so you may start earlier than shown.</div>
@@ -1374,6 +1393,33 @@ async function loadQuestData() {
   if (document.getElementById('quest-list')) renderQuests();
   if (document.getElementById('goals-list')) renderGoals();
   if (document.getElementById('dash-body')) renderDashboard();
+}
+
+// ── OPTIMAL QUEST ORDER ──────────────────────────────────────────────────────────
+// Baseline recommended quest sequence from the OSRS Wiki "Optimal quest guide"
+// (public/quest-order.json). QUEST_ORDER maps a master-list quest name → its position
+// (0-based) in the recommended order; QUEST_UNSEQ holds quests the guide doesn't
+// sequence (miniquests/activities). Used by the Quests tab "Optimal order" mode and the
+// "next in your optimal path" banner. Names are pre-reconciled to the master list, and
+// RFD subquests are collapsed to a single "Recipe for Disaster" entry in the dataset.
+let QUEST_ORDER = new Map();   // name → optimal index
+let QUEST_UNSEQ = new Set();   // names with no optimal-guide position
+let QUEST_ORDER_LEN = 0;       // count of sequenced quests (for "#n of N")
+
+async function loadQuestOrder() {
+  try {
+    const r = await fetch('/quest-order.json', { cache: 'no-cache' });
+    if (!r.ok) throw new Error('quest-order ' + r.status);
+    const data = await r.json();
+    const order = Array.isArray(data && data.order) ? data.order : [];
+    QUEST_ORDER = new Map(order.map((n, i) => [n, i]));
+    QUEST_ORDER_LEN = order.length;
+    QUEST_UNSEQ = new Set(Array.isArray(data && data.unsequenced) ? data.unsequenced : []);
+  } catch (e) {
+    console.warn('Could not load quest-order.json — Optimal order unavailable.', e);
+    QUEST_ORDER = new Map(); QUEST_UNSEQ = new Set(); QUEST_ORDER_LEN = 0;
+  }
+  if (questSort === 'optimal' && document.getElementById('quest-list')) renderQuests();
 }
 
 // ── ACHIEVEMENT DIARIES (F2.3) ──────────────────────────────────────────────────
@@ -3081,11 +3127,18 @@ function outstandingFor(name, completed) {
 }
 
 let questFilter = 'all';
+let questSort = 'default';   // 'default' | 'optimal' (OSRS Wiki optimal quest guide order)
 
 function setFilter(f) {
   questFilter = f;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.quest-controls .filter-btn:not(.sort-btn)').forEach(b => b.classList.remove('active'));
   document.getElementById('filter-'+f).classList.add('active');
+  renderQuests();
+}
+
+function toggleOptimalSort() {
+  questSort = questSort === 'optimal' ? 'default' : 'optimal';
+  document.getElementById('sort-optimal').classList.toggle('active', questSort === 'optimal');
   renderQuests();
 }
 
@@ -3392,11 +3445,52 @@ function renderQuests() {
   const earnedQP = QUESTS.filter(q => completed[q.name]).reduce((s,q) => s+q.qp, 0);
   document.getElementById('qp-counter').textContent = `${earnedQP} / ${TOTAL_QP} QP`;
 
+  // Optimal-order mode: sort by the wiki guide index (sequenced first, in order; quests the
+  // guide doesn't sequence sink to the bottom, kept in their existing relative order).
+  if (questSort === 'optimal') {
+    filtered.sort((a, b) => {
+      const ia = QUEST_ORDER.has(a.name) ? QUEST_ORDER.get(a.name) : Infinity;
+      const ib = QUEST_ORDER.has(b.name) ? QUEST_ORDER.get(b.name) : Infinity;
+      return ia - ib;
+    });
+  }
+
   const list = document.getElementById('quest-list');
   list.innerHTML = '';
 
+  // "Next in your optimal path": first incomplete sequenced quest in guide order.
+  if (questSort === 'optimal' && QUEST_ORDER_LEN) {
+    let nextName = null, nextIdx = Infinity;
+    QUESTS.forEach(q => {
+      if (completed[q.name] || !QUEST_ORDER.has(q.name)) return;
+      const i = QUEST_ORDER.get(q.name);
+      if (i < nextIdx) { nextIdx = i; nextName = q.name; }
+    });
+    if (nextName) {
+      const st = questStatus(QUESTS.find(q => q.name === nextName) || { name: nextName }, completed);
+      const ready = st.state === 'ready';
+      const sub = ready ? 'Ready to start now' :
+        (st.state === 'locked' ? `Locked — needs: ${st.missing.join(', ')}` : 'Requirements not listed — check wiki');
+      const esc = nextName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const banner = document.createElement('div');
+      banner.className = 'optimal-next' + (ready ? ' ready' : '');
+      banner.innerHTML = `
+        <span class="optimal-next-tag">🧭 Next in your optimal path</span>
+        <span class="optimal-next-name"><a href="${wikiUrl(nextName)}" target="_blank" rel="noopener">${nextName}</a></span>
+        <span class="optimal-next-pos">#${nextIdx + 1} of ${QUEST_ORDER_LEN}</span>
+        <span class="optimal-next-sub">${sub}</span>
+        ${ready ? `<button class="optimal-next-do" onclick="toggleQuest('${esc}',true)">✓ Mark done</button>` : ''}`;
+      list.appendChild(banner);
+    } else {
+      const banner = document.createElement('div');
+      banner.className = 'optimal-next ready';
+      banner.innerHTML = '<span class="optimal-next-tag">🧭 Optimal path</span><span class="optimal-next-sub">Every sequenced quest is complete — nice. 🎉</span>';
+      list.appendChild(banner);
+    }
+  }
+
   if (!filtered.length) {
-    list.innerHTML = '<div style="color:#8a6830;font-style:italic;padding:8px;">No quests match your filter.</div>';
+    list.insertAdjacentHTML('beforeend', '<div style="color:#8a6830;font-style:italic;padding:8px;">No quests match your filter.</div>');
     return;
   }
 
@@ -3405,6 +3499,13 @@ function renderQuests() {
     const done = st.state === 'done';
     const escapedName = q.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     const req = REQS[q.name];
+
+    let orderBadge = '';
+    if (questSort === 'optimal') {
+      orderBadge = QUEST_ORDER.has(q.name)
+        ? `<span class="order-badge" title="Optimal quest guide position">#${QUEST_ORDER.get(q.name) + 1}</span>`
+        : `<span class="order-badge unseq" title="Not sequenced by the optimal quest guide">—</span>`;
+    }
 
     let chip = '';
     if (done) chip = '<span class="status-chip done">✓ Done</span>';
@@ -3428,6 +3529,7 @@ function renderQuests() {
       <input type="checkbox" ${done?'checked':''} onchange="toggleQuest('${escapedName}',this.checked)">
       <div class="quest-main">
         <div class="quest-row1">
+          ${orderBadge}
           <span class="quest-name"><a href="${wikiUrl(q.name)}" target="_blank" rel="noopener">${q.name}</a></span>
           <span class="qtype-badge qtype-${q.type}">${q.type==='mini'?'Mini':q.type.toUpperCase()}</span>
           ${chip}
@@ -4456,6 +4558,7 @@ renderGains();
 loadSavedAI();
 commitSnapshot();            // record current levels for next-visit gain detection
 loadQuestData();             // async: pull structured quest requirement data, then re-render
+loadQuestOrder();            // async: pull the OSRS Wiki optimal quest order (Quests tab "Optimal order")
 loadXpMethods();             // async: pull XP/hr-per-method data for time-to-goal estimates
 loadDiaryData();             // async: pull achievement-diary requirement data (Diary tab + tile)
 loadGearData();              // async: pull gear progression ladders (Gear tab; prices load on open)

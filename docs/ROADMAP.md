@@ -75,6 +75,12 @@ account record; no feature code assumes a single global player.
   **excluded unreleased/future quests** (The Blood Moon Rises, The Graveyard, Fallen From Grace), and
   fixed name/skill-key bugs (Vampyre Slayer, The Hand in the Sand, Runecraft→Runecrafting) that were
   silently breaking gates. Non-quest **unlocks** (items, area access, skill unlocks) still pending.
+  **Optimal quest order (baseline) live** — a 🧭 "Optimal order" toggle on the Quests tab re-sorts the
+  log into the **OSRS Wiki Optimal quest guide** sequence (`public/quest-order.json`, scraped from the
+  guide's `data-rowid` order via the MediaWiki API: 193 of the 205 master-list quests sequenced; RFD
+  subquests collapsed to one entry at its final step; 12 miniquests the guide doesn't sequence sink to
+  the bottom). Each row gets a `#n` position badge, and a **"Next in your optimal path"** banner surfaces
+  the first incomplete quest in guide order with its live ready/locked gating and a one-click ✓ Mark done.
 - 🟢 **F1.3** "What should I do next?" engine — ranked, prerequisite-aware suggestions on the dashboard.
   **Live** as the "🧭 What to do next" panel: `nextActions()` ranks across tiers — quest-goal next
   steps, Quest Cape, skill goals, **goal-independent opportunity quests**, a **high-leverage
