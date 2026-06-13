@@ -108,16 +108,17 @@ and the dashboard recommends agreeable next actions.
   can't verify are surfaced as notes rather than false-locking gates.
 - 🟢 **F2.4** Daily/weekly checklist with reset timers.
 - 🟢 **F2.5** Account Value score, trended over time.
-- 🟡 **F2.6** Gear & upgrade path — **v1 + v2 live.** A Gear tab with curated progression ladders
-  (`public/gear-data.json`: melee/ranged/magic weapons + body armor) where each item is gated
-  ready/locked against live stats + completed quests (`gearStatus` reuses the quest/diary engine)
-  and priced via `GET /api/prices` (reuses the GE machinery). **v2 adds ownership tracking** (a
-  per-item owned checkbox → `gear_owned` table on the `/api/state` path): "next upgrade" is now the
-  first un-owned rung above your current best (tagged 🎯 next, "current" on your best owned), and a
-  new ranker tier suggests the cheapest next-rung item you can equip now but don't own — dropping out
-  once owned. **Now covers the full armour set** — weapon, helm, body, legs, boots, and amulet
-  ladders per style (18 ladders, grouped by ⚔️/🏹/🔮 in the tab). Remaining: rings/gloves/shields,
-  and optionally style-aware prioritisation once bank value lands.
+- 🟢 **F2.6** Gear & upgrade path. A Gear tab with curated progression ladders
+  (`public/gear-data.json`) where each item is gated ready/locked against live stats + completed
+  quests (`gearStatus` reuses the quest/diary engine) and priced via `GET /api/prices` (reuses the GE
+  machinery). **Ownership tracking** (a per-item owned checkbox → `gear_owned` table on the
+  `/api/state` path) makes "next upgrade" the first un-owned rung above your current best (tagged 🎯
+  next, "current" on your best owned), and a ranker tier suggests the cheapest next-rung item you can
+  equip now but don't own — dropping out once owned. **Covers every equipment slot** — weapon, helm,
+  body, legs, boots, amulet, ring, gloves, shield, and cape per style, plus ranged ammo (**31 ladders
+  / 88 items**, grouped by ⚔️/🏹/🔮). Endgame reqs wiki-verified. Optional future: **style-aware
+  prioritisation** (lead with your main style) and "next *affordable* upgrade" once bank value lands
+  from the custom plugin.
 - ⚪ Frontend modularization if/when `index.html` interactivity outgrows hand-editing (ADR first).
 
 **Exit criteria:** the hub shows trends over time, not just current state.
