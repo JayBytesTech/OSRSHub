@@ -484,6 +484,11 @@ body {
 .preset-btn:hover { background: #3a7a1c; }
 .preset-btn.added { background: #8a9a78; cursor: default; }
 .preset-btn:disabled { opacity: .85; }
+.template-form { padding-top: 4px; align-items: center; }
+.goal-templates { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.template-btn { background: #5a3a8a; }
+.template-btn:hover { background: #6c49a3; }
+.goal-template-msg { font-size: 12px; color: #2e6614; margin-left: 8px; }
 .goals-list { display: flex; flex-direction: column; gap: 10px; }
 .goal-card {
   background: #f0e4c8;
@@ -907,6 +912,11 @@ body {
     <div class="add-goal-form preset-form">
       <label>Presets</label>
       <button class="add-goal-btn preset-btn" id="preset-quest_cape" onclick="addPresetGoal('quest_cape')">🧢 + Quest Cape</button>
+    </div>
+    <div class="add-goal-form template-form">
+      <label title="One click adds a curated bundle of skill/quest/diary goals that then decompose normally">Templates</label>
+      <span id="goal-templates" class="goal-templates"></span>
+      <span id="goal-template-msg" class="goal-template-msg"></span>
     </div>
     <div class="goals-list" id="goals-list"></div>
   </div>
@@ -3836,6 +3846,79 @@ function refreshPresetButtons() {
   btn.textContent = active ? '🧢 Quest Cape added' : '🧢 + Quest Cape';
 }
 
+// ── GOAL TEMPLATES (F1.1) ─────────────────────────────────────────────────────────
+// One-click bundles that expand into the existing goal types (skill / quest / diary),
+// which then decompose + drive the ranker normally. Curated; purely additive — applying
+// one just adds its component goals (skipping any already met or already tracked).
+const GOAL_TEMPLATES = [
+  { id: 'barrows_gloves', emoji: '🥊', label: 'Barrows gloves', desc: 'Recipe for Disaster — unlocks the best all-round gloves', quests: ['Recipe for Disaster'] },
+  { id: 'fire_cape', emoji: '🔥', label: 'Fire cape', desc: 'Stat prep for the Fight Caves (guideline)', skills: { Ranged: 70, Defence: 60, Prayer: 43, Hitpoints: 60 } },
+  { id: 'base70', emoji: '💪', label: 'Base 70 combat', desc: 'All combat skills to 70', skills: { Attack: 70, Strength: 70, Defence: 70, Hitpoints: 70, Ranged: 70, Magic: 70, Prayer: 70 } },
+  { id: 'base90', emoji: '🏆', label: 'Base 90 combat', desc: 'All combat skills to 90', skills: { Attack: 90, Strength: 90, Defence: 90, Hitpoints: 90, Ranged: 90, Magic: 90, Prayer: 90 } },
+  { id: 'hard_diaries', emoji: '📖', label: 'All Hard diaries', desc: "Every region's Hard tier", diariesTier: 'Hard' },
+  { id: 'sote', emoji: '🧝', label: 'Song of the Elves', desc: 'Grandmaster quest — decomposes the whole elf chain', quests: ['Song of the Elves'] },
+];
+
+function renderGoalTemplates() {
+  const box = document.getElementById('goal-templates');
+  if (!box) return;
+  box.innerHTML = GOAL_TEMPLATES.map(t =>
+    `<button class="add-goal-btn template-btn" title="${t.desc.replace(/"/g, '&quot;')}" onclick="applyGoalTemplate('${t.id}')">${t.emoji} ${t.label}</button>`
+  ).join('');
+}
+
+// Apply a template: add its skill/quest/diary goals, skipping anything already met or tracked.
+function applyGoalTemplate(id) {
+  const t = GOAL_TEMPLATES.find(x => x.id === id);
+  if (!t) return;
+  const completed = getCompleted();
+  let added = 0, skipped = 0;
+
+  if (t.skills) {
+    const goals = getGoals();
+    for (const sk in t.skills) {
+      const target = t.skills[sk];
+      const cur = STATS[sk] ? STATS[sk][1] : 1;
+      if (cur >= target) { skipped++; continue; }
+      const i = goals.findIndex(g => g.skill === sk);
+      if (i >= 0) { if (goals[i].target >= target) { skipped++; continue; } goals[i].target = target; }
+      else goals.push({ skill: sk, target });
+      added++;
+    }
+    saveGoalsLocal(goals);
+  }
+  if (t.quests) {
+    const qg = getQuestGoals();
+    for (const q of t.quests) {
+      if (completed[q] || qg.includes(q)) { skipped++; continue; }
+      qg.push(q); added++;
+    }
+    saveQuestGoalsLocal(qg);
+  }
+  if (t.diariesTier || t.diaries) {
+    const dg = getDiaryGoals();
+    const targets = t.diaries
+      ? t.diaries
+      : Object.keys(DIARY_DATA || {}).filter(r => (DIARY_DATA[r] || {})[t.diariesTier]).map(r => ({ region: r, tier: t.diariesTier }));
+    for (const d of targets) {
+      if (diaryDone(d.region, d.tier) || dg.some(x => x.region === d.region && x.tier === d.tier)) { skipped++; continue; }
+      dg.push({ region: d.region, tier: d.tier }); added++;
+    }
+    saveDiaryGoalsLocal(dg);
+  }
+
+  renderGoals(); populateGoalSelect(); populateQuestGoalDatalist(); renderDashboard();
+  if (added) scheduleVaultSave();
+  const msg = document.getElementById('goal-template-msg');
+  if (msg) {
+    msg.textContent = added
+      ? `✓ ${t.label}: added ${added} goal${added === 1 ? '' : 's'}${skipped ? `, ${skipped} already met/tracked` : ''}.`
+      : `${t.label}: nothing to add — all ${skipped} already met or tracked.`;
+    clearTimeout(renderGoalTemplates._t);
+    renderGoalTemplates._t = setTimeout(() => { if (msg) msg.textContent = ''; }, 6000);
+  }
+}
+
 function questCapeCard() {
   const completed = getCompleted();
   const s = questCapeStatus(completed);
@@ -4367,6 +4450,7 @@ renderGoals();
 renderDashboard();
 populateGoalSelect();
 populateQuestGoalDatalist();
+renderGoalTemplates();
 populateChartSelect();
 renderGains();
 loadSavedAI();
