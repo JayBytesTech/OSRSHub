@@ -60,7 +60,10 @@ account record; no feature code assumes a single global player.
   goal with the 🎯 toggle on any Diaries tier; it shows a decomposition card in Goals, a row in the
   dashboard Active-Goals peek, and drives the "what to do next" ranker (best startable quest in the
   tier, else the nearest missing skill). Persisted via a new `diary_goals` table on the `/api/state`
-  path. Exit criteria met: adding a high-level goal yields an accurate outstanding-requirements list.
+  path. **Goal templates** (a Templates row in the Goals tab) one-click-expand curated bundles into
+  these goal types — Barrows gloves, Fire cape, Base 70/90 combat, All Hard diaries, Song of the
+  Elves — skipping anything already met/tracked. Exit criteria met: adding a high-level goal yields
+  an accurate outstanding-requirements list.
 - 🟡 **F1.2** Quest **dependency graph** (recursive, "can I start now?") — **engine + full dataset live.**
   `buildRequirementTree`/`outstandingFor` expand the whole transitive prerequisite tree (cycle-guarded,
   diamond-deduped) with an ordered to-do list and aggregated skill summary. The prerequisite dataset
