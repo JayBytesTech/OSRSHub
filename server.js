@@ -117,6 +117,16 @@ const sumLootValue = (items) =>
 
 // Map a Dink payload → array of { type, summary, data }. Unknown event types fall
 // through to a generic 'other' row so nothing is silently dropped.
+// Dink fires a QUEST event for each Recipe for Disaster SUBQUEST (e.g. "Recipe for Disaster -
+// Mountain Dwarf"). The hub tracks RFD atomically as the single quest "Recipe for Disaster", so
+// auto-ticking a subquest name just creates an orphan quest_completions row that never counts toward
+// QP and never displays. We still STORE the event (it carries the running QP total used for the
+// quest-point reconciliation banner) — we just don't auto-tick subquest names. The bare
+// "Recipe for Disaster" (the master-list quest) passes through normally.
+function isAutoTickableQuest(name) {
+  return !/^Recipe for Disaster\s*[-–—:]/.test(String(name || ''));
+}
+
 function normalizeDinkEvent(payload) {
   const p = payload || {};
   const extra = p.extra || {};
@@ -233,7 +243,7 @@ app.post('/api/ingest', ingestUpload.any(), (req, res) => {
     const normalized = normalizeDinkEvent(payload);
     let stored = 0, questsTicked = 0, diariesTicked = 0;
     for (const ev of normalized) {
-      if (ev.type === 'quest' && ev.data && ev.data.questName) {
+      if (ev.type === 'quest' && ev.data && ev.data.questName && isAutoTickableQuest(ev.data.questName)) {
         if (state.addQuestCompletion(account.id, ev.data.questName)) questsTicked++;
       }
       if (ev.type === 'diary' && ev.data && ev.data.region && ev.data.tier) {
