@@ -187,6 +187,8 @@ body {
 .skill-emoji { font-size: 20px; line-height: 1; flex-shrink: 0; }
 .sicon { vertical-align: middle; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
 .sicon-emoji { display: inline-block; }
+.iicon { vertical-align: middle; flex: none; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
+.money-name .iicon { margin-right: 2px; }
 .skill-info { flex: 1; min-width: 0; }
 .skill-name { font-size: 10px; color: #6a4a14; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
 .skill-level { font-size: 24px; font-weight: bold; color: #1a0a00; line-height: 1.1; }
@@ -1205,6 +1207,21 @@ html[data-theme="dark"] body { background:#0f1115; color:#e7e5df; }
 html[data-theme="dark"] .layout { background:#0f1115; }
 html[data-theme="dark"] .content { background:#14161b; color:#e7e5df; }
 
+
+/* ===== CHROME DARK OVERRIDE: slate header + sidebar (replace authored brown) ===== */
+html[data-theme="dark"] .header { background: linear-gradient(180deg,#1b1e25 0%,#13151a 100%); border-bottom-color:#2c313b; }
+html[data-theme="dark"] .sidebar { background:#13151a; border-right-color:#2c313b; }
+html[data-theme="dark"] .sidebar-toggle { background:#1b1e25; color:#e8c870; border-bottom-color:#2c313b; }
+html[data-theme="dark"] .sidebar-toggle:hover { background:#232732; color:#ffd27a; }
+html[data-theme="dark"] .nav-item { color:#aab0bb; }
+html[data-theme="dark"] .nav-item:hover:not(.active) { background:#1f232c; color:#f0c060; }
+html[data-theme="dark"] .nav-item.active { background:#232732; color:#ffd27a; border-left-color:#e0a93a; }
+html[data-theme="dark"] .nav-group-label { color:#6f7682; }
+html[data-theme="dark"] .nav-group { border-top-color:#23262e; }
+html[data-theme="dark"] .header-note { color:#7f8694; }
+html[data-theme="dark"] .sync-badge { background:#1b1e25; border-color:#2c313b; }
+html[data-theme="dark"] .theme-toggle { background:#1b1e25; border-color:#2c313b; }
+
 </style>
 </head>
 <body>
@@ -1571,6 +1588,14 @@ function skillIcon(name, px) {
   const key = String(name || '').toLowerCase();
   if (SKILL_ICON_SET.has(key)) return `<img class="sicon" src="/icons/skills/${key}.png" alt="${name}" title="${name}" width="${px}" height="${px}" loading="lazy">`;
   return `<span class="sicon-emoji">${SKILL_EMOJIS[name] || ''}</span>`;
+}
+// Real OSRS item icons (self-hosted, public/icons/items/<slug>.png). Used for gear rows + money
+// output items. Self-removes (onerror) when we don't have that item's icon, so misses leave no gap.
+function itemIcon(name, px) {
+  px = px || 18;
+  if (!name) return '';
+  const slug = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  return `<img class="iicon" src="/icons/items/${slug}.png" alt="" title="${String(name).replace(/"/g, '&quot;')}" height="${px}" loading="lazy" onerror="this.remove()">`;
 }
 
 // [rank, level, xp] — embedded fallback; overwritten live from /api/stats on load
@@ -2093,6 +2118,7 @@ function renderGear() {
       return `<div class="gear-row gear-${stateCls}">
         <label class="gear-check" title="Mark owned"><input type="checkbox" ${own ? 'checked' : ''} onchange="toggleGearOwned('${it.name.replace(/'/g, "\\'")}')"></label>
         <span class="gear-icon">${icon}</span>
+        ${itemIcon(it.ge || it.name, 20)}
         <span class="gear-name"><a href="${wikiUrl(it.name)}" target="_blank" rel="noopener">${it.name}</a> ${note}${badge}</span>
         <span class="gear-right">${need}${priceStr}</span>
       </div>`;
@@ -5797,7 +5823,7 @@ function moneyCard(x, cls) {
     reqLine = `<span class="money-gap">needs: ${parts.join(', ')}</span> · ${m.reqsText || ''}`;
   }
   card.innerHTML =
-    `<div class="money-name">${m.name}</div>` +
+    `<div class="money-name">${m.output && m.output[0] ? itemIcon(m.output[0].item, 18) + ' ' : ''}${m.name}</div>` +
     gpEl +
     `<div class="money-badges">${moneyBadges(m)}</div>` +
     `<div class="money-reqs">${reqLine}</div>` +
