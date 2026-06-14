@@ -121,6 +121,13 @@ and the dashboard recommends agreeable next actions.
 ## Phase 4 — Depth & analytics  ⚪
 *Make progress measurable and motivating.*
 
+- 🟢 **F2.8** GP / money-goal planner. A **money goal** type in the unified goal system
+  (`money_goals` table on the `/api/state` path): set a GP target (with k/m/b shorthand and an
+  optional label like "Twisted bow"), and it decomposes into the **fastest money methods available
+  now** + **time-to-earn** each, ranked by live GE GP/hr (`bestMoneyMethods`/`methodGphr` reuse the
+  Money tab's live-or-estimated rates). Shows a plan card in Goals, a row in the dashboard
+  Active-Goals peek, and a ranker tier ("Earn N for X — best method ~rate → ~time"). `fmt()` gained a
+  billions tier. No progress bar (the hub can't read liquid GP), so it's an honest "how to earn it" planner.
 - 🟡 **F2.1** Money-maker analytics: historical GP/hr, profit per activity, wealth-over-time charts.
   **Trends view live** — the Progress tab charts XP-over-time (per-skill + Total; the line breaks at
   the XP-tracking start since legacy history is levels-only), Account Value over time, and cumulative

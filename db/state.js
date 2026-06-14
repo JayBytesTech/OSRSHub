@@ -17,6 +17,7 @@ module.exports = function makeState(db) {
   const insUnlock = db.prepare('INSERT OR REPLACE INTO unlock_done (account_id, unlock) VALUES (?, ?)');
   const insUnlockGoal = db.prepare('INSERT OR REPLACE INTO unlock_goals (account_id, unlock) VALUES (?, ?)');
   const insCaGoal = db.prepare('INSERT OR REPLACE INTO ca_goals (account_id, tier) VALUES (?, ?)');
+  const insMoneyGoal = db.prepare('INSERT OR REPLACE INTO money_goals (account_id, label, amount) VALUES (?, ?, ?)');
   const delQuests = db.prepare('DELETE FROM quest_completions WHERE account_id = ?');
   const delGoals  = db.prepare('DELETE FROM goals WHERE account_id = ?');
   const delQGoals = db.prepare('DELETE FROM quest_goals WHERE account_id = ?');
@@ -29,6 +30,7 @@ module.exports = function makeState(db) {
   const delUnlocks = db.prepare('DELETE FROM unlock_done WHERE account_id = ?');
   const delUnlockGoals = db.prepare('DELETE FROM unlock_goals WHERE account_id = ?');
   const delCaGoals = db.prepare('DELETE FROM ca_goals WHERE account_id = ?');
+  const delMoneyGoals = db.prepare('DELETE FROM money_goals WHERE account_id = ?');
 
   function getState(accountId) {
     const completed = {};
@@ -46,11 +48,12 @@ module.exports = function makeState(db) {
     const unlocksDone = db.prepare('SELECT unlock FROM unlock_done WHERE account_id = ? ORDER BY unlock').all(accountId).map(r => r.unlock);
     const unlockGoals = db.prepare('SELECT unlock FROM unlock_goals WHERE account_id = ? ORDER BY unlock').all(accountId).map(r => r.unlock);
     const caGoals = db.prepare('SELECT tier FROM ca_goals WHERE account_id = ? ORDER BY tier').all(accountId).map(r => r.tier);
-    return { completed, goals, questGoals, presetGoals, diaries, diaryTasks, diaryGoals, gearOwned, caTasks, unlocksDone, unlockGoals, caGoals };
+    const moneyGoals = db.prepare('SELECT label, amount FROM money_goals WHERE account_id = ? ORDER BY amount').all(accountId).map(r => ({ label: r.label, amount: r.amount }));
+    return { completed, goals, questGoals, presetGoals, diaries, diaryTasks, diaryGoals, gearOwned, caTasks, unlocksDone, unlockGoals, caGoals, moneyGoals };
   }
 
   // Replace this account's entire state in one transaction. Returns inserted counts.
-  const replaceTx = db.transaction((accountId, completed, goals, questGoals, presetGoals, diaries, diaryTasks, diaryGoals, gearOwned, caTasks, unlocksDone, unlockGoals, caGoals) => {
+  const replaceTx = db.transaction((accountId, completed, goals, questGoals, presetGoals, diaries, diaryTasks, diaryGoals, gearOwned, caTasks, unlocksDone, unlockGoals, caGoals, moneyGoals) => {
     delQuests.run(accountId);
     delGoals.run(accountId);
     delQGoals.run(accountId);
@@ -63,6 +66,7 @@ module.exports = function makeState(db) {
     delUnlocks.run(accountId);
     delUnlockGoals.run(accountId);
     delCaGoals.run(accountId);
+    delMoneyGoals.run(accountId);
     let quests = 0, goalCount = 0, questGoalCount = 0, presetGoalCount = 0, diaryCount = 0, diaryTaskCount = 0, diaryGoalCount = 0;
     for (const quest in (completed || {})) {
       if (!completed[quest]) continue;            // only store truthy completions
@@ -156,12 +160,23 @@ module.exports = function makeState(db) {
       insCaGoal.run(accountId, tier);
       caGoalCount++;
     }
-    return { quests, goals: goalCount, questGoals: questGoalCount, presetGoals: presetGoalCount, diaries: diaryCount, diaryTasks: diaryTaskCount, diaryGoals: diaryGoalCount, gearOwned: gearOwnedCount, caTasks: caTaskCount, unlocksDone: unlockCount, unlockGoals: unlockGoalCount, caGoals: caGoalCount };
+    const seenMG = new Set();
+    let moneyGoalCount = 0;
+    for (const g of (Array.isArray(moneyGoals) ? moneyGoals : [])) {
+      if (!g || g.label == null) continue;
+      const label = String(g.label);
+      const amount = parseInt(g.amount, 10);
+      if (!label || !Number.isInteger(amount) || amount <= 0 || seenMG.has(label)) continue;
+      seenMG.add(label);
+      insMoneyGoal.run(accountId, label, amount);
+      moneyGoalCount++;
+    }
+    return { quests, goals: goalCount, questGoals: questGoalCount, presetGoals: presetGoalCount, diaries: diaryCount, diaryTasks: diaryTaskCount, diaryGoals: diaryGoalCount, gearOwned: gearOwnedCount, caTasks: caTaskCount, unlocksDone: unlockCount, unlockGoals: unlockGoalCount, caGoals: caGoalCount, moneyGoals: moneyGoalCount };
   });
 
   function setState(accountId, payload) {
     const body = payload || {};
-    return replaceTx(accountId, body.completed || {}, body.goals || [], body.questGoals || [], body.presetGoals || [], body.diaries || [], body.diaryTasks || [], body.diaryGoals || [], body.gearOwned || [], body.caTasks || [], body.unlocksDone || [], body.unlockGoals || [], body.caGoals || []);
+    return replaceTx(accountId, body.completed || {}, body.goals || [], body.questGoals || [], body.presetGoals || [], body.diaries || [], body.diaryTasks || [], body.diaryGoals || [], body.gearOwned || [], body.caTasks || [], body.unlocksDone || [], body.unlockGoals || [], body.caGoals || [], body.moneyGoals || []);
   }
 
   // Additive, non-destructive single-quest completion (used by telemetry ingest).
