@@ -170,6 +170,16 @@ module.exports = function makeEvents(db) {
     let caPoints = null;
     for (const r of rowsOf('ca')) { const p = Number(r.data.totalPoints); if (Number.isFinite(p)) caPoints = p; }
 
+    // Quests: the most recent quest event carries the player's true total QP + quest counts
+    // (Dink reports running totals on each QUEST_COMPLETED). Lets the hub reconcile ticked vs real.
+    let quest = { points: null, completed: null, total: null, lastQuest: null };
+    for (const r of rowsOf('quest')) {
+      const p = Number(r.data.questPoints); if (Number.isFinite(p)) quest.points = p;
+      const c = Number(r.data.completedQuests); if (Number.isFinite(c)) quest.completed = c;
+      const t = Number(r.data.totalQuests); if (Number.isFinite(t)) quest.total = t;
+      if (r.data.questName) quest.lastQuest = r.data.questName;
+    }
+
     // Pets: count non-duplicate obtains + names.
     const petNames = [];
     for (const r of rowsOf('pet')) { if (!r.data.duplicate && r.data.petName) petNames.push(r.data.petName); }
@@ -182,6 +192,7 @@ module.exports = function makeEvents(db) {
       clog,
       clues,
       ca: { points: caPoints },
+      quest,
       pets: { count: petNames.length, names: petNames.slice(-12) },
       deaths: { count: deathRows.length, valueLost },
     };

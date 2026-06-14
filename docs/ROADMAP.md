@@ -94,6 +94,10 @@ account record; no feature code assumes a single global player.
   subquests collapsed to one entry at its final step; 12 miniquests the guide doesn't sequence sink to
   the bottom). Each row gets a `#n` position badge, and a **"Next in your optimal path"** banner surfaces
   the first incomplete quest in guide order with its live ready/locked gating and a one-click ✓ Mark done.
+  **QP reconciliation** — since no public API exposes which quests a player has done, the Quests tab shows
+  a banner comparing the hub's ticked QP against a reference (the true total Dink reports on its last quest
+  event — now surfaced via `milestonesSummary().quest` — or a manually-entered in-game QP), counting the
+  gap down to zero so you can find quests completed before tracking and confirm when you're back in sync.
 - 🟢 **F1.3** "What should I do next?" engine — ranked, prerequisite-aware suggestions on the dashboard.
   **Live** as the "🧭 What to do next" panel: `nextActions()` ranks across tiers — quest-goal next
   steps, Quest Cape, skill goals, **goal-independent opportunity quests**, a **high-leverage
