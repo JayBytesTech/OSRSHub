@@ -157,8 +157,11 @@ and the dashboard recommends agreeable next actions.
   Completion is tracked **per task id** (manual ticks; the hub can't verify combat capability so there's
   no ready/locked gating), persisted via a new `ca_completions` table on the `/api/state` path. A
   **dashboard tile** (points + pts-to-next-tier) and a **ranker tier** ("N pts to <tier> CA rewards",
-  shown once the player is engaged) round it out. Optional future: auto-tick from the existing Dink
-  `COMBAT_ACHIEVEMENT` telemetry events, and CA tier **goals** that decompose like diary goals.
+  shown once the player is engaged) round it out. **CA tier goals** decompose like diary goals (F1.1),
+  CAs **auto-tick from Dink** `COMBAT_ACHIEVEMENT` telemetry (name→id match, unknown names stored but not
+  ticked), and a **CA-points reconciliation banner** (mirroring the quest-point one) compares hub-tracked
+  points against the plugin-reported total (or a manual entry) so achievements earned before tracking are
+  visible — new ones auto-tick going forward.
 - ⚪ Frontend modularization if/when `index.html` interactivity outgrows hand-editing (ADR first).
 
 **Exit criteria:** the hub shows trends over time, not just current state.
