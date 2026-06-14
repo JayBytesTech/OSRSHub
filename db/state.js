@@ -185,6 +185,17 @@ module.exports = function makeState(db) {
     return info.changes > 0;
   }
 
+  // Additive, non-destructive Combat Achievement task completion (used by Dink telemetry ingest).
+  // Won't touch the rest of state. Returns true if the task was newly marked complete.
+  function addCaCompletion(accountId, taskId) {
+    const tid = parseInt(taskId, 10);
+    if (!Number.isInteger(tid)) return false;
+    const info = db.prepare(
+      'INSERT OR IGNORE INTO ca_completions (account_id, task_id) VALUES (?, ?)'
+    ).run(accountId, tid);
+    return info.changes > 0;
+  }
+
   function count(accountId) {
     const q = db.prepare('SELECT COUNT(*) AS c FROM quest_completions WHERE account_id = ?').get(accountId).c;
     const g = db.prepare('SELECT COUNT(*) AS c FROM goals WHERE account_id = ?').get(accountId).c;
@@ -202,5 +213,5 @@ module.exports = function makeState(db) {
     return replaceTx(accountId, data.completed || {}, Array.isArray(data.goals) ? data.goals : [], Array.isArray(data.questGoals) ? data.questGoals : [], Array.isArray(data.presetGoals) ? data.presetGoals : []);
   }
 
-  return { getState, setState, addQuestCompletion, addDiaryCompletion, count, importFromVaultMarkdown };
+  return { getState, setState, addQuestCompletion, addDiaryCompletion, addCaCompletion, count, importFromVaultMarkdown };
 };

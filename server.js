@@ -127,6 +127,22 @@ function isAutoTickableQuest(name) {
   return !/^Recipe for Disaster\s*[-–—:]/.test(String(name || ''));
 }
 
+// Lazy Combat-Achievement task-name → id map (from the curated dataset) for auto-ticking
+// COMBAT_ACHIEVEMENT telemetry. Built once; task names are unique in ca-data.json. Returns null
+// when the name isn't recognized (e.g. a task added to the game but not yet in our dataset).
+let _caNameToId = null;
+function caTaskId(taskName) {
+  if (!_caNameToId) {
+    _caNameToId = new Map();
+    try {
+      const data = require('./public/ca-data.json');
+      for (const t of (data.tasks || [])) _caNameToId.set(t.name, t.id);
+    } catch { /* dataset missing — CA auto-tick disabled */ }
+  }
+  const id = _caNameToId.get(String(taskName || '').trim());
+  return Number.isInteger(id) ? id : null;
+}
+
 function normalizeDinkEvent(payload) {
   const p = payload || {};
   const extra = p.extra || {};
@@ -241,7 +257,7 @@ app.post('/api/ingest', ingestUpload.any(), (req, res) => {
     const nowIso = new Date().toISOString();
     const minute = nowIso.slice(0, 16);            // YYYY-MM-DDTHH:mm (dedupe granularity)
     const normalized = normalizeDinkEvent(payload);
-    let stored = 0, questsTicked = 0, diariesTicked = 0;
+    let stored = 0, questsTicked = 0, diariesTicked = 0, caTicked = 0;
     for (const ev of normalized) {
       if (ev.type === 'quest' && ev.data && ev.data.questName && isAutoTickableQuest(ev.data.questName)) {
         if (state.addQuestCompletion(account.id, ev.data.questName)) questsTicked++;
@@ -249,14 +265,18 @@ app.post('/api/ingest', ingestUpload.any(), (req, res) => {
       if (ev.type === 'diary' && ev.data && ev.data.region && ev.data.tier) {
         if (state.addDiaryCompletion(account.id, ev.data.region, ev.data.tier)) diariesTicked++;
       }
+      if (ev.type === 'ca' && ev.data && ev.data.task) {
+        const caId = caTaskId(ev.data.task);
+        if (caId != null && state.addCaCompletion(account.id, caId)) caTicked++;
+      }
       const inserted = events.addEvent(account.id, {
         type: ev.type, occurred_at: nowIso, summary: ev.summary, data: ev.data,
         source: 'dink', dedupe_key: `${ev.type}|${ev.summary}|${minute}`,
       });
       if (inserted) stored++;
     }
-    console.log(`[ingest] type=${(payload && payload.type) || '?'} received=${normalized.length} stored=${stored}${questsTicked ? ` questsTicked=${questsTicked}` : ''}${diariesTicked ? ` diariesTicked=${diariesTicked}` : ''}`);
-    res.json({ ok: true, stored, questsTicked, diariesTicked });
+    console.log(`[ingest] type=${(payload && payload.type) || '?'} received=${normalized.length} stored=${stored}${questsTicked ? ` questsTicked=${questsTicked}` : ''}${diariesTicked ? ` diariesTicked=${diariesTicked}` : ''}${caTicked ? ` caTicked=${caTicked}` : ''}`);
+    res.json({ ok: true, stored, questsTicked, diariesTicked, caTicked });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
