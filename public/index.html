@@ -200,6 +200,8 @@ body {
   max-width: 340px;
 }
 .skill-emoji { font-size: 20px; line-height: 1; flex-shrink: 0; }
+.sicon { vertical-align: middle; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
+.sicon-emoji { display: inline-block; }
 .skill-info { flex: 1; min-width: 0; }
 .skill-name { font-size: 10px; color: #6a4a14; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
 .skill-level { font-size: 24px; font-weight: bold; color: #1a0a00; line-height: 1.1; }
@@ -1231,6 +1233,18 @@ const SKILL_EMOJIS = {
   "Mining":"⛏️","Herblore":"🌿","Agility":"🏃","Thieving":"🗝️","Slayer":"💀",
   "Farming":"🌱","Runecrafting":"🔯","Hunter":"🦊","Construction":"🏠","Sailing":"⛵"
 };
+
+// Real OSRS skill icons (self-hosted from the Wiki, public/icons/skills/<skill>.png). 24 skills
+// have an icon; Overall (and anything unknown) falls back to its emoji. Returns an inline <img>.
+const SKILL_ICON_SET = new Set(["attack","strength","defence","hitpoints","ranged","prayer","magic",
+  "cooking","woodcutting","fletching","fishing","firemaking","crafting","smithing","mining","herblore",
+  "agility","thieving","slayer","farming","runecrafting","hunter","construction","sailing"]);
+function skillIcon(name, px) {
+  px = px || 18;
+  const key = String(name || '').toLowerCase();
+  if (SKILL_ICON_SET.has(key)) return `<img class="sicon" src="/icons/skills/${key}.png" alt="${name}" title="${name}" width="${px}" height="${px}" loading="lazy">`;
+  return `<span class="sicon-emoji">${SKILL_EMOJIS[name] || ''}</span>`;
+}
 
 // [rank, level, xp] — embedded fallback; overwritten live from /api/stats on load
 const STATS = {
@@ -3286,7 +3300,7 @@ function renderDashboard() {
       const bm   = bestMethod(g.skill, curLvl);
       const eta  = (bm && curLvl < g.target) ? ` · ~${fmtHours(Math.max(0, targetXP - curXP) / bm.xphr)}` : '';
       return `<div class="dash-goal">
-        <div class="dash-goal-top"><span>${SKILL_EMOJIS[g.skill]} ${g.skill}</span><span class="dash-goal-lvl">Lvl ${curLvl} → ${g.target} · ${pct}%${eta}</span></div>
+        <div class="dash-goal-top"><span>${skillIcon(g.skill, 16)} ${g.skill}</span><span class="dash-goal-lvl">Lvl ${curLvl} → ${g.target} · ${pct}%${eta}</span></div>
         <div class="goal-progress-wrap"><div class="goal-progress-bar" style="width:${pct}%"></div></div>
       </div>`;
     }).join('');
@@ -3497,7 +3511,7 @@ function renderSkills() {
     }
 
     card.innerHTML = `
-      <div class="skill-emoji">${SKILL_EMOJIS[name]}</div>
+      <div class="skill-emoji">${skillIcon(name, 24)}</div>
       <div class="skill-info">
         <div class="skill-name">${name}</div>
         <div class="skill-level">${isOverall ? totalLevel() : level}</div>
@@ -3541,7 +3555,7 @@ function renderXpPlan() {
   }
   const xpLeft = Math.max(0, xpForLevel(target) - curXP);
   const plan = xpPlanHTML(skill, curLvl, xpLeft);
-  out.innerHTML = `<div class="plan-head">${SKILL_EMOJIS[skill]} ${skill}: ${curLvl} → ${target} · ${fmt(xpLeft)} XP to go</div>`
+  out.innerHTML = `<div class="plan-head">${skillIcon(skill, 18)} ${skill}: ${curLvl} → ${target} · ${fmt(xpLeft)} XP to go</div>`
     + (plan || '<div class="plan-msg">No training-method data for this skill yet.</div>');
 }
 
@@ -4567,7 +4581,7 @@ function renderGains() {
     const card = document.createElement('div');
     card.className = 'gain-card';
     card.innerHTML = `
-      <div class="gain-skill">${key==='Total'?'📊':(SKILL_EMOJIS[key]||'')} ${label}</div>
+      <div class="gain-skill">${key==='Total'?'📊':skillIcon(key, 16)} ${label}</div>
       <div class="gain-val ${moved?'':'flat'}">${big}</div>
       <div class="gain-sub">${sub}</div>`;
     grid.appendChild(card);
@@ -4954,7 +4968,7 @@ function diaryGoalCard(region, tier, completed) {
     const curXP = STATS[m.skill] ? STATS[m.skill][2] : 0;
     const bm = bestMethod(m.skill, m.have);
     const eta = bm ? ` · ~${fmtHours(Math.max(0, xpForLevel(m.need) - curXP) / bm.xphr)}` : '';
-    return `<div class="rt-node rt-locked"><span class="rt-icon">✗</span> ${SKILL_EMOJIS[m.skill] || ''} ${m.skill} <span class="rt-need">${m.have} → ${m.need}${eta}</span></div>`;
+    return `<div class="rt-node rt-locked"><span class="rt-icon">✗</span> ${skillIcon(m.skill, 15)} ${m.skill} <span class="rt-need">${m.have} → ${m.need}${eta}</span></div>`;
   }).join('');
   const combatRow = st.missingCombat
     ? `<div class="rt-node rt-locked"><span class="rt-icon">✗</span> ⚔️ Combat <span class="rt-need">${st.missingCombat.have} → ${st.missingCombat.need}</span></div>` : '';
@@ -5011,7 +5025,7 @@ function unlockGoalCard(name, completed) {
     const curXP = STATS[m.skill] ? STATS[m.skill][2] : 0;
     const bm = bestMethod(m.skill, m.have);
     const eta = bm ? ` · ~${fmtHours(Math.max(0, xpForLevel(m.need) - curXP) / bm.xphr)}` : '';
-    return `<div class="rt-node rt-locked"><span class="rt-icon">✗</span> ${SKILL_EMOJIS[m.skill] || ''} ${m.skill} <span class="rt-need">${m.have} → ${m.need}${eta}</span></div>`;
+    return `<div class="rt-node rt-locked"><span class="rt-icon">✗</span> ${skillIcon(m.skill, 15)} ${m.skill} <span class="rt-need">${m.have} → ${m.need}${eta}</span></div>`;
   }).join('');
   const questRows = st.missingQuests.map(qn => {
     const qs = questStatus(QUESTS.find(q => q.name === qn) || { name: qn }, completed);
@@ -5123,7 +5137,7 @@ function renderGoals() {
     card.className = 'goal-card';
     card.innerHTML = `
       <div class="goal-header">
-        <span class="goal-emoji">${SKILL_EMOJIS[g.skill]}</span>
+        <span class="goal-emoji">${skillIcon(g.skill, 20)}</span>
         <span class="goal-skill-name">${g.skill}</span>
         <span class="goal-levels">Lvl ${curLvl} → ${g.target}</span>
         <button class="goal-delete" onclick="deleteGoal('${g.skill}')" title="Remove">✕</button>
