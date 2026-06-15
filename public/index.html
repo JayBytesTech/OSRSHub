@@ -1222,6 +1222,61 @@ html[data-theme="dark"] .header-note { color:#7f8694; }
 html[data-theme="dark"] .sync-badge { background:#1b1e25; border-color:#2c313b; }
 html[data-theme="dark"] .theme-toggle { background:#1b1e25; border-color:#2c313b; }
 
+
+/* ===== DARK UI POLISH: tokens, unified buttons, form fields, pills ===== */
+html[data-theme="dark"] {
+  --acc:#e0a93a; --acc-hi:#f2bd52; --acc-dim:#bd8a28;
+  --field-bg:#191c22; --field-bd:#363b45; --ink:#e7e5df;
+}
+/* Primary action buttons -> gold filled */
+html[data-theme="dark"] .add-goal-btn,
+html[data-theme="dark"] .ai-btn,
+html[data-theme="dark"] .preset-btn,
+html[data-theme="dark"] .settings-save,
+html[data-theme="dark"] .qp-rec-btn,
+html[data-theme="dark"] .checklist-add-btn { background:var(--acc); color:#15171b; border:1px solid var(--acc-dim); font-weight:700; }
+html[data-theme="dark"] .add-goal-btn:hover:not(:disabled),
+html[data-theme="dark"] .ai-btn:hover:not(:disabled),
+html[data-theme="dark"] .preset-btn:hover:not(:disabled),
+html[data-theme="dark"] .settings-save:hover:not(:disabled),
+html[data-theme="dark"] .qp-rec-btn:hover:not(:disabled),
+html[data-theme="dark"] .checklist-add-btn:hover:not(:disabled) { background:var(--acc-hi); }
+html[data-theme="dark"] .ai-btn:disabled,
+html[data-theme="dark"] .add-goal-btn:disabled { opacity:.45; }
+html[data-theme="dark"] .qp-rec-btn.ghost { background:transparent; color:var(--acc); border-color:var(--field-bd); }
+/* Utility buttons -> ghost gold */
+html[data-theme="dark"] .refresh-btn { background:#22262e; color:var(--acc); border:1px solid #3a3f4a; }
+html[data-theme="dark"] .refresh-btn:hover:not(:disabled) { background:#2c313b; border-color:var(--acc-dim); }
+/* Form fields -> unified dark + gold focus ring */
+html[data-theme="dark"] .quest-search,
+html[data-theme="dark"] .goal-select,
+html[data-theme="dark"] .goal-input,
+html[data-theme="dark"] .settings-input,
+html[data-theme="dark"] #plan-skill,
+html[data-theme="dark"] #plan-target,
+html[data-theme="dark"] #chat-input,
+html[data-theme="dark"] #qp-target-input,
+html[data-theme="dark"] #ca-target-input { background:var(--field-bg); color:var(--ink); border:1px solid var(--field-bd); border-radius:5px; }
+html[data-theme="dark"] .quest-search:focus,
+html[data-theme="dark"] .goal-select:focus,
+html[data-theme="dark"] .goal-input:focus,
+html[data-theme="dark"] .settings-input:focus,
+html[data-theme="dark"] #plan-skill:focus,
+html[data-theme="dark"] #plan-target:focus,
+html[data-theme="dark"] #chat-input:focus,
+html[data-theme="dark"] #qp-target-input:focus,
+html[data-theme="dark"] #ca-target-input:focus { outline:none; border-color:var(--acc); box-shadow:0 0 0 2px rgba(224,169,58,.18); }
+/* Pills -> consistent tinted language */
+html[data-theme="dark"] .status-chip.ready,
+html[data-theme="dark"] .status-chip.done { background:#152a12; color:#74d65f; border:1px solid #2f6e29; }
+html[data-theme="dark"] .status-chip.locked { background:#2a1a12; color:#e89a5a; border:1px solid #7a4a2a; }
+html[data-theme="dark"] .status-chip.unknown { background:#24262b; color:#a6abb4; border:1px solid #41454e; }
+html[data-theme="dark"] .qtype-f2p { background:#10222b; color:#5bb6d8; border:1px solid #245a6e; }
+html[data-theme="dark"] .qtype-p2p { background:#2a2410; color:#d8b95a; border:1px solid #6e5e24; }
+html[data-theme="dark"] .qtype-mini { background:#221433; color:#b48cdf; border:1px solid #4a2f6e; }
+html[data-theme="dark"] .gear-badge.next { background:#2a2410; color:var(--acc); border:1px solid #6e5e24; }
+html[data-theme="dark"] .gear-badge.cur { background:#152a12; color:#74d65f; border:1px solid #2f6e29; }
+
 </style>
 </head>
 <body>
