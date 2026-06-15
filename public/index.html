@@ -1276,6 +1276,21 @@ html[data-theme="dark"] .qtype-p2p { background:#2a2410; color:#d8b95a; border:1
 html[data-theme="dark"] .qtype-mini { background:#221433; color:#b48cdf; border:1px solid #4a2f6e; }
 html[data-theme="dark"] .gear-badge.next { background:#2a2410; color:var(--acc); border:1px solid #6e5e24; }
 html[data-theme="dark"] .gear-badge.cur { background:#152a12; color:#74d65f; border:1px solid #2f6e29; }
+/* Card elevation + hover lift (dark) */
+html[data-theme="dark"] .dash-tile,
+html[data-theme="dark"] .dash-panel,
+html[data-theme="dark"] .skill-card,
+html[data-theme="dark"] .goal-card,
+html[data-theme="dark"] .money-card,
+html[data-theme="dark"] .ca-tiercard,
+html[data-theme="dark"] .ca-group,
+html[data-theme="dark"] .unlock-item,
+html[data-theme="dark"] .diary-region,
+html[data-theme="dark"] .settings-card { border-radius:8px; box-shadow:0 1px 2px rgba(0,0,0,.35); }
+html[data-theme="dark"] .dash-tile { transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease; }
+html[data-theme="dark"] .dash-clickable:hover { border-color:var(--acc); background:#20242c; transform:translateY(-1px); box-shadow:0 5px 14px rgba(0,0,0,.45); }
+html[data-theme="dark"] .skill-card { transition:border-color .12s ease, box-shadow .12s ease; }
+html[data-theme="dark"] .skill-card:hover { border-color:#4a4f59; box-shadow:0 3px 10px rgba(0,0,0,.4); }
 
 </style>
 </head>
