@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "schema": "scan/1",
+  "updatedAt": "2026-06-15",
+  "notes": [
+    "Server-owned manifest (ADR 0003 D4). Tells the OSRS Hub RuneLite plugin which game values to",
+    "read for a baseline scan, and how often. Edit THIS file when a game update shifts varbit/varp",
+    "IDs — no plugin redeploy needed. 'updatePeriod' throttles live re-reads (WikiSync's lesson):",
+    "'session' = read once per login + on the relevant change event; never per XP tick.",
+    "varbit/varp IDs marked null are TODO — fill from RuneLite Varbits.java / VarPlayer / the WikiSync",
+    "manifest (https://github.com/weirdgloop/WikiSync) when implementing the plugin scan slice."
+  ],
+  "sections": {
+    "skills": {
+      "read": "client.getRealSkillLevel + client.getSkillExperience",
+      "updatePeriod": "session",
+      "payloadKey": "skills"
+    },
+    "quests": {
+      "read": "Quest.getState(client) tri-state for every Quest enum value",
+      "updatePeriod": "session",
+      "payloadKey": "quests"
+    },
+    "diaries": {
+      "read": "varbit per (region, tier) completion flag",
+      "updatePeriod": "session",
+      "payloadKey": "diaries",
+      "entries": []
+    },
+    "combatAchievements": {
+      "read": "varbit per CA task completion flag (task ids match public/ca-data.json)",
+      "updatePeriod": "session",
+      "payloadKey": "combatAchievements",
+      "entries": []
+    },
+    "unlocks": {
+      "read": "derivable unlocks only (e.g. Barrows gloves via RFD) — additive, never wipes manual",
+      "updatePeriod": "session",
+      "payloadKey": "unlocks",
+      "entries": []
+    },
+    "stats": {
+      "read": "scalar varbits/varps -> profile_stats keys",
+      "updatePeriod": "session",
+      "payloadKey": "stats",
+      "entries": [
+        { "key": "slayer.points",  "source": "varp",    "id": null, "type": "num" },
+        { "key": "slayer.streak",  "source": "varbit",  "id": null, "type": "num" },
+        { "key": "slayer.task",    "source": "varbit",  "id": null, "type": "str" },
+        { "key": "music.unlocked", "source": "computed", "id": null, "type": "num" },
+        { "key": "music.total",    "source": "computed", "id": null, "type": "num" },
+        { "key": "questPoints",    "source": "varp",    "id": 101,  "type": "num" }
+      ]
+    },
+    "collectionLog": {
+      "read": "interface-gated: total count via varbit on login; per-item only after the log is opened, then live on obtain (research §7)",
+      "updatePeriod": "onInterfaceOpen + onObtain",
+      "payloadKey": "collectionLog",
+      "countVarbit": null
+    },
+    "bank": {
+      "read": "sum ItemManager GE price over the BANK item container (existing /api/bank path)",
+      "updatePeriod": "onBankChange",
+      "payloadKey": "bank"
+    }
+  }
+}

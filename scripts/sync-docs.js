@@ -43,6 +43,7 @@ const DOCS = [
   { repo: 'ARCHITECTURE.md',                        vault: 'OSRS Hub — Architecture.md',                  tags: ['osrs', 'osrs-hub', 'planning', 'architecture'] },
   { repo: 'GUARDRAILS.md',                          vault: 'OSRS Hub — Guardrails.md',                    tags: ['osrs', 'osrs-hub', 'planning', 'guardrails'] },
   { repo: 'decisions/0001-foundational-decisions.md', vault: 'OSRS Hub — ADR 0001 Foundational Decisions.md', tags: ['osrs', 'osrs-hub', 'planning', 'adr'] },
+  { repo: 'decisions/0003-baseline-scan-ingest.md',  vault: 'OSRS Hub — ADR 0003 Baseline Scan Ingest.md',  tags: ['osrs', 'osrs-hub', 'planning', 'adr'] },
 ];
 
 // Normalised link target (no leading ./, no trailing /) → vault wiki-link.
@@ -54,6 +55,7 @@ const LINK_MAP = {
   'GUARDRAILS.md': '[[OSRS Hub — Guardrails]]',
   'decisions': '[[OSRS Hub — ADR 0001 Foundational Decisions]]',
   'decisions/0001-foundational-decisions.md': '[[OSRS Hub — ADR 0001 Foundational Decisions]]',
+  'decisions/0003-baseline-scan-ingest.md': '[[OSRS Hub — ADR 0003 Baseline Scan Ingest]]',
 };
 
 // Plain text / inline-code references that have a nicer vault equivalent.

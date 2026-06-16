@@ -19,7 +19,7 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const anthropic = API_KEY ? new Anthropic({ apiKey: API_KEY }) : null;
 
 // SQLite store (history/time-series + account scoping). Vault stays for human notes.
-const { getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, deleteAccount, snapshots, state, accountValue, checklist, events, bank } = require('./db');
+const { getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, deleteAccount, snapshots, state, accountValue, checklist, events, bank, scan } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -314,6 +314,69 @@ app.get('/api/bank', (_req, res) => {
   try {
     const account = getCurrentAccount();
     res.json(bank.getTrend(account.id));
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ── Baseline character scan (ADR 0003) ───────────────────────────────────────
+// A full-state DUMP from the RuneLite plugin. First-sight accounts apply wholesale; known
+// characters store the dump and surface a diff the user confirms from the hub UI. Passive only.
+const SCAN_MANIFEST_PATH = path.join(__dirname, 'scan-manifest.json');
+
+// GET /api/scan/manifest — server-owned list of varbits/varps/keys the plugin should read (ADR D4).
+app.get('/api/scan/manifest', (_req, res) => {
+  try {
+    res.type('application/json').send(require('fs').readFileSync(SCAN_MANIFEST_PATH, 'utf8'));
+  } catch (e) {
+    res.status(500).json({ error: 'scan manifest unavailable: ' + String(e) });
+  }
+});
+
+// POST /api/scan — ingest a full-state dump (plugin → hub). Honors INGEST_TOKEN like /api/ingest.
+app.post('/api/scan', (req, res) => {
+  try {
+    if (INGEST_TOKEN && req.query.token !== INGEST_TOKEN) {
+      return res.status(401).json({ error: 'invalid or missing token' });
+    }
+    const dump = req.body || {};
+    const account = getCurrentAccount();
+    const result = scan.ingest(account.id, dump, todayLabel(), dump.manifestVersion);
+    console.log(`[scan] account=${account.rsn} firstSight=${result.firstSight}${result.firstSight ? ` applied=${JSON.stringify(result.applied)}` : ' pending=1'}`);
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// GET /api/scan/pending — the stored pending dump's fresh diff for the hub's review banner.
+app.get('/api/scan/pending', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json(scan.getPending(account.id) || { pending: false });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// POST /api/scan/apply — user confirmed the diff: apply the pending dump.
+app.post('/api/scan/apply', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    const result = scan.applyPending(account.id, todayLabel());
+    if (result.error) return res.status(409).json(result);
+    console.log(`[scan] applied pending account=${account.rsn} ${JSON.stringify(result.applied)}`);
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// POST /api/scan/dismiss — user discarded the pending dump.
+app.post('/api/scan/dismiss', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json({ ok: true, ...scan.clearPending(account.id) });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
