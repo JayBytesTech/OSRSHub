@@ -34,6 +34,17 @@ function safeVaultPath(rel) {
   return abs;
 }
 
+// ── Vault live snapshot (ADR 0004): one-way SQLite → Obsidian projection ───────
+// Regenerates a hub-owned note so the chat / Obsidian-side AI always reads current data.
+// scheduleSync() is called from the mutating routes (debounced); writes are path-confined.
+const LIVE_REL = process.env.LIVE_REL || 'Gaming/OSRS/OSRS Hub — Live.md';
+const writeNote = async (rel, content) => {
+  const abs = safeVaultPath(rel);
+  await fs.mkdir(path.dirname(abs), { recursive: true });   // ensure the OSRS folder exists
+  await fs.writeFile(abs, content, 'utf8');
+};
+const vaultLive = require('./vaultLive')({ db: require('./db'), writeNote, liveRel: LIVE_REL });
+
 // ── State API (quest completions + goals, backed by SQLite) ───────────────────
 app.get('/api/state', (_req, res) => {
   try {
@@ -48,6 +59,7 @@ app.put('/api/state', (req, res) => {
   try {
     const account = getCurrentAccount();
     state.setState(account.id, req.body || {});   // full replace of this account's state
+    vaultLive.scheduleSync();
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: String(e) });
@@ -276,6 +288,7 @@ app.post('/api/ingest', ingestUpload.any(), (req, res) => {
       if (inserted) stored++;
     }
     console.log(`[ingest] type=${(payload && payload.type) || '?'} received=${normalized.length} stored=${stored}${questsTicked ? ` questsTicked=${questsTicked}` : ''}${diariesTicked ? ` diariesTicked=${diariesTicked}` : ''}${caTicked ? ` caTicked=${caTicked}` : ''}`);
+    if (stored || questsTicked || diariesTicked || caTicked) vaultLive.scheduleSync();
     res.json({ ok: true, stored, questsTicked, diariesTicked, caTicked });
   } catch (e) {
     res.status(500).json({ error: String(e) });
@@ -303,6 +316,7 @@ app.post('/api/bank', (req, res) => {
     if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: 'value must be a non-negative number' });
     const account = getCurrentAccount();
     bank.record(account.id, todayLabel(), value);
+    vaultLive.scheduleSync();
     console.log(`[bank] value=${Math.round(value).toLocaleString()} account=${account.rsn}`);
     res.json({ ok: true, trend: bank.getTrend(account.id) });
   } catch (e) {
@@ -342,6 +356,7 @@ app.post('/api/scan', (req, res) => {
     const dump = req.body || {};
     const account = getCurrentAccount();
     const result = scan.ingest(account.id, dump, todayLabel(), dump.manifestVersion);
+    if (result.firstSight) vaultLive.scheduleSync();   // known-char applies happen at /apply
     console.log(`[scan] account=${account.rsn} firstSight=${result.firstSight}${result.firstSight ? ` applied=${JSON.stringify(result.applied)}` : ' pending=1'}`);
     res.json({ ok: true, ...result });
   } catch (e) {
@@ -365,6 +380,7 @@ app.post('/api/scan/apply', (_req, res) => {
     const account = getCurrentAccount();
     const result = scan.applyPending(account.id, todayLabel());
     if (result.error) return res.status(409).json(result);
+    vaultLive.scheduleSync();
     console.log(`[scan] applied pending account=${account.rsn} ${JSON.stringify(result.applied)}`);
     res.json({ ok: true, ...result });
   } catch (e) {
@@ -377,6 +393,16 @@ app.post('/api/scan/dismiss', (_req, res) => {
   try {
     const account = getCurrentAccount();
     res.json({ ok: true, ...scan.clearPending(account.id) });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// POST /api/vault/sync — regenerate the live vault snapshot now (ADR 0004). Manual/on-demand
+// counterpart to the debounced scheduleSync() the mutating routes call.
+app.post('/api/vault/sync', async (_req, res) => {
+  try {
+    res.json(await vaultLive.syncNow());
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
@@ -441,6 +467,7 @@ app.get('/api/stats', async (_req, res) => {
     const account = getCurrentAccount();
     const stats = await fetchHiscores(account.rsn);
     snapshots.recordSnapshot(account.id, todayLabel(), stats);   // upsert today's per-skill rows
+    vaultLive.scheduleSync();
     const history = snapshots.getHistory(account.id);            // legacy { dates, skills } shape
     res.json({ stats, history, rsn: account.rsn, displayName: account.displayName || null });
   } catch (e) {
