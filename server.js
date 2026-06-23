@@ -120,7 +120,16 @@ app.post('/api/account-value', (req, res) => {
 // multipart/form-data with a `payload_json` text field (+ optional screenshot file), so
 // multer parses that one route; raw application/json is still accepted for testing.
 const multer = require('multer');
-const ingestUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+// Dink attaches a screenshot we don't even use; the old 5 MB cap made multer abort the WHOLE
+// request (HTTP 500) on larger screenshots, silently dropping the event. Raise the cap, and wrap
+// the parser so an oversized/odd upload still lets the JSON event through instead of 500-ing.
+const ingestUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+function ingestUploadSafe(req, res, next) {
+  ingestUpload.any()(req, res, (err) => {
+    if (err) console.warn('[ingest] upload parse issue (continuing):', String(err && err.message || err));
+    next();   // proceed regardless; payload_json (a text field) is parsed before the file part
+  });
+}
 const INGEST_TOKEN = process.env.INGEST_TOKEN || '';
 
 const sumLootValue = (items) =>
@@ -256,7 +265,7 @@ function normalizeDinkEvent(payload) {
   return out;
 }
 
-app.post('/api/ingest', ingestUpload.any(), (req, res) => {
+app.post('/api/ingest', ingestUploadSafe, (req, res) => {
   try {
     if (INGEST_TOKEN && req.query.token !== INGEST_TOKEN) {
       return res.status(401).json({ error: 'invalid or missing token' });
