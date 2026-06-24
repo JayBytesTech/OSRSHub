@@ -149,5 +149,7 @@ const accountValue = require('./accountValue')(db);
 const checklist    = require('./checklist')(db);
 const events       = require('./events')(db);
 const bank         = require('./bank')(db);
+const scan         = require('./scan')(db);
+const sessions     = require('./sessions')(db);
 
-module.exports = { db, getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, deleteAccount, snapshots, state, accountValue, checklist, events, bank };
+module.exports = { db, getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, deleteAccount, snapshots, state, accountValue, checklist, events, bank, scan, sessions };

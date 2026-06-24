@@ -51,14 +51,25 @@ Copy `.env.example` → `.env`. Key variables:
 ```
 browser (public/index.html)   ← vanilla JS/HTML/CSS, no framework, no build
         │
-        │  fetch /api/state    GET/PUT  → quest completions + goals (SQLite)
-        │  fetch /api/stats    GET      → OSRS Hiscores + history snapshot (SQLite)
-        │  fetch /api/money    GET      → vault money methods data
-        │  fetch /api/gephr    GET      → OSRS Wiki real-time GE prices → GP/hr
-        │  fetch /api/chat     POST     → Claude tool-use loop
+        │  fetch /api/state     GET/PUT → quest completions + goals (SQLite)
+        │  fetch /api/stats     GET     → OSRS Hiscores + history snapshot (SQLite)
+        │  fetch /api/money      GET     → vault money methods data
+        │  fetch /api/gephr      GET     → OSRS Wiki real-time GE prices → GP/hr
+        │  fetch /api/timeline   GET     → account_events feed (Timeline tab)
+        │  fetch /api/sessions   GET     → play-session aggregates (+/current) — XP/hr, GP/hr
+        │  fetch /api/scan/...   GET/POST→ baseline-scan pending diff + apply/dismiss
+        │  fetch /api/chat      POST     → Claude tool-use loop
+        ▲
+        │  (RuneLite plugin → hub; passive telemetry, honors INGEST_TOKEN)
+        │  POST /api/events    → native events/1 feed (level/quest/loot/… — replaces Dink)
+        │  POST /api/ingest    → legacy Dink webhook (transitional; normalizeDinkEvent)
+        │  POST /api/bank      → daily bank-value snapshot
+        │  POST /api/sessions  → live session upsert (XP/hr + GP/hr + gathered resources)
+        │  POST /api/scan      → full skills/quests/diaries dump (first-sight apply or diff)
         ▼
 server.js (Express, CommonJS)
-        ├─ db/ (SQLite via better-sqlite3) — history + state, scoped by account_id
+        ├─ db/ (SQLite via better-sqlite3) — history, state, events, sessions, scan; scoped by account_id
+        ├─ vaultLive.js — one-way SQLite → Obsidian "Live snapshot" note (ADR 0004)
         ├─ filesystem (VAULT_PATH) — money methods + chat vault tools, via safeVaultPath()
         └─ Anthropic SDK — tools: search_vault, read_note, append_note, web_search
 ```
@@ -75,7 +86,11 @@ Single-file Express server. All routes are in this file.
 
 **Data stores**: structured/account data — quest completions, goals, and daily Hiscores history — lives in **SQLite** (`db/`, file at `DB_PATH`, default `data/osrs-hub.db`), behind `/api/state` and `/api/stats`. The **vault** is still read for **money methods** (`/api/money`, `/api/gephr` parse a fenced ` ```json ` block from `MONEY_REL`) and by the **chat** vault tools. On first boot the server one-time-imports the legacy vault history + state notes into SQLite; those notes are no longer rewritten.
 
-**SQLite layer** (`db/`): `index.js` opens the DB, runs a forward-only migration runner over `db/migrations/*.sql`, and exposes `getCurrentAccount()` (the account-scoping seam). Repositories `db/snapshots.js` (history) and `db/state.js` (quests/goals) are factories `(db) => ({...})`. Add schema changes as a new numbered migration file — never edit an applied one.
+**SQLite layer** (`db/`): `index.js` opens the DB, runs a forward-only migration runner over `db/migrations/*.sql`, and exposes `getCurrentAccount()` (the account-scoping seam). Repositories are factories `(db) => ({...})`: `snapshots.js` (history), `state.js` (quests/goals/diaries/CAs), `events.js` (timeline feed), `bank.js` (daily bank value), `sessions.js` (play-session aggregates), `scan.js` (baseline scan), `accountValue.js`, `checklist.js`. Add schema changes as a new numbered migration file — never edit an applied one. All account-scoped tables are picked up automatically by `deleteAccount`'s cascade.
+
+**Plugin telemetry** (the in-house RuneLite plugin in `plugin/osrshub-telemetry/`, replacing Dink — ADR 0005): passively reads game state and POSTs. `POST /api/events` is the native `events/1` feed (all 11 categories: level/death/quest/diary/ca/clue/pet/slayer/kc/loot/clog) landing in the one `account_events` table, deduped by idempotency key, with quest/diary/CA auto-ticking; `normalizeDinkEvent` + `POST /api/ingest` remain for the Dink transition. `POST /api/sessions` upserts live play-session aggregates by `session_id` (XP/hr over idle-gated active time, GP/hr from loot + gathered resources, per-skill XP, resource counts — ADR 0006); rates are derived on read in `db/sessions.js`. `POST /api/scan` ingests a full skills/quests/diaries dump and either applies it (first sight) or stores a confirm-diff (known account — ADR 0003). All telemetry routes honor the optional `INGEST_TOKEN` and are passive only (ADR 0001 D2).
+
+**Vault Live snapshot** (`vaultLive.js`, ADR 0004): a one-way, debounced projection of the SQLite source of truth into a hub-owned Obsidian note (`LIVE_REL`) so chat / Obsidian-side AI always reads current data. Nothing is read back; regenerated wholesale on change via the path-confined `writeNote`.
 
 **Skill-name coupling**: the old positional `SKILL_NAMES` coupling is retired — history is keyed by skill **name** in SQLite, so `server.js` no longer defines `SKILL_NAMES` (only `public/index.html` does, for render order). Both `/api/stats` and `/api/state` keep their original response shapes; only the backing store changed, so the frontend is unaffected.
 

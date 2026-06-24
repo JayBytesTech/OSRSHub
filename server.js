@@ -19,7 +19,7 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const anthropic = API_KEY ? new Anthropic({ apiKey: API_KEY }) : null;
 
 // SQLite store (history/time-series + account scoping). Vault stays for human notes.
-const { getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, deleteAccount, snapshots, state, accountValue, checklist, events, bank } = require('./db');
+const { getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, deleteAccount, snapshots, state, accountValue, checklist, events, bank, scan, sessions } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -33,6 +33,17 @@ function safeVaultPath(rel) {
   }
   return abs;
 }
+
+// ── Vault live snapshot (ADR 0004): one-way SQLite → Obsidian projection ───────
+// Regenerates a hub-owned note so the chat / Obsidian-side AI always reads current data.
+// scheduleSync() is called from the mutating routes (debounced); writes are path-confined.
+const LIVE_REL = process.env.LIVE_REL || 'Gaming/OSRS/OSRS Hub — Live.md';
+const writeNote = async (rel, content) => {
+  const abs = safeVaultPath(rel);
+  await fs.mkdir(path.dirname(abs), { recursive: true });   // ensure the OSRS folder exists
+  await fs.writeFile(abs, content, 'utf8');
+};
+const vaultLive = require('./vaultLive')({ db: require('./db'), writeNote, liveRel: LIVE_REL });
 
 // ── State API (quest completions + goals, backed by SQLite) ───────────────────
 app.get('/api/state', (_req, res) => {
@@ -48,6 +59,7 @@ app.put('/api/state', (req, res) => {
   try {
     const account = getCurrentAccount();
     state.setState(account.id, req.body || {});   // full replace of this account's state
+    vaultLive.scheduleSync();
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: String(e) });
@@ -108,7 +120,16 @@ app.post('/api/account-value', (req, res) => {
 // multipart/form-data with a `payload_json` text field (+ optional screenshot file), so
 // multer parses that one route; raw application/json is still accepted for testing.
 const multer = require('multer');
-const ingestUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+// Dink attaches a screenshot we don't even use; the old 5 MB cap made multer abort the WHOLE
+// request (HTTP 500) on larger screenshots, silently dropping the event. Raise the cap, and wrap
+// the parser so an oversized/odd upload still lets the JSON event through instead of 500-ing.
+const ingestUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+function ingestUploadSafe(req, res, next) {
+  ingestUpload.any()(req, res, (err) => {
+    if (err) console.warn('[ingest] upload parse issue (continuing):', String(err && err.message || err));
+    next();   // proceed regardless; payload_json (a text field) is parsed before the file part
+  });
+}
 const INGEST_TOKEN = process.env.INGEST_TOKEN || '';
 
 const sumLootValue = (items) =>
@@ -244,7 +265,7 @@ function normalizeDinkEvent(payload) {
   return out;
 }
 
-app.post('/api/ingest', ingestUpload.any(), (req, res) => {
+app.post('/api/ingest', ingestUploadSafe, (req, res) => {
   try {
     if (INGEST_TOKEN && req.query.token !== INGEST_TOKEN) {
       return res.status(401).json({ error: 'invalid or missing token' });
@@ -276,7 +297,63 @@ app.post('/api/ingest', ingestUpload.any(), (req, res) => {
       if (inserted) stored++;
     }
     console.log(`[ingest] type=${(payload && payload.type) || '?'} received=${normalized.length} stored=${stored}${questsTicked ? ` questsTicked=${questsTicked}` : ''}${diariesTicked ? ` diariesTicked=${diariesTicked}` : ''}${caTicked ? ` caTicked=${caTicked}` : ''}`);
+    if (stored || questsTicked || diariesTicked || caTicked) vaultLive.scheduleSync();
     res.json({ ok: true, stored, questsTicked, diariesTicked, caTicked });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ── Native plugin event feed (ADR 0005) ───────────────────────────────────────
+// The OSRS Hub plugin posts hub-native events here (schema "events/1"), replacing Dink
+// category-by-category. Events are already in the hub's {type, summary, data} shape, so unlike
+// /api/ingest there's no Dink mapping — the server just validates, dedupes (idempotency key), and
+// writes to the same account_events feed. Mirrors the Dink path's quest/diary/CA auto-ticking so
+// migrated categories keep advancing state. Passive only. Honors INGEST_TOKEN.
+const isoOrNull = (s) => {
+  if (typeof s !== 'string') return null;
+  const t = Date.parse(s);
+  return Number.isNaN(t) ? null : new Date(t).toISOString();
+};
+app.post('/api/events', (req, res) => {
+  try {
+    if (INGEST_TOKEN && req.query.token !== INGEST_TOKEN) {
+      return res.status(401).json({ error: 'invalid or missing token' });
+    }
+    const body = req.body || {};
+    if (body.schema !== 'events/1') {
+      return res.status(400).json({ error: 'unsupported schema; expected "events/1"' });
+    }
+    const list = Array.isArray(body.events) ? body.events : [];
+    const account = getCurrentAccount();
+    const nowIso = new Date().toISOString();
+    const minute = nowIso.slice(0, 16);
+    let stored = 0, questsTicked = 0, diariesTicked = 0, caTicked = 0, skipped = 0;
+    for (const ev of list) {
+      const type = ev && typeof ev.type === 'string' ? ev.type.trim() : '';
+      if (!type) { skipped++; continue; }
+      const data = ev.data && typeof ev.data === 'object' ? ev.data : null;
+      const summary = (typeof ev.summary === 'string' && ev.summary.trim()) ? ev.summary.trim() : `📌 ${type}`;
+      const occurred_at = isoOrNull(ev.occurredAt) || nowIso;
+      // Parity side-effects: advance tracked state for migrated categories.
+      if (type === 'quest' && data && data.questName && isAutoTickableQuest(data.questName)) {
+        if (state.addQuestCompletion(account.id, data.questName)) questsTicked++;
+      }
+      if (type === 'diary' && data && data.region && data.tier) {
+        if (state.addDiaryCompletion(account.id, data.region, data.tier)) diariesTicked++;
+      }
+      if (type === 'ca' && data && (data.taskId != null || data.task)) {
+        const caId = data.taskId != null ? Number(data.taskId) : caTaskId(data.task);
+        if (caId != null && state.addCaCompletion(account.id, caId)) caTicked++;
+      }
+      // Idempotency: plugin-supplied key wins (account_id|type|game-ts|subject lives in dedupe_key);
+      // fall back to the minute-bucket like the Dink path.
+      const dedupe_key = (typeof ev.key === 'string' && ev.key) ? ev.key : `${type}|${summary}|${minute}`;
+      if (events.addEvent(account.id, { type, occurred_at, summary, data, source: 'osrshub-plugin', dedupe_key })) stored++;
+    }
+    if (stored || questsTicked || diariesTicked || caTicked) vaultLive.scheduleSync();
+    console.log(`[events] received=${list.length} stored=${stored}${skipped ? ` skipped=${skipped}` : ''}${questsTicked ? ` questsTicked=${questsTicked}` : ''}${diariesTicked ? ` diariesTicked=${diariesTicked}` : ''}${caTicked ? ` caTicked=${caTicked}` : ''}`);
+    res.json({ ok: true, stored, skipped, questsTicked, diariesTicked, caTicked });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
@@ -303,6 +380,7 @@ app.post('/api/bank', (req, res) => {
     if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: 'value must be a non-negative number' });
     const account = getCurrentAccount();
     bank.record(account.id, todayLabel(), value);
+    vaultLive.scheduleSync();
     console.log(`[bank] value=${Math.round(value).toLocaleString()} account=${account.rsn}`);
     res.json({ ok: true, trend: bank.getTrend(account.id) });
   } catch (e) {
@@ -314,6 +392,126 @@ app.get('/api/bank', (_req, res) => {
   try {
     const account = getCurrentAccount();
     res.json(bank.getTrend(account.id));
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ── Play sessions: XP/hr & GP/hr (ADR 0006, plugin Phase 2) ───────────────────
+// The plugin's SessionTracker upserts a running aggregate per session (periodic while playing + a
+// final post on logout), keyed by session_id (ADR 0006 D1 — a dedicated path, not account_events).
+// Rates are derived on read (db/sessions.js). Passive; honors INGEST_TOKEN like the other plugin feeds.
+app.post('/api/sessions', (req, res) => {
+  try {
+    if (INGEST_TOKEN && req.query.token !== INGEST_TOKEN) {
+      return res.status(401).json({ error: 'invalid or missing token' });
+    }
+    const body = req.body || {};
+    if (body.schema !== 'sessions/1') {
+      return res.status(400).json({ error: 'unsupported schema; expected "sessions/1"' });
+    }
+    const s = body.session;
+    if (!s || typeof s !== 'object' || !s.sessionId || !s.startedAt) {
+      return res.status(400).json({ error: 'session requires sessionId and startedAt' });
+    }
+    const account = getCurrentAccount();
+    const stored = sessions.upsert(account.id, s);
+    vaultLive.scheduleSync();
+    console.log(`[session] ${stored.final ? 'end ' : 'live'} ${stored.sessionId} active=${stored.activeSeconds}s xp=${stored.totalXp.toLocaleString()}${stored.xpPerHour != null ? ` (${stored.xpPerHour.toLocaleString()}/hr)` : ''} account=${account.rsn}`);
+    res.json({ ok: true, session: stored });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.get('/api/sessions', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json({ sessions: sessions.recent(account.id, 30) });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.get('/api/sessions/current', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json({ session: sessions.current(account.id) });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ── Baseline character scan (ADR 0003) ───────────────────────────────────────
+// A full-state DUMP from the RuneLite plugin. First-sight accounts apply wholesale; known
+// characters store the dump and surface a diff the user confirms from the hub UI. Passive only.
+const SCAN_MANIFEST_PATH = path.join(__dirname, 'scan-manifest.json');
+
+// GET /api/scan/manifest — server-owned list of varbits/varps/keys the plugin should read (ADR D4).
+app.get('/api/scan/manifest', (_req, res) => {
+  try {
+    res.type('application/json').send(require('fs').readFileSync(SCAN_MANIFEST_PATH, 'utf8'));
+  } catch (e) {
+    res.status(500).json({ error: 'scan manifest unavailable: ' + String(e) });
+  }
+});
+
+// POST /api/scan — ingest a full-state dump (plugin → hub). Honors INGEST_TOKEN like /api/ingest.
+app.post('/api/scan', (req, res) => {
+  try {
+    if (INGEST_TOKEN && req.query.token !== INGEST_TOKEN) {
+      return res.status(401).json({ error: 'invalid or missing token' });
+    }
+    const dump = req.body || {};
+    const account = getCurrentAccount();
+    const result = scan.ingest(account.id, dump, todayLabel(), dump.manifestVersion);
+    if (result.firstSight) vaultLive.scheduleSync();   // known-char applies happen at /apply
+    console.log(`[scan] account=${account.rsn} firstSight=${result.firstSight}${result.firstSight ? ` applied=${JSON.stringify(result.applied)}` : ' pending=1'}`);
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// GET /api/scan/pending — the stored pending dump's fresh diff for the hub's review banner.
+app.get('/api/scan/pending', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json(scan.getPending(account.id) || { pending: false });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// POST /api/scan/apply — user confirmed the diff: apply the pending dump.
+app.post('/api/scan/apply', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    const result = scan.applyPending(account.id, todayLabel());
+    if (result.error) return res.status(409).json(result);
+    vaultLive.scheduleSync();
+    console.log(`[scan] applied pending account=${account.rsn} ${JSON.stringify(result.applied)}`);
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// POST /api/scan/dismiss — user discarded the pending dump.
+app.post('/api/scan/dismiss', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json({ ok: true, ...scan.clearPending(account.id) });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// POST /api/vault/sync — regenerate the live vault snapshot now (ADR 0004). Manual/on-demand
+// counterpart to the debounced scheduleSync() the mutating routes call.
+app.post('/api/vault/sync', async (_req, res) => {
+  try {
+    res.json(await vaultLive.syncNow());
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
@@ -378,6 +576,7 @@ app.get('/api/stats', async (_req, res) => {
     const account = getCurrentAccount();
     const stats = await fetchHiscores(account.rsn);
     snapshots.recordSnapshot(account.id, todayLabel(), stats);   // upsert today's per-skill rows
+    vaultLive.scheduleSync();
     const history = snapshots.getHistory(account.id);            // legacy { dates, skills } shape
     res.json({ stats, history, rsn: account.rsn, displayName: account.displayName || null });
   } catch (e) {

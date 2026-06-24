@@ -45,4 +45,17 @@ tasks.register('run', JavaExec) {
     description = 'Run a RuneLite dev client with OSRS Hub Telemetry loaded'
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'com.osrshub.telemetry.OsrsHubPluginTest'
+    enableAssertions = true   // RuneLite's ExternalPluginManager.loadBuiltin requires -ea
+    // Gradle's JavaExec sanitizes the environment, dropping the Jagex session vars and resetting
+    // HOME. When launched via Bolt's custom command we must forward them so the forked client uses
+    // the right .runelite profile AND can authenticate the Jagex account.
+    def rlHome = System.getenv('RL_USER_HOME') ?: System.getenv('HOME')
+    if (rlHome) {
+        systemProperty 'user.home', rlHome
+        environment 'HOME', rlHome
+    }
+    ['JX_SESSION_ID', 'JX_CHARACTER_ID', 'JX_DISPLAY_NAME', 'JX_ACCESS_TOKEN', 'JX_REFRESH_TOKEN'].each { k ->
+        def v = System.getenv(k)
+        if (v != null) environment k, v
+    }
 }

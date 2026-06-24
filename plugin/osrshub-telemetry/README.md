@@ -31,6 +31,35 @@ gradle wrapper        # one-time: creates ./gradlew (uses the version in gradle-
 ```
 `run` launches a RuneLite dev client with the plugin side-loaded.
 
+### C. Jagex account via the Bolt launcher (Linux) — the real-world recipe
+
+If you log in with a **Jagex account** you can't use a bare dev client (it has no Jagex session) and
+you **can't** just drop the jar in `~/.runelite/sideloaded-plugins/`. RuneLite computes
+`developerMode = has("--developer-mode") && launcherVersion == null`, and sideloaded-plugin loading
+is gated on `developerMode` — so **any** official launcher (Bolt included) force-disables it. The
+working approach is to have **Bolt launch the `loadBuiltin` dev client** (`./gradlew run`), which
+isn't gated by launcher version, while Bolt supplies the Jagex session via `JX_*` env vars.
+
+1. Install **JDK 11** (`sudo pacman -S jdk11-openjdk`) and bootstrap the gradle wrapper once (path B).
+2. Create a wrapper script, e.g. `~/.local/share/bolt-launcher/launch-runelite-dev.sh`:
+   ```sh
+   #!/bin/sh
+   export HOME=/home/<you>/.local/share/bolt-launcher        # Bolt's .runelite profile
+   export RL_USER_HOME=/home/<you>/.local/share/bolt-launcher
+   export JAVA_HOME=/usr/lib/jvm/java-11-openjdk
+   export GRADLE_USER_HOME=/home/<you>/.gradle
+   cd /home/<you>/Projects/OSRSHub/plugin/osrshub-telemetry || exit 1
+   exec ./gradlew run --console=plain --no-daemon
+   ```
+   `--no-daemon` matters: a cached daemon forks the client with a stale environment.
+3. Point Bolt at it: set `runelite_launch_command` in `~/.config/bolt-launcher/launcher.json` to the
+   script's path (back the file up first; revert by clearing it). Bolt must be **closed** when editing.
+4. The `run` task (see `build.gradle`) forwards `user.home` + the `JX_*` session vars to the forked
+   client, because Gradle's JavaExec otherwise strips them (no creds → no login; wrong home → no
+   plugins). It also sets `enableAssertions` (`loadBuiltin` requires `-ea`).
+5. Launch RuneLite through Bolt as usual. You get your full plugin list **plus** OSRS Hub Telemetry,
+   logged into your Jagex account. Relaunching after a code change rebuilds automatically.
+
 ## Use it
 1. In the running RuneLite client, log into OSRS.
 2. Make sure the hub is running. If you changed the hub's port or set `INGEST_TOKEN`, open the
