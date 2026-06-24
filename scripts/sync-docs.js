@@ -44,6 +44,8 @@ const DOCS = [
   { repo: 'GUARDRAILS.md',                          vault: 'OSRS Hub — Guardrails.md',                    tags: ['osrs', 'osrs-hub', 'planning', 'guardrails'] },
   { repo: 'decisions/0001-foundational-decisions.md', vault: 'OSRS Hub — ADR 0001 Foundational Decisions.md', tags: ['osrs', 'osrs-hub', 'planning', 'adr'] },
   { repo: 'decisions/0003-baseline-scan-ingest.md',  vault: 'OSRS Hub — ADR 0003 Baseline Scan Ingest.md',  tags: ['osrs', 'osrs-hub', 'planning', 'adr'] },
+  { repo: 'decisions/0004-vault-live-snapshot.md',   vault: 'OSRS Hub — ADR 0004 Vault Live Snapshot.md',   tags: ['osrs', 'osrs-hub', 'planning', 'adr'] },
+  { repo: 'decisions/0005-plugin-event-feed-dink-replacement.md', vault: 'OSRS Hub — ADR 0005 Plugin Event Feed.md', tags: ['osrs', 'osrs-hub', 'planning', 'adr'] },
 ];
 
 // Normalised link target (no leading ./, no trailing /) → vault wiki-link.
@@ -56,6 +58,8 @@ const LINK_MAP = {
   'decisions': '[[OSRS Hub — ADR 0001 Foundational Decisions]]',
   'decisions/0001-foundational-decisions.md': '[[OSRS Hub — ADR 0001 Foundational Decisions]]',
   'decisions/0003-baseline-scan-ingest.md': '[[OSRS Hub — ADR 0003 Baseline Scan Ingest]]',
+  'decisions/0004-vault-live-snapshot.md': '[[OSRS Hub — ADR 0004 Vault Live Snapshot]]',
+  'decisions/0005-plugin-event-feed-dink-replacement.md': '[[OSRS Hub — ADR 0005 Plugin Event Feed]]',
 };
 
 // Plain text / inline-code references that have a nicer vault equivalent.

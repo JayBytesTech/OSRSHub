@@ -304,6 +304,61 @@ app.post('/api/ingest', ingestUploadSafe, (req, res) => {
   }
 });
 
+// ── Native plugin event feed (ADR 0005) ───────────────────────────────────────
+// The OSRS Hub plugin posts hub-native events here (schema "events/1"), replacing Dink
+// category-by-category. Events are already in the hub's {type, summary, data} shape, so unlike
+// /api/ingest there's no Dink mapping — the server just validates, dedupes (idempotency key), and
+// writes to the same account_events feed. Mirrors the Dink path's quest/diary/CA auto-ticking so
+// migrated categories keep advancing state. Passive only. Honors INGEST_TOKEN.
+const isoOrNull = (s) => {
+  if (typeof s !== 'string') return null;
+  const t = Date.parse(s);
+  return Number.isNaN(t) ? null : new Date(t).toISOString();
+};
+app.post('/api/events', (req, res) => {
+  try {
+    if (INGEST_TOKEN && req.query.token !== INGEST_TOKEN) {
+      return res.status(401).json({ error: 'invalid or missing token' });
+    }
+    const body = req.body || {};
+    if (body.schema !== 'events/1') {
+      return res.status(400).json({ error: 'unsupported schema; expected "events/1"' });
+    }
+    const list = Array.isArray(body.events) ? body.events : [];
+    const account = getCurrentAccount();
+    const nowIso = new Date().toISOString();
+    const minute = nowIso.slice(0, 16);
+    let stored = 0, questsTicked = 0, diariesTicked = 0, caTicked = 0, skipped = 0;
+    for (const ev of list) {
+      const type = ev && typeof ev.type === 'string' ? ev.type.trim() : '';
+      if (!type) { skipped++; continue; }
+      const data = ev.data && typeof ev.data === 'object' ? ev.data : null;
+      const summary = (typeof ev.summary === 'string' && ev.summary.trim()) ? ev.summary.trim() : `📌 ${type}`;
+      const occurred_at = isoOrNull(ev.occurredAt) || nowIso;
+      // Parity side-effects: advance tracked state for migrated categories.
+      if (type === 'quest' && data && data.questName && isAutoTickableQuest(data.questName)) {
+        if (state.addQuestCompletion(account.id, data.questName)) questsTicked++;
+      }
+      if (type === 'diary' && data && data.region && data.tier) {
+        if (state.addDiaryCompletion(account.id, data.region, data.tier)) diariesTicked++;
+      }
+      if (type === 'ca' && data && (data.taskId != null || data.task)) {
+        const caId = data.taskId != null ? Number(data.taskId) : caTaskId(data.task);
+        if (caId != null && state.addCaCompletion(account.id, caId)) caTicked++;
+      }
+      // Idempotency: plugin-supplied key wins (account_id|type|game-ts|subject lives in dedupe_key);
+      // fall back to the minute-bucket like the Dink path.
+      const dedupe_key = (typeof ev.key === 'string' && ev.key) ? ev.key : `${type}|${summary}|${minute}`;
+      if (events.addEvent(account.id, { type, occurred_at, summary, data, source: 'osrshub-plugin', dedupe_key })) stored++;
+    }
+    if (stored || questsTicked || diariesTicked || caTicked) vaultLive.scheduleSync();
+    console.log(`[events] received=${list.length} stored=${stored}${skipped ? ` skipped=${skipped}` : ''}${questsTicked ? ` questsTicked=${questsTicked}` : ''}${diariesTicked ? ` diariesTicked=${diariesTicked}` : ''}${caTicked ? ` caTicked=${caTicked}` : ''}`);
+    res.json({ ok: true, stored, skipped, questsTicked, diariesTicked, caTicked });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
 app.get('/api/timeline', (_req, res) => {
   try {
     const account = getCurrentAccount();
