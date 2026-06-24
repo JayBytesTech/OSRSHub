@@ -150,6 +150,14 @@ public class OsrsHubPlugin extends Plugin
 		return m;
 	}
 
+	// Combat-achievement completion is a bitset packed across these player varps (id → varp[id>>>5],
+	// bit id&31). The plugin just dumps the raw values; the hub does the bit math against ca-data.json
+	// (task ids 0–636). Varp set + order from reldo's task-json-store (COMBAT task type).
+	private static final int[] CA_COMPLETION_VARPS = {
+		3116, 3117, 3118, 3119, 3120, 3121, 3122, 3123, 3124, 3125, 3126, 3127, 3128,
+		3387, 3718, 3773, 3774, 4204, 4496, 4721,
+	};
+
 	private static void putDiary(Map<Integer, String[]> m, String region, int easy, int med, int hard, int elite)
 	{
 		m.put(easy, new String[]{region, "Easy"});
@@ -509,12 +517,22 @@ public class OsrsHubPlugin extends Plugin
 		stats.addProperty("slayer.streak", client.getVarbitValue(Varbits.SLAYER_TASK_STREAK));
 		stats.addProperty("questPoints", client.getVarpValue(VarPlayer.QUEST_POINTS));
 
+		// Combat achievements: dump the raw completion varps; the hub decodes the bitset.
+		final JsonObject caVarps = new JsonObject();
+		for (int vp : CA_COMPLETION_VARPS)
+		{
+			caVarps.addProperty(Integer.toString(vp), client.getVarpValue(vp));
+		}
+		final JsonObject combatAchievements = new JsonObject();
+		combatAchievements.add("varps", caVarps);
+
 		final JsonObject dump = new JsonObject();
 		dump.addProperty("schema", "scan/1");
 		dump.add("skills", skills);
 		dump.add("quests", quests);
 		dump.add("diaries", diaries);
 		dump.add("stats", stats);
+		dump.add("combatAchievements", combatAchievements);
 		postJson("/api/scan", dump, "scan");
 	}
 

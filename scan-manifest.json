@@ -28,9 +28,12 @@
       "entries": []
     },
     "combatAchievements": {
-      "read": "varbit per CA task completion flag (task ids match public/ca-data.json)",
+      "read": "plugin dumps the completion-bitset varps; hub decodes bit (id&31) of varps[id>>>5] against ca-data.json task ids (0-636)",
       "updatePeriod": "session",
       "payloadKey": "combatAchievements",
+      "status": "implemented",
+      "completionVarps": [3116, 3117, 3118, 3119, 3120, 3121, 3122, 3123, 3124, 3125, 3126, 3127, 3128, 3387, 3718, 3773, 3774, 4204, 4496, 4721],
+      "note": "Varp set + order from reldo's task-json-store (COMBAT task type). Struct param ids for reference: id=1306, tier=1310, name=1308, desc=1309.",
       "entries": []
     },
     "unlocks": {

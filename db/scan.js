@@ -87,8 +87,12 @@ module.exports = function makeScan(db) {
         .filter(t => t && t.done && typeof t.region === 'string' && typeof t.tier === 'string')
         .map(t => ({ region: t.region, tier: t.tier }));
     }
-    if (d.combatAchievements && Array.isArray(d.combatAchievements.completed)) {
-      out.caCompleted = d.combatAchievements.completed.map(int).filter(Number.isInteger);
+    if (d.combatAchievements && typeof d.combatAchievements === 'object') {
+      if (Array.isArray(d.combatAchievements.completed)) {
+        out.caCompleted = d.combatAchievements.completed.map(int).filter(Number.isInteger);
+      } else if (d.combatAchievements.varps && typeof d.combatAchievements.varps === 'object') {
+        out.caCompleted = caCompletedFromVarps(d.combatAchievements.varps);   // decode the bitset
+      }
       out.caTotalPoints = numOrNull(d.combatAchievements.totalPoints);
     }
     if (Array.isArray(d.unlocks)) {
@@ -252,6 +256,37 @@ module.exports = function makeScan(db) {
 
   return { isFirstSight, buildDiff, applyDump, ingest, getPending, applyPending, clearPending };
 };
+
+// ---- combat-achievement bitset decoding --------------------------------------
+// CA completion is packed across these player varps in this exact order: task id T is complete iff
+// bit (T & 31) is set in CA_COMPLETION_VARPS[T >>> 5]. Varp set/order from reldo's task-json-store
+// (COMBAT task type). The plugin dumps the raw varp values; we decode against ca-data.json's task ids.
+const CA_COMPLETION_VARPS = [
+  3116, 3117, 3118, 3119, 3120, 3121, 3122, 3123, 3124, 3125, 3126, 3127, 3128,
+  3387, 3718, 3773, 3774, 4204, 4496, 4721,
+];
+let _caTaskIds = null;
+function caTaskIds() {
+  if (_caTaskIds) return _caTaskIds;
+  _caTaskIds = [];
+  try {
+    for (const t of (require('../public/ca-data.json').tasks || [])) {
+      if (Number.isInteger(t.id)) _caTaskIds.push(t.id);
+    }
+  } catch { /* dataset missing — CA varp decode disabled */ }
+  return _caTaskIds;
+}
+// Decode { "<varpId>": value, ... } → array of completed task ids.
+function caCompletedFromVarps(varps) {
+  const out = [];
+  for (const id of caTaskIds()) {
+    const varpId = CA_COMPLETION_VARPS[id >>> 5];
+    if (varpId == null) continue;
+    const v = Number(varps[varpId] != null ? varps[varpId] : varps[String(varpId)]) || 0;
+    if (((v >>> (id & 31)) & 1) === 1) out.push(id);
+  }
+  return out;
+}
 
 // ---- small utils -------------------------------------------------------------
 function int(v) { const n = parseInt(v, 10); return Number.isInteger(n) ? n : (Number.isFinite(Number(v)) ? Math.round(Number(v)) : NaN); }
