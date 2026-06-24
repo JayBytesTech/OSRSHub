@@ -62,6 +62,7 @@ import okhttp3.Response;
  *   • combat achs → POST /api/events (ADR 0005 Phase 1)
  *   • clues       → POST /api/events (ADR 0005 Phase 1)
  *   • pets        → POST /api/events (ADR 0005 Phase 1)
+ *   • slayer      → POST /api/events (ADR 0005 Phase 1)
  * Read-only — this plugin never sends input to or acts on the game (see docs/decisions/0002,
  * 0005 and ADR 0001 D2).
  */
@@ -93,6 +94,14 @@ public class OsrsHubPlugin extends Plugin
 		"You (?:have a funny feeling like you would have been followed|feel something weird sneaking into your backpack, but you already own)");
 	private static final Pattern PET_PATTERN = Pattern.compile(
 		"You (?:have a funny feeling like you're being followed|feel something weird sneaking into your backpack)");
+
+	// Slayer. The completion line carries the count + (optional) points but never names the monster;
+	// the monster name only appears in the assignment line, so we remember it from there. Best-effort:
+	// if the plugin started mid-task we never saw the assignment and degrade to a generic name.
+	private static final Pattern SLAYER_ASSIGN_PATTERN = Pattern.compile(
+		"You(?:'re| have been) assigned to kill (?:[\\d,]+ )?(?<name>.+?)(?: (?:in|on) (?:the )?.+?)?; only [\\d,]+ more to go");
+	private static final Pattern SLAYER_COMPLETE_PATTERN = Pattern.compile(
+		"You've completed (?<count>[\\d,]+) (?:Wilderness )?tasks?(?: in a row)?(?:.*?received (?<points>[\\d,]+) points?)?");
 
 	// Each Achievement-Diary tier sets a dedicated completion varbit. Map varbit id → {region, tier}
 	// where region/tier match public/diary-data.json exactly so the hub's diary auto-tick lights up.
@@ -148,6 +157,9 @@ public class OsrsHubPlugin extends Plugin
 	// Diary-tier varbit ids already complete at login, so we only emit on a *new* tier completion.
 	private final Set<Integer> completedDiaries = new HashSet<>();
 	private boolean diariesBaselined = false;
+
+	// Current Slayer task name, learned from the assignment chat line and reported on completion.
+	private String currentSlayerTask = null;
 
 	@Provides
 	OsrsHubConfig provideConfig(ConfigManager configManager)
@@ -365,10 +377,26 @@ public class OsrsHubPlugin extends Plugin
 		if (PET_DUPLICATE_PATTERN.matcher(message).find())
 		{
 			emitPet(true);
+			return;
 		}
-		else if (PET_PATTERN.matcher(message).find())
+		if (PET_PATTERN.matcher(message).find())
 		{
 			emitPet(false);
+			return;
+		}
+
+		// Slayer assignment — just remember the task name for the eventual completion event.
+		final Matcher assign = SLAYER_ASSIGN_PATTERN.matcher(message);
+		if (assign.find())
+		{
+			currentSlayerTask = assign.group("name").trim();
+			return;
+		}
+
+		final Matcher slayer = SLAYER_COMPLETE_PATTERN.matcher(message);
+		if (slayer.find())
+		{
+			emitSlayer(currentSlayerTask, slayer.group("count"), slayer.group("points"));
 		}
 	}
 
@@ -400,6 +428,28 @@ public class OsrsHubPlugin extends Plugin
 		ev.addProperty("occurredAt", Instant.now().toString());
 		ev.addProperty("summary", "🗺️ " + clueType + " clue completed (#" + numberCompleted + ")");
 		ev.addProperty("key", "clue|" + clueType + "|" + numberCompleted);   // count rises each time → idempotent
+		ev.add("data", data);
+		postEvent(ev);
+	}
+
+	// slayerCompleted/slayerPoints are sent as strings (matching the Dink data shape); points is
+	// optional (Turael tasks award none). task degrades to "task" if the assignment was never seen.
+	private void emitSlayer(String task, String count, String points)
+	{
+		final String taskName = (task == null || task.isEmpty()) ? "task" : task;
+		final String completed = count == null ? null : count.replace(",", "");
+
+		final JsonObject data = new JsonObject();
+		data.addProperty("slayerTask", taskName);
+		if (completed != null) { data.addProperty("slayerCompleted", completed); } else { data.add("slayerCompleted", JsonNull.INSTANCE); }
+		if (points != null) { data.addProperty("slayerPoints", points.replace(",", "")); } else { data.add("slayerPoints", JsonNull.INSTANCE); }
+
+		final String occurredAt = Instant.now().toString();
+		final JsonObject ev = new JsonObject();
+		ev.addProperty("type", "slayer");
+		ev.addProperty("occurredAt", occurredAt);
+		ev.addProperty("summary", "💀 Slayer task complete: " + taskName + (completed != null ? " (" + completed + " done)" : ""));
+		ev.addProperty("key", "slayer|" + occurredAt);   // tasks repeat → distinct moment, time-keyed
 		ev.add("data", data);
 		postEvent(ev);
 	}
