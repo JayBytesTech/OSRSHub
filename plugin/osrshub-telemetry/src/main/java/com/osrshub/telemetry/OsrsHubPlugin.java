@@ -502,11 +502,19 @@ public class OsrsHubPlugin extends Plugin
 		final JsonObject diaries = new JsonObject();
 		diaries.add("tiers", tiers);
 
+		// Scalar stats → profile_stats (current values, latest-wins). Slayer task NAME isn't exposed
+		// here (only a creature index), so it's left to the incremental slayer emitter.
+		final JsonObject stats = new JsonObject();
+		stats.addProperty("slayer.points", client.getVarbitValue(Varbits.SLAYER_POINTS));
+		stats.addProperty("slayer.streak", client.getVarbitValue(Varbits.SLAYER_TASK_STREAK));
+		stats.addProperty("questPoints", client.getVarpValue(VarPlayer.QUEST_POINTS));
+
 		final JsonObject dump = new JsonObject();
 		dump.addProperty("schema", "scan/1");
 		dump.add("skills", skills);
 		dump.add("quests", quests);
 		dump.add("diaries", diaries);
+		dump.add("stats", stats);
 		postJson("/api/scan", dump, "scan");
 	}
 
