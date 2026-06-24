@@ -201,6 +201,21 @@ public class OsrsHubPlugin extends Plugin
 	private long lastXpGainAt = 0;
 	private int sessionPostTicks = 0;
 
+	// Per-skill XP baseline → per-skill gains = getSkillExperience(skill) − start (ADR 0006 2B).
+	private final Map<Skill, Integer> sessionStartXp = new EnumMap<>(Skill.class);
+
+	// Resource counter (ADR 0006 D5): attribute an inventory increase to gathering ONLY when a
+	// gathering-skill XP gain fired on the same tick. Processing skills (Cooking/Fletching/…) are
+	// excluded by restricting to GATHERING_SKILLS, so a crafted product is never counted as "gathered".
+	private static final Set<Skill> GATHERING_SKILLS =
+		EnumSet.of(Skill.WOODCUTTING, Skill.MINING, Skill.FISHING, Skill.HUNTER, Skill.FARMING);
+	private final Map<Integer, Integer> invSnapshot = new HashMap<>();   // itemId → qty (inventory)
+	private boolean invSnapshotReady = false;
+	private Skill tickGatherSkill = null;                                // gathering XP this tick?
+	private final Map<Integer, Integer> tickInvGains = new HashMap<>();  // inv gains awaiting correlation
+	private final Map<String, Integer> sessionResources = new HashMap<>(); // itemName → qty gathered
+	private long sessionGatheredValue = 0;
+
 	@Provides
 	OsrsHubConfig provideConfig(ConfigManager configManager)
 	{
@@ -252,6 +267,18 @@ public class OsrsHubPlugin extends Plugin
 				}
 				lastXpGainAt = now;
 				currentTotalXp = overall;
+
+				// Gathering attribution: mark the tick, and if an inventory gain already arrived this
+				// tick (events can fire in either order), attribute it now.
+				if (GATHERING_SKILLS.contains(skill))
+				{
+					tickGatherSkill = skill;
+					if (!tickInvGains.isEmpty())
+					{
+						attributeGathered(tickInvGains);
+						tickInvGains.clear();
+					}
+				}
 			}
 		}
 		final int level = event.getLevel();              // real (XP-derived) level, 1..99
@@ -333,6 +360,14 @@ public class OsrsHubPlugin extends Plugin
 		{
 			startTotalXp = client.getOverallExperience();
 			currentTotalXp = startTotalXp;
+			for (Skill sk : Skill.values())
+			{
+				if (sk != Skill.OVERALL)
+				{
+					sessionStartXp.put(sk, client.getSkillExperience(sk));
+				}
+			}
+			snapshotInventory();   // so the first inventory change diffs against a real baseline
 			sessionPendingBaseline = false;
 		}
 		else if (++sessionPostTicks >= SESSION_POST_TICKS)
@@ -366,6 +401,10 @@ public class OsrsHubPlugin extends Plugin
 			questScanTicks--;
 			scanForNewlyFinishedQuests();
 		}
+		// End-of-tick reset for the gathering correlation window: a one-tick window means an inventory
+		// gain on a tick with no gathering XP (e.g. a bank withdrawal) is discarded, not misattributed.
+		tickGatherSkill = null;
+		tickInvGains.clear();
 	}
 
 	// Emit a quest event for any quest that has flipped to FINISHED since our baseline. The
@@ -705,6 +744,11 @@ public class OsrsHubPlugin extends Plugin
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event)
 	{
+		if (event.getContainerId() == InventoryID.INVENTORY.getId())
+		{
+			handleInventoryChange(event.getItemContainer());
+			return;
+		}
 		if (event.getContainerId() != InventoryID.BANK.getId())
 		{
 			return;
@@ -735,6 +779,88 @@ public class OsrsHubPlugin extends Plugin
 		postBankValue(total);
 	}
 
+	// ── Resource gathering counter (ADR 0006 2B / D5) ─────────────────────────────
+	// Diff the inventory vs the last snapshot; positive deltas are candidate gathers. Attribute them to
+	// gathering only if a gathering-skill XP gain fired this tick (bidirectional: this catches the
+	// "inventory before XP" order; the StatChanged handler catches "XP before inventory").
+	private void handleInventoryChange(ItemContainer inventory)
+	{
+		if (inventory == null)
+		{
+			return;
+		}
+		if (!sessionActive || sessionPendingBaseline || !invSnapshotReady)
+		{
+			snapshotInventory(inventory);   // keep the snapshot current so we never count a backlog
+			return;
+		}
+		final Map<Integer, Integer> now = countItems(inventory);
+		final Map<Integer, Integer> gains = new HashMap<>();
+		for (Map.Entry<Integer, Integer> e : now.entrySet())
+		{
+			final int delta = e.getValue() - invSnapshot.getOrDefault(e.getKey(), 0);
+			if (delta > 0)
+			{
+				gains.put(e.getKey(), delta);
+			}
+		}
+		invSnapshot.clear();
+		invSnapshot.putAll(now);
+
+		if (gains.isEmpty())
+		{
+			return;
+		}
+		if (tickGatherSkill != null)
+		{
+			attributeGathered(gains);   // XP already fired this tick
+		}
+		else
+		{
+			gains.forEach((id, q) -> tickInvGains.merge(id, q, Integer::sum));   // await XP this tick
+		}
+	}
+
+	private void attributeGathered(Map<Integer, Integer> gains)
+	{
+		for (Map.Entry<Integer, Integer> e : gains.entrySet())
+		{
+			final int id = e.getKey();
+			final int qty = e.getValue();
+			sessionResources.merge(itemManager.getItemComposition(id).getName(), qty, Integer::sum);
+			sessionGatheredValue += (long) itemManager.getItemPrice(id) * qty;
+		}
+	}
+
+	private void snapshotInventory()
+	{
+		snapshotInventory(client.getItemContainer(InventoryID.INVENTORY));
+	}
+
+	private void snapshotInventory(ItemContainer inventory)
+	{
+		invSnapshot.clear();
+		if (inventory != null)
+		{
+			invSnapshot.putAll(countItems(inventory));
+		}
+		invSnapshotReady = true;
+	}
+
+	private static Map<Integer, Integer> countItems(ItemContainer container)
+	{
+		final Map<Integer, Integer> counts = new HashMap<>();
+		for (Item item : container.getItems())
+		{
+			final int id = item.getId();
+			if (id >= 0 && item.getQuantity() > 0)
+			{
+				counts.merge(id, item.getQuantity(), Integer::sum);
+			}
+		}
+		return counts;
+	}
+
 	// ── Play sessions (ADR 0006 Phase 2) ──────────────────────────────────────────
 	private long idleThresholdMs()
 	{
@@ -752,6 +878,13 @@ public class OsrsHubPlugin extends Plugin
 		sessionActiveMs = 0;
 		lastXpGainAt = 0;
 		sessionPostTicks = 0;
+		sessionStartXp.clear();
+		invSnapshot.clear();
+		invSnapshotReady = false;
+		tickGatherSkill = null;
+		tickInvGains.clear();
+		sessionResources.clear();
+		sessionGatheredValue = 0;
 	}
 
 	private void endSession()
@@ -787,6 +920,32 @@ public class OsrsHubPlugin extends Plugin
 		}
 		session.addProperty("activeSeconds", sessionActiveMs / 1000L);
 		session.addProperty("totalXp", totalXp);
+
+		// Per-skill XP gained this session (skip OVERALL and unchanged skills).
+		final JsonObject perSkill = new JsonObject();
+		for (Skill sk : Skill.values())
+		{
+			final Integer start = sessionStartXp.get(sk);
+			if (sk == Skill.OVERALL || start == null)
+			{
+				continue;
+			}
+			final int gained = client.getSkillExperience(sk) - start;
+			if (gained > 0)
+			{
+				perSkill.addProperty(sk.getName(), gained);
+			}
+		}
+		session.add("perSkill", perSkill.size() > 0 ? perSkill : JsonNull.INSTANCE);
+
+		// Resources gathered this session + their GE value (feeds GP/hr in 2C).
+		final JsonObject resources = new JsonObject();
+		for (Map.Entry<String, Integer> e : sessionResources.entrySet())
+		{
+			resources.addProperty(e.getKey(), e.getValue());
+		}
+		session.add("resources", resources.size() > 0 ? resources : JsonNull.INSTANCE);
+		session.addProperty("gatheredValue", sessionGatheredValue);
 		session.addProperty("final", finalPost);
 
 		final JsonObject body = new JsonObject();
