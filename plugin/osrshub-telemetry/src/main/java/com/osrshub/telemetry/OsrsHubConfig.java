@@ -40,4 +40,14 @@ public interface OsrsHubConfig extends Config
 	{
 		return 25000;
 	}
+
+	@ConfigItem(
+		keyName = "sessionIdleMinutes",
+		name = "Session idle minutes",
+		description = "Active-time pauses after this many minutes without an XP gain, so AFK time doesn't dilute your XP/hr & GP/hr."
+	)
+	default int sessionIdleMinutes()
+	{
+		return 5;
+	}
 }

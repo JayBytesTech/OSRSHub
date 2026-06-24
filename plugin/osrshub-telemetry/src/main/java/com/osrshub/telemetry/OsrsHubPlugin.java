@@ -75,6 +75,7 @@ import okhttp3.Response;
  *   • kill counts → POST /api/events (ADR 0005 Phase 1)
  *   • loot        → POST /api/events (ADR 0005 Phase 1; min-value gated)
  *   • collection  → POST /api/events (ADR 0005 Phase 1)
+ *   • sessions    → POST /api/sessions (ADR 0006 Phase 2; XP/hr from idle-gated active time)
  * Read-only — this plugin never sends input to or acts on the game (see docs/decisions/0002,
  * 0005 and ADR 0001 D2).
  */
@@ -185,6 +186,21 @@ public class OsrsHubPlugin extends Plugin
 	// Current Slayer task name, learned from the assignment chat line and reported on completion.
 	private String currentSlayerTask = null;
 
+	// Play-session tracking (ADR 0006 Phase 2). A session spans login→logout (world hops keep it
+	// going). startTotalXp is baselined on the first tick; total XP gained = current − start. Active
+	// time is idle-gated: only the gap between consecutive XP gains counts, capped at the idle
+	// threshold, so AFK doesn't dilute XP/hr. Posted periodically while playing + finally on logout.
+	private static final int SESSION_POST_TICKS = 100;   // ~60s at 0.6s/tick
+	private boolean sessionActive = false;
+	private boolean sessionPendingBaseline = false;
+	private String sessionId = null;
+	private String sessionStartedAt = null;
+	private long startTotalXp = 0;
+	private long currentTotalXp = 0;
+	private long sessionActiveMs = 0;
+	private long lastXpGainAt = 0;
+	private int sessionPostTicks = 0;
+
 	@Provides
 	OsrsHubConfig provideConfig(ConfigManager configManager)
 	{
@@ -205,6 +221,13 @@ public class OsrsHubPlugin extends Plugin
 			completedDiaries.clear();
 			diariesBaselined = false;
 		}
+		// End the play session on logout (LOGIN_SCREEN). A world hop is HOPPING, not LOGIN_SCREEN, so
+		// sessions correctly survive hops. Session START happens in onGameTick (handles login + the
+		// plugin being enabled mid-session).
+		if (state == GameState.LOGIN_SCREEN && sessionActive)
+		{
+			endSession();
+		}
 	}
 
 	@Subscribe
@@ -214,6 +237,22 @@ public class OsrsHubPlugin extends Plugin
 		if (skill == null)
 		{
 			return;
+		}
+		// Session active-time + total-XP accounting (idle-gated). Counted only on a real overall-XP
+		// increase, so the post-login / post-hop StatChanged replay (XP unchanged) adds nothing.
+		if (sessionActive && !sessionPendingBaseline)
+		{
+			final long overall = client.getOverallExperience();
+			if (overall > currentTotalXp)
+			{
+				final long now = System.currentTimeMillis();
+				if (lastXpGainAt > 0)
+				{
+					sessionActiveMs += Math.min(now - lastXpGainAt, idleThresholdMs());
+				}
+				lastXpGainAt = now;
+				currentTotalXp = overall;
+			}
 		}
 		final int level = event.getLevel();              // real (XP-derived) level, 1..99
 		final Integer prev = levels.put(skill, level);
@@ -282,6 +321,24 @@ public class OsrsHubPlugin extends Plugin
 		if (client.getGameState() != GameState.LOGGED_IN)
 		{
 			return;
+		}
+		// Session lifecycle (independent of the quest/diary baseline, which re-runs on world hop —
+		// sessions must NOT restart on a hop). Start on first logged-in tick (or when the plugin is
+		// enabled mid-session); baseline start XP once; post a live update every ~60s.
+		if (!sessionActive)
+		{
+			startSession();
+		}
+		if (sessionPendingBaseline)
+		{
+			startTotalXp = client.getOverallExperience();
+			currentTotalXp = startTotalXp;
+			sessionPendingBaseline = false;
+		}
+		else if (++sessionPostTicks >= SESSION_POST_TICKS)
+		{
+			sessionPostTicks = 0;
+			postSession(false);
 		}
 		// First logged-in tick: snapshot what's already done so login never emits historical progress.
 		if (!questsBaselined)
@@ -676,6 +733,66 @@ public class OsrsHubPlugin extends Plugin
 		}
 		lastSentValue = total;
 		postBankValue(total);
+	}
+
+	// ── Play sessions (ADR 0006 Phase 2) ──────────────────────────────────────────
+	private long idleThresholdMs()
+	{
+		return Math.max(1, config.sessionIdleMinutes()) * 60_000L;
+	}
+
+	private void startSession()
+	{
+		sessionActive = true;
+		sessionPendingBaseline = true;
+		sessionId = Instant.now().toString();
+		sessionStartedAt = sessionId;
+		startTotalXp = 0;
+		currentTotalXp = 0;
+		sessionActiveMs = 0;
+		lastXpGainAt = 0;
+		sessionPostTicks = 0;
+	}
+
+	private void endSession()
+	{
+		postSession(true);
+		sessionActive = false;
+		sessionId = null;
+	}
+
+	// Post the running session aggregate. Skips empty sessions (no XP gained) so we never store an
+	// AFK/idle row. The server upserts by sessionId, so the live posts and the final post share a row.
+	private void postSession(boolean finalPost)
+	{
+		if (sessionId == null)
+		{
+			return;
+		}
+		final long totalXp = Math.max(0, currentTotalXp - startTotalXp);
+		if (totalXp <= 0)
+		{
+			return;
+		}
+		final JsonObject session = new JsonObject();
+		session.addProperty("sessionId", sessionId);
+		session.addProperty("startedAt", sessionStartedAt);
+		if (finalPost)
+		{
+			session.addProperty("endedAt", Instant.now().toString());
+		}
+		else
+		{
+			session.add("endedAt", JsonNull.INSTANCE);
+		}
+		session.addProperty("activeSeconds", sessionActiveMs / 1000L);
+		session.addProperty("totalXp", totalXp);
+		session.addProperty("final", finalPost);
+
+		final JsonObject body = new JsonObject();
+		body.addProperty("schema", "sessions/1");
+		body.add("session", session);
+		postJson("/api/sessions", body, "session");
 	}
 
 	private void postBankValue(long value)
