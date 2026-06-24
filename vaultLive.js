@@ -102,6 +102,7 @@ module.exports = function makeVaultLive({ db, writeNote, liveRel, debounceMs = 4
     const recent = db.events.recent(id, 25);
     const wkXp = weeklyXp(id);
     const wkEv = weeklyEvents(id);
+    const lastSession = db.sessions.recent(id, 1)[0] || null;
 
     const now = new Date();
     const L = [];
@@ -184,6 +185,22 @@ module.exports = function makeVaultLive({ db, writeNote, liveRel, debounceMs = 4
       L.push('');
     }
 
+    // Last / current session (ADR 0006 Phase 2)
+    if (lastSession) {
+      const s = lastSession;
+      const rateBits = [`${fmtDur(s.activeSeconds)} active`];
+      if (s.xpPerHour != null) rateBits.push(`${fmt(s.xpPerHour)}/hr XP`);
+      if (s.gpPerHour) rateBits.push(`${fmt(s.gpPerHour)}/hr gp`);
+      const skills = s.perSkill ? Object.entries(s.perSkill).sort((a, b) => b[1] - a[1]).slice(0, 5) : [];
+      const res = s.resources ? Object.entries(s.resources).sort((a, b) => b[1] - a[1]).slice(0, 8) : [];
+      L.push(`## ${s.final ? 'Last session' : 'Current session'}`);
+      L.push('');
+      L.push(`*${rateBits.join(' · ')}${s.final ? '' : ' · live'}*`);
+      if (skills.length) L.push(`- **Skills:** ${skills.map(([k, v]) => `${k} +${fmt(v)}`).join(', ')}`);
+      if (res.length) L.push(`- **Gathered:** ${res.map(([k, v]) => `${k} ×${Number(v).toLocaleString()}`).join(', ')}`);
+      L.push('');
+    }
+
     // Recent activity
     if (recent.length) {
       L.push('## Recent activity');
@@ -226,6 +243,13 @@ function fmt(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
   if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
   return String(n);
+}
+function fmtDur(secs) {
+  secs = Math.max(0, Math.round(Number(secs) || 0));
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return `${secs}s`;
 }
 function stamp(d) {
   return d.toISOString().slice(0, 16).replace('T', ' ');
