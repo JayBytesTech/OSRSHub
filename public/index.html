@@ -690,6 +690,20 @@ html[data-theme="dark"] .sess-card.sess-live { border-color: #3f7d3f; background
 html[data-theme="dark"] .sess-when, html[data-theme="dark"] .sess-stat-v, html[data-theme="dark"] .sess-chip b { color: #e4e5e7; }
 html[data-theme="dark"] .sess-dur, html[data-theme="dark"] .sess-stat-l, html[data-theme="dark"] .sess-section-l, html[data-theme="dark"] .sess-muted { color: var(--d-mut); }
 html[data-theme="dark"] .sess-chip { background: #2c2e32; border-color: var(--d-bd4); color: #c9ccd1; }
+
+/* Baseline-scan review banner (ADR 0003) */
+.scan-banner { display: flex; align-items: center; gap: 10px; background: #e7eecb; border: 1px solid #3f7d3f; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; }
+.scan-banner-ico { font-size: 18px; }
+.scan-banner-txt { flex: 1; font-size: 13px; color: #1a0a00; }
+.scan-btn { border: 1px solid #8b6914; border-radius: 5px; padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.scan-apply { background: #3f7d3f; color: #fff; border-color: #2f5d2f; }
+.scan-apply:hover { background: #356b35; }
+.scan-dismiss { background: transparent; color: #6a4a10; }
+.scan-dismiss:hover { background: #d9c894; }
+html[data-theme="dark"] .scan-banner { background: #232a20; border-color: #3f7d3f; }
+html[data-theme="dark"] .scan-banner-txt { color: #e4e5e7; }
+html[data-theme="dark"] .scan-dismiss { color: var(--d-mut); }
+html[data-theme="dark"] .scan-dismiss:hover { background: #36383c; }
 .dash-cols {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -1389,6 +1403,9 @@ html[data-theme="dark"] .skill-card:hover { border-color:#4a4f59; box-shadow:0 3
 </nav>
 
 <main class="content" id="content">
+
+<!-- BASELINE SCAN review banner (ADR 0003) — shows on any tab when a scan awaits confirmation -->
+<div id="scan-banner"></div>
 
 <!-- DASHBOARD -->
 <div id="tab-dashboard" class="tab-content active">
@@ -2827,6 +2844,62 @@ function renderSessions() {
     return;
   }
   body.innerHTML = SESSIONS.map(sessionCardHTML).join('');
+}
+
+// ── BASELINE SCAN review (ADR 0003) ─────────────────────────────────────────────
+// A known account's scan is held server-side until the user confirms. Poll the diff and
+// surface a banner with Apply/Dismiss. (First-sight scans auto-apply server-side — no banner.)
+let SCAN_PENDING = null;
+function scanDiffHasChanges(d) {
+  if (!d) return false;
+  return ['quests', 'diaries', 'combatAchievements', 'unlocks', 'skills'].some(k =>
+    d[k] && ((d[k].added && d[k].added.length) || (d[k].removed && d[k].removed.length) || (d[k].changed && d[k].changed.length)));
+}
+async function loadScanPending() {
+  try {
+    const r = await fetch('/api/scan/pending');
+    if (!r.ok) throw new Error('scan/pending ' + r.status);
+    const j = await r.json();
+    SCAN_PENDING = scanDiffHasChanges(j.diff) ? j : null;
+  } catch (e) {
+    SCAN_PENDING = null;   // server without the route / offline → no banner
+  }
+  renderScanBanner();
+}
+function renderScanBanner() {
+  const el = document.getElementById('scan-banner');
+  if (!el) return;
+  if (!SCAN_PENDING) { el.innerHTML = ''; return; }
+  const d = SCAN_PENDING.diff;
+  const parts = [];
+  const seg = (label, x) => {
+    if (!x) return;
+    const a = (x.added && x.added.length) || 0, r = (x.removed && x.removed.length) || 0, c = (x.changed && x.changed.length) || 0;
+    if (a) parts.push(`+${a} ${label}`);
+    if (r) parts.push(`−${r} ${label}`);
+    if (c) parts.push(`~${c} ${label}`);
+  };
+  seg('quest', d.quests); seg('diary', d.diaries); seg('combat task', d.combatAchievements);
+  seg('unlock', d.unlocks); seg('skill', d.skills);
+  el.innerHTML = `<div class="scan-banner">
+    <span class="scan-banner-ico">🧬</span>
+    <span class="scan-banner-txt"><b>RuneLite baseline scan ready.</b> ${escapeHtml(parts.join(' · ') || 'changes detected')} — apply to your hub?</span>
+    <button class="scan-btn scan-apply" onclick="applyScan()">Apply</button>
+    <button class="scan-btn scan-dismiss" onclick="dismissScan()">Dismiss</button>
+  </div>`;
+}
+async function applyScan() {
+  try {
+    const r = await fetch('/api/scan/apply', { method: 'POST' });
+    if (!r.ok) throw new Error('apply ' + r.status);
+  } catch (e) { console.warn('Could not apply scan.', e); return; }
+  SCAN_PENDING = null; renderScanBanner();
+  if (typeof loadVaultState === 'function') loadVaultState();   // re-sync quests/diaries/goals
+  loadStats(); loadMilestones();
+}
+async function dismissScan() {
+  try { await fetch('/api/scan/dismiss', { method: 'POST' }); } catch (e) { /* ignore */ }
+  SCAN_PENDING = null; renderScanBanner();
 }
 
 function sessionCardHTML(s) {
@@ -6156,6 +6229,8 @@ loadBank();                  // async: pull bank-value trend (Progress chart ser
 loadMilestones();            // async: pull progression milestones (Collection Log tile + panel)
 loadSession();               // async: pull the live play session (XP/hr tile, ADR 0006)
 startSessionPolling();       // keep the Session tile fresh while the Dashboard (default tab) is open
+loadScanPending();           // async: surface a baseline-scan confirm banner if one awaits (ADR 0003)
+setInterval(loadScanPending, 30000);   // a scan can arrive any time the plugin (re)logs in
 loadBosses();                // async: pull per-boss KC + loot summary (Bosses tab)
 loadAccount();               // async: pull account identity (Settings + header name)
 loadMoney();                 // async: pull money methods, auto-bucket vs live stats/quests
