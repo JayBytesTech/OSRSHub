@@ -201,8 +201,14 @@ public class OsrsHubPlugin extends Plugin
 	private long lastXpGainAt = 0;
 	private int sessionPostTicks = 0;
 
-	// Per-skill XP baseline → per-skill gains = getSkillExperience(skill) − start (ADR 0006 2B).
+	// Per-skill XP baseline + latest reading → per-skill gains = current − start (ADR 0006 2B). We track
+	// current on each StatChanged (not read from the client at post time) so the logout final post is
+	// accurate even after the client has begun tearing down, and multi-skill ticks are all captured.
 	private final Map<Skill, Integer> sessionStartXp = new EnumMap<>(Skill.class);
+	private final Map<Skill, Integer> sessionCurrentXp = new EnumMap<>(Skill.class);
+
+	// Value of loot received this session (Phase-1 valuation) → feeds GP/hr alongside gatheredValue.
+	private long sessionLootValue = 0;
 
 	// Resource counter (ADR 0006 D5): attribute an inventory increase to gathering ONLY when a
 	// gathering-skill XP gain fired on the same tick. Processing skills (Cooking/Fletching/…) are
@@ -257,6 +263,7 @@ public class OsrsHubPlugin extends Plugin
 		// increase, so the post-login / post-hop StatChanged replay (XP unchanged) adds nothing.
 		if (sessionActive && !sessionPendingBaseline)
 		{
+			sessionCurrentXp.put(skill, event.getXp());   // authoritative latest XP for this skill
 			final long overall = client.getOverallExperience();
 			if (overall > currentTotalXp)
 			{
@@ -364,7 +371,9 @@ public class OsrsHubPlugin extends Plugin
 			{
 				if (sk != Skill.OVERALL)
 				{
-					sessionStartXp.put(sk, client.getSkillExperience(sk));
+					final int xp = client.getSkillExperience(sk);
+					sessionStartXp.put(sk, xp);
+					sessionCurrentXp.put(sk, xp);
 				}
 			}
 			snapshotInventory();   // so the first inventory change diffs against a real baseline
@@ -705,7 +714,16 @@ public class OsrsHubPlugin extends Plugin
 			jsonItems.add(it);
 			names.add(qty > 1 ? name + " x" + qty : name);
 		}
-		if (jsonItems.size() == 0 || total < config.lootMinValue())
+		if (jsonItems.size() == 0)
+		{
+			return;
+		}
+		// ALL loot value feeds session GP/hr; the min-value threshold only gates the timeline event.
+		if (sessionActive)
+		{
+			sessionLootValue += total;
+		}
+		if (total < config.lootMinValue())
 		{
 			return;
 		}
@@ -879,6 +897,8 @@ public class OsrsHubPlugin extends Plugin
 		lastXpGainAt = 0;
 		sessionPostTicks = 0;
 		sessionStartXp.clear();
+		sessionCurrentXp.clear();
+		sessionLootValue = 0;
 		invSnapshot.clear();
 		invSnapshotReady = false;
 		tickGatherSkill = null;
@@ -889,9 +909,57 @@ public class OsrsHubPlugin extends Plugin
 
 	private void endSession()
 	{
-		postSession(true);
+		postSession(true);     // final authoritative session row
+		emitSessionRecap();    // one human-readable Timeline recap (ADR 0006 D6)
 		sessionActive = false;
 		sessionId = null;
+	}
+
+	// One timeline event summarising the session at logout (ADR 0006 D6). Skipped for empty sessions.
+	private void emitSessionRecap()
+	{
+		if (sessionId == null)
+		{
+			return;
+		}
+		final long totalXp = Math.max(0, currentTotalXp - startTotalXp);
+		if (totalXp <= 0)
+		{
+			return;
+		}
+		final long activeSeconds = sessionActiveMs / 1000L;
+		final long gp = sessionLootValue + sessionGatheredValue;
+
+		final JsonObject data = new JsonObject();
+		data.addProperty("activeSeconds", activeSeconds);
+		data.addProperty("totalXp", totalXp);
+		data.addProperty("lootValue", sessionLootValue);
+		data.addProperty("gatheredValue", sessionGatheredValue);
+
+		final JsonObject ev = new JsonObject();
+		ev.addProperty("type", "session");
+		ev.addProperty("occurredAt", Instant.now().toString());
+		ev.addProperty("summary", "🧭 Session: " + fmtDurationShort(activeSeconds) + " active · "
+			+ fmtShort(totalXp) + " XP" + (gp > 0 ? " · " + fmtShort(gp) + " gp" : ""));
+		ev.addProperty("key", "session|" + sessionId);   // one recap per session → idempotent
+		ev.add("data", data);
+		postEvent(ev);
+	}
+
+	private static String fmtShort(long n)
+	{
+		if (n >= 1_000_000_000L) return String.format("%.2fB", n / 1e9);
+		if (n >= 1_000_000L) return String.format("%.2fM", n / 1e6);
+		if (n >= 1_000L) return String.format("%.1fk", n / 1e3);
+		return String.valueOf(n);
+	}
+
+	private static String fmtDurationShort(long secs)
+	{
+		final long h = secs / 3600, m = (secs % 3600) / 60;
+		if (h > 0) return h + "h" + m + "m";
+		if (m > 0) return m + "m";
+		return secs + "s";
 	}
 
 	// Post the running session aggregate. Skips empty sessions (no XP gained) so we never store an
@@ -921,24 +989,19 @@ public class OsrsHubPlugin extends Plugin
 		session.addProperty("activeSeconds", sessionActiveMs / 1000L);
 		session.addProperty("totalXp", totalXp);
 
-		// Per-skill XP gained this session (skip OVERALL and unchanged skills).
+		// Per-skill XP gained this session (from the tracked maps, so it's valid even at logout).
 		final JsonObject perSkill = new JsonObject();
-		for (Skill sk : Skill.values())
+		for (Map.Entry<Skill, Integer> e : sessionStartXp.entrySet())
 		{
-			final Integer start = sessionStartXp.get(sk);
-			if (sk == Skill.OVERALL || start == null)
-			{
-				continue;
-			}
-			final int gained = client.getSkillExperience(sk) - start;
+			final int gained = sessionCurrentXp.getOrDefault(e.getKey(), e.getValue()) - e.getValue();
 			if (gained > 0)
 			{
-				perSkill.addProperty(sk.getName(), gained);
+				perSkill.addProperty(e.getKey().getName(), gained);
 			}
 		}
 		session.add("perSkill", perSkill.size() > 0 ? perSkill : JsonNull.INSTANCE);
 
-		// Resources gathered this session + their GE value (feeds GP/hr in 2C).
+		// Resources gathered + GE value, and loot value — both feed GP/hr server-side.
 		final JsonObject resources = new JsonObject();
 		for (Map.Entry<String, Integer> e : sessionResources.entrySet())
 		{
@@ -946,6 +1009,7 @@ public class OsrsHubPlugin extends Plugin
 		}
 		session.add("resources", resources.size() > 0 ? resources : JsonNull.INSTANCE);
 		session.addProperty("gatheredValue", sessionGatheredValue);
+		session.addProperty("lootValue", sessionLootValue);
 		session.addProperty("final", finalPost);
 
 		final JsonObject body = new JsonObject();
