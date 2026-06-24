@@ -63,6 +63,7 @@ import okhttp3.Response;
  *   • clues       → POST /api/events (ADR 0005 Phase 1)
  *   • pets        → POST /api/events (ADR 0005 Phase 1)
  *   • slayer      → POST /api/events (ADR 0005 Phase 1)
+ *   • kill counts → POST /api/events (ADR 0005 Phase 1)
  * Read-only — this plugin never sends input to or acts on the game (see docs/decisions/0002,
  * 0005 and ADR 0001 D2).
  */
@@ -102,6 +103,13 @@ public class OsrsHubPlugin extends Plugin
 		"You(?:'re| have been) assigned to kill (?:[\\d,]+ )?(?<name>.+?)(?: (?:in|on) (?:the )?.+?)?; only [\\d,]+ more to go");
 	private static final Pattern SLAYER_COMPLETE_PATTERN = Pattern.compile(
 		"You've completed (?<count>[\\d,]+) (?:Wilderness )?tasks?(?: in a row)?(?:.*?received (?<points>[\\d,]+) points?)?");
+
+	// Kill-count lines. Covers regular bosses ("Your Zulrah kill/success count is: <col>N"),
+	// chest activities ("Your Barrows chest count is: …"), and raids ("Your completed Chambers of
+	// Xeric count is: …"). The lower-case kill/success/chest qualifier is stripped from the name;
+	// proper-cased words (e.g. "Lunar Chest") stay part of the boss name.
+	private static final Pattern KILL_COUNT_PATTERN = Pattern.compile(
+		"Your (?:completed )?(?<boss>.+?)(?: (?:kill|success|chest))? count is:? ?(?:<col=[0-9a-f]{6}>)?(?<count>[0-9,]+)");
 
 	// Each Achievement-Diary tier sets a dedicated completion varbit. Map varbit id → {region, tier}
 	// where region/tier match public/diary-data.json exactly so the hub's diary auto-tick lights up.
@@ -397,6 +405,13 @@ public class OsrsHubPlugin extends Plugin
 		if (slayer.find())
 		{
 			emitSlayer(currentSlayerTask, slayer.group("count"), slayer.group("points"));
+			return;
+		}
+
+		final Matcher kc = KILL_COUNT_PATTERN.matcher(message);
+		if (kc.find())
+		{
+			emitKillCount(kc.group("boss").trim(), Integer.parseInt(kc.group("count").replace(",", "")));
 		}
 	}
 
@@ -428,6 +443,21 @@ public class OsrsHubPlugin extends Plugin
 		ev.addProperty("occurredAt", Instant.now().toString());
 		ev.addProperty("summary", "🗺️ " + clueType + " clue completed (#" + numberCompleted + ")");
 		ev.addProperty("key", "clue|" + clueType + "|" + numberCompleted);   // count rises each time → idempotent
+		ev.add("data", data);
+		postEvent(ev);
+	}
+
+	private void emitKillCount(String boss, int count)
+	{
+		final JsonObject data = new JsonObject();
+		data.addProperty("boss", boss);
+		data.addProperty("count", count);
+
+		final JsonObject ev = new JsonObject();
+		ev.addProperty("type", "kc");
+		ev.addProperty("occurredAt", Instant.now().toString());
+		ev.addProperty("summary", "⚔️ " + boss + " KC: " + String.format("%,d", count));
+		ev.addProperty("key", "kc|" + boss + "|" + count);   // count rises each kill → idempotent
 		ev.add("data", data);
 		postEvent(ev);
 	}
