@@ -74,6 +74,7 @@ import okhttp3.Response;
  *   • slayer      → POST /api/events (ADR 0005 Phase 1)
  *   • kill counts → POST /api/events (ADR 0005 Phase 1)
  *   • loot        → POST /api/events (ADR 0005 Phase 1; min-value gated)
+ *   • collection  → POST /api/events (ADR 0005 Phase 1)
  * Read-only — this plugin never sends input to or acts on the game (see docs/decisions/0002,
  * 0005 and ADR 0001 D2).
  */
@@ -120,6 +121,11 @@ public class OsrsHubPlugin extends Plugin
 	// proper-cased words (e.g. "Lunar Chest") stay part of the boss name.
 	private static final Pattern KILL_COUNT_PATTERN = Pattern.compile(
 		"Your (?:completed )?(?<boss>.+?)(?: (?:kill|success|chest))? count is:? ?(?:<col=[0-9a-f]{6}>)?(?<count>[0-9,]+)");
+
+	// Collection-log unlock. Requires the in-game "New addition notification" setting enabled (same
+	// prerequisite Dink has). The slot counts aren't in the message, so they're left null.
+	private static final Pattern COLLECTION_LOG_PATTERN = Pattern.compile(
+		"New item added to your collection log: (?<item>.+?)\\.?$");
 
 	// Each Achievement-Diary tier sets a dedicated completion varbit. Map varbit id → {region, tier}
 	// where region/tier match public/diary-data.json exactly so the hub's diary auto-tick lights up.
@@ -422,6 +428,13 @@ public class OsrsHubPlugin extends Plugin
 		if (kc.find())
 		{
 			emitKillCount(kc.group("boss").trim(), Integer.parseInt(kc.group("count").replace(",", "")));
+			return;
+		}
+
+		final Matcher clog = COLLECTION_LOG_PATTERN.matcher(message);
+		if (clog.find())
+		{
+			emitCollectionLog(clog.group("item").trim());
 		}
 	}
 
@@ -453,6 +466,25 @@ public class OsrsHubPlugin extends Plugin
 		ev.addProperty("occurredAt", Instant.now().toString());
 		ev.addProperty("summary", "🗺️ " + clueType + " clue completed (#" + numberCompleted + ")");
 		ev.addProperty("key", "clue|" + clueType + "|" + numberCompleted);   // count rises each time → idempotent
+		ev.add("data", data);
+		postEvent(ev);
+	}
+
+	// Slot counts (completedEntries/totalEntries) and price aren't in the message, so they're null/0
+	// to match the Dink data shape; the server's summary degrades gracefully without the counts.
+	private void emitCollectionLog(String item)
+	{
+		final JsonObject data = new JsonObject();
+		data.addProperty("itemName", item);
+		data.add("completedEntries", JsonNull.INSTANCE);
+		data.add("totalEntries", JsonNull.INSTANCE);
+		data.addProperty("price", 0);
+
+		final JsonObject ev = new JsonObject();
+		ev.addProperty("type", "clog");
+		ev.addProperty("occurredAt", Instant.now().toString());
+		ev.addProperty("summary", "📒 New collection log: " + item);
+		ev.addProperty("key", "clog|" + item);   // each item unlocks once → idempotent
 		ev.add("data", data);
 		postEvent(ev);
 	}
