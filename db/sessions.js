@@ -27,6 +27,15 @@ module.exports = function makeSessions(db) {
   const intOr0 = (v) => Math.max(0, Math.round(Number(v) || 0));
   const jsonOrNull = (o) => (o && typeof o === 'object' ? JSON.stringify(o) : null);
 
+  // A non-final session is only "live" if it was updated recently — the plugin posts ~every 60s, so a
+  // session whose updates stopped (client closed/crashed without a logout) goes stale instead of
+  // masquerading as live forever. SQLite stores updated_at as UTC 'YYYY-MM-DD HH:MM:SS'.
+  const LIVE_WINDOW_MS = 10 * 60 * 1000;
+  const isFresh = (updatedAt) => {
+    const t = Date.parse(String(updatedAt).replace(' ', 'T') + 'Z');
+    return Number.isFinite(t) && (Date.now() - t) < LIVE_WINDOW_MS;
+  };
+
   // Upsert a session aggregate. `s` is the plugin's session object (camelCase). Returns the stored row
   // (derived rates included). Throws only on programmer error; callers validate sessionId/startedAt.
   function upsert(accountId, s) {
@@ -61,6 +70,7 @@ module.exports = function makeSessions(db) {
       perSkill: row.per_skill_json ? JSON.parse(row.per_skill_json) : null,
       resources: row.resources_json ? JSON.parse(row.resources_json) : null,
       final: !!row.final,
+      live: !row.final && isFresh(row.updated_at),   // ongoing AND still posting
       // Derived rates (null when there's no active time yet, to avoid div-by-zero / misleading 0).
       xpPerHour: activeHours > 0 ? Math.round(row.total_xp / activeHours) : null,
       gpPerHour: activeHours > 0 ? Math.round(gpTotal / activeHours) : null,
@@ -79,10 +89,12 @@ module.exports = function makeSessions(db) {
     ).all(accountId, limit).map(shape);
   }
 
-  // The live/most-recent ongoing session (not yet final). Falls back to null if none is open.
+  // The live/most-recent ongoing session — not final AND still being posted to (a stale, never-ended
+  // session from a crash/close is excluded so the dashboard doesn't show a phantom live session).
   function current(accountId) {
     return shape(db.prepare(
-      'SELECT * FROM xp_sessions WHERE account_id = ? AND final = 0 ORDER BY started_at DESC LIMIT 1'
+      "SELECT * FROM xp_sessions WHERE account_id = ? AND final = 0" +
+      " AND updated_at >= datetime('now', '-10 minutes') ORDER BY started_at DESC LIMIT 1"
     ).get(accountId));
   }
 

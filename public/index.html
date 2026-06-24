@@ -2830,7 +2830,7 @@ function renderSessions() {
 }
 
 function sessionCardHTML(s) {
-  const live = !s.final;
+  const live = s.live;   // ongoing AND still posting (server marks stale sessions not-live)
   const when = live ? 'Active now' : relTime(s.startedAt);
   const skills = s.perSkill ? Object.entries(s.perSkill).sort((a, b) => b[1] - a[1]) : [];
   const res = s.resources ? Object.entries(s.resources).sort((a, b) => b[1] - a[1]) : [];
