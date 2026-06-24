@@ -12,9 +12,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.InventoryID;
@@ -27,6 +30,7 @@ import net.runelite.api.Skill;
 import net.runelite.api.VarPlayer;
 import net.runelite.api.Varbits;
 import net.runelite.api.events.ActorDeath;
+import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
@@ -54,6 +58,7 @@ import okhttp3.Response;
  *   • deaths      → POST /api/events (ADR 0005 Phase 1)
  *   • quests      → POST /api/events (ADR 0005 Phase 1)
  *   • diaries     → POST /api/events (ADR 0005 Phase 1)
+ *   • combat achs → POST /api/events (ADR 0005 Phase 1)
  * Read-only — this plugin never sends input to or acts on the game (see docs/decisions/0002,
  * 0005 and ADR 0001 D2).
  */
@@ -66,6 +71,12 @@ import okhttp3.Response;
 public class OsrsHubPlugin extends Plugin
 {
 	private static final MediaType JSON = MediaType.parse("application/json");
+
+	// Combat-task completion chat message, e.g.
+	//   "Congratulations, you've completed an Elite combat task: <col=06600c>Peach Conjurer</col>."
+	// Same shape RuneLite's own ScreenshotPlugin parses. Captures the tier word and the task name.
+	private static final Pattern COMBAT_ACHIEVEMENT_PATTERN = Pattern.compile(
+		"Congratulations, you've completed an? (?<tier>\\w+) combat task: <col=[0-9a-f]+>(?<task>.+)</col>");
 
 	// Each Achievement-Diary tier sets a dedicated completion varbit. Map varbit id → {region, tier}
 	// where region/tier match public/diary-data.json exactly so the hub's diary auto-tick lights up.
@@ -304,6 +315,36 @@ public class OsrsHubPlugin extends Plugin
 		ev.addProperty("occurredAt", Instant.now().toString());
 		ev.addProperty("summary", "📖 " + region + " " + tier + " diary complete");
 		ev.addProperty("key", "diary|" + region + "|" + tier);   // a tier completes once → idempotent
+		ev.add("data", data);
+		postEvent(ev);
+	}
+
+	@Subscribe
+	public void onChatMessage(ChatMessage event)
+	{
+		// Combat-achievement completions arrive as a game message. No baseline needed — this only
+		// fires on a fresh completion, never replayed on login.
+		if (event.getType() != ChatMessageType.GAMEMESSAGE)
+		{
+			return;
+		}
+		final Matcher m = COMBAT_ACHIEVEMENT_PATTERN.matcher(event.getMessage());
+		if (!m.find())
+		{
+			return;
+		}
+		final String tier = m.group("tier");
+		final String task = m.group("task").trim();
+
+		final JsonObject data = new JsonObject();
+		data.addProperty("task", task);   // server maps name → task id via caTaskId() for auto-tick
+		data.addProperty("tier", tier);
+
+		final JsonObject ev = new JsonObject();
+		ev.addProperty("type", "ca");
+		ev.addProperty("occurredAt", Instant.now().toString());
+		ev.addProperty("summary", "🏅 Combat achievement: " + task + (tier.isEmpty() ? "" : " (" + tier + ")"));
+		ev.addProperty("key", "ca|" + task);   // task names are unique → idempotent
 		ev.add("data", data);
 		postEvent(ev);
 	}
