@@ -183,6 +183,10 @@ public class OsrsHubPlugin extends Plugin
 	private final Set<Integer> completedDiaries = new HashSet<>();
 	private boolean diariesBaselined = false;
 
+	// Baseline scan (ADR 0003): post a full skills/quests/diaries dump once per login so an established
+	// account's existing state imports wholesale (first sight) or surfaces a confirm-diff (known char).
+	private boolean scanPostedThisLogin = false;
+
 	// Current Slayer task name, learned from the assignment chat line and reported on completion.
 	private String currentSlayerTask = null;
 
@@ -245,9 +249,13 @@ public class OsrsHubPlugin extends Plugin
 		// End the play session on logout (LOGIN_SCREEN). A world hop is HOPPING, not LOGIN_SCREEN, so
 		// sessions correctly survive hops. Session START happens in onGameTick (handles login + the
 		// plugin being enabled mid-session).
-		if (state == GameState.LOGIN_SCREEN && sessionActive)
+		if (state == GameState.LOGIN_SCREEN)
 		{
-			endSession();
+			scanPostedThisLogin = false;   // re-scan on the next login (survives world hops, which are HOPPING)
+			if (sessionActive)
+			{
+				endSession();
+			}
 		}
 	}
 
@@ -403,6 +411,11 @@ public class OsrsHubPlugin extends Plugin
 			}
 			questsBaselined = true;
 			diariesBaselined = true;
+			if (!scanPostedThisLogin)
+			{
+				postBaselineScan();   // once per login (the gate isn't reset on hop)
+				scanPostedThisLogin = true;
+			}
 			return;
 		}
 		if (questScanTicks > 0)
@@ -439,6 +452,62 @@ public class OsrsHubPlugin extends Plugin
 			ev.add("data", data);
 			postEvent(ev);
 		}
+	}
+
+	// Baseline scan (ADR 0003): a full skills/quests/diaries dump → POST /api/scan. The server applies
+	// it wholesale on first sight, or stores a confirm-diff for a known account. Reuses the same
+	// game-state reads as the incremental emitters. CAs/collection-log/stats are deferred (varbit TODO).
+	private void postBaselineScan()
+	{
+		final JsonArray skills = new JsonArray();
+		for (Skill sk : Skill.values())
+		{
+			if (sk == Skill.OVERALL)
+			{
+				continue;
+			}
+			final JsonObject s = new JsonObject();
+			s.addProperty("skill", sk.getName());
+			s.addProperty("level", client.getRealSkillLevel(sk));
+			s.addProperty("xp", client.getSkillExperience(sk));
+			skills.add(s);
+		}
+
+		final JsonObject quests = new JsonObject();   // {name: "FINISHED"|"IN_PROGRESS"} (NOT_STARTED omitted)
+		for (Quest q : Quest.values())
+		{
+			final QuestState st = q.getState(client);
+			if (st == QuestState.FINISHED)
+			{
+				quests.addProperty(q.getName(), "FINISHED");
+			}
+			else if (st == QuestState.IN_PROGRESS)
+			{
+				quests.addProperty(q.getName(), "IN_PROGRESS");
+			}
+		}
+
+		final JsonArray tiers = new JsonArray();
+		for (Map.Entry<Integer, String[]> e : DIARY_VARBITS.entrySet())
+		{
+			if (client.getVarbitValue(e.getKey()) > 0)
+			{
+				final JsonObject t = new JsonObject();
+				t.addProperty("region", e.getValue()[0]);
+				t.addProperty("tier", e.getValue()[1]);
+				t.addProperty("done", true);
+				tiers.add(t);
+			}
+		}
+		final JsonObject diaries = new JsonObject();
+		diaries.add("tiers", tiers);
+
+		final JsonObject dump = new JsonObject();
+		dump.addProperty("schema", "scan/1");
+		dump.add("skills", skills);
+		dump.add("quests", quests);
+		dump.add("diaries", diaries);
+		postJson("/api/scan", dump, "scan");
 	}
 
 	@Subscribe
