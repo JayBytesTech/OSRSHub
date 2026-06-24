@@ -44,12 +44,12 @@
       "updatePeriod": "session",
       "payloadKey": "stats",
       "entries": [
-        { "key": "slayer.points",  "source": "varp",    "id": null, "type": "num" },
-        { "key": "slayer.streak",  "source": "varbit",  "id": null, "type": "num" },
-        { "key": "slayer.task",    "source": "varbit",  "id": null, "type": "str" },
-        { "key": "music.unlocked", "source": "computed", "id": null, "type": "num" },
-        { "key": "music.total",    "source": "computed", "id": null, "type": "num" },
-        { "key": "questPoints",    "source": "varp",    "id": 101,  "type": "num" }
+        { "key": "slayer.points",  "source": "varbit",  "id": 4068, "type": "num", "status": "implemented" },
+        { "key": "slayer.streak",  "source": "varbit",  "id": 4069, "type": "num", "status": "implemented" },
+        { "key": "questPoints",    "source": "varp",    "id": 101,  "type": "num", "status": "implemented" },
+        { "key": "slayer.task",    "source": "varp",    "id": null, "type": "str", "status": "deferred", "note": "VarPlayer.SLAYER_TASK_CREATURE is a creature INDEX, not a name; resolving it needs the slayer DBTable. Captured incrementally by the slayer chat emitter instead." },
+        { "key": "music.unlocked", "source": "computed", "id": null, "type": "num", "status": "deferred" },
+        { "key": "music.total",    "source": "computed", "id": null, "type": "num", "status": "deferred" }
       ]
     },
     "collectionLog": {
