@@ -19,7 +19,7 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const anthropic = API_KEY ? new Anthropic({ apiKey: API_KEY }) : null;
 
 // SQLite store (history/time-series + account scoping). Vault stays for human notes.
-const { getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, deleteAccount, snapshots, state, accountValue, checklist, events, bank, scan } = require('./db');
+const { getCurrentAccount, updateAccount, listAccounts, createAccount, setCurrentAccount, deleteAccount, snapshots, state, accountValue, checklist, events, bank, scan, sessions } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
@@ -392,6 +392,51 @@ app.get('/api/bank', (_req, res) => {
   try {
     const account = getCurrentAccount();
     res.json(bank.getTrend(account.id));
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// ── Play sessions: XP/hr & GP/hr (ADR 0006, plugin Phase 2) ───────────────────
+// The plugin's SessionTracker upserts a running aggregate per session (periodic while playing + a
+// final post on logout), keyed by session_id (ADR 0006 D1 — a dedicated path, not account_events).
+// Rates are derived on read (db/sessions.js). Passive; honors INGEST_TOKEN like the other plugin feeds.
+app.post('/api/sessions', (req, res) => {
+  try {
+    if (INGEST_TOKEN && req.query.token !== INGEST_TOKEN) {
+      return res.status(401).json({ error: 'invalid or missing token' });
+    }
+    const body = req.body || {};
+    if (body.schema !== 'sessions/1') {
+      return res.status(400).json({ error: 'unsupported schema; expected "sessions/1"' });
+    }
+    const s = body.session;
+    if (!s || typeof s !== 'object' || !s.sessionId || !s.startedAt) {
+      return res.status(400).json({ error: 'session requires sessionId and startedAt' });
+    }
+    const account = getCurrentAccount();
+    const stored = sessions.upsert(account.id, s);
+    vaultLive.scheduleSync();
+    console.log(`[session] ${stored.final ? 'end ' : 'live'} ${stored.sessionId} active=${stored.activeSeconds}s xp=${stored.totalXp.toLocaleString()}${stored.xpPerHour != null ? ` (${stored.xpPerHour.toLocaleString()}/hr)` : ''} account=${account.rsn}`);
+    res.json({ ok: true, session: stored });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.get('/api/sessions', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json({ sessions: sessions.recent(account.id, 30) });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.get('/api/sessions/current', (_req, res) => {
+  try {
+    const account = getCurrentAccount();
+    res.json({ session: sessions.current(account.id) });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
