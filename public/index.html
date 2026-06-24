@@ -2733,6 +2733,13 @@ function fmtDuration(secs) {
   return `${secs}s`;
 }
 
+// Top skill trained this session, for the live Session tile (e.g. " · Woodcutting 180k").
+function topSkillStr(perSkill) {
+  if (!perSkill || typeof perSkill !== 'object') return '';
+  const top = Object.entries(perSkill).sort((a, b) => b[1] - a[1])[0];
+  return top ? ` · ${top[0]} ${fmt(top[1])}` : '';
+}
+
 async function loadSession() {
   try {
     const r = await fetch('/api/sessions/current');
@@ -3729,7 +3736,7 @@ function renderDashboard() {
   const tiles =
     (SESSION_CURRENT && SESSION_CURRENT.xpPerHour != null
       ? tile('🧭', 'Session', `${fmt(SESSION_CURRENT.xpPerHour)} <span class="dash-frac">xp/hr</span>`,
-          `${fmtDuration(SESSION_CURRENT.activeSeconds)} active · ${fmt(SESSION_CURRENT.totalXp)} xp`, { cls: 'dash-live' })
+          `${fmtDuration(SESSION_CURRENT.activeSeconds)} active · ${fmt(SESSION_CURRENT.totalXp)} xp${topSkillStr(SESSION_CURRENT.perSkill)}`, { cls: 'dash-live' })
       : stub('🧭', 'Session')) +
     tile('⚔️', 'Combat', combatLevel(), 'combat level') +
     tile('📊', 'Total Level', totalLevel(), `${SKILL_NAMES.length - 1} skills`) +
