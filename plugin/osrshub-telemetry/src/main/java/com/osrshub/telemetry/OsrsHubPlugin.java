@@ -7,7 +7,9 @@ import com.google.inject.Provides;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Map;
+import java.util.Set;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
@@ -17,11 +19,17 @@ import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.Player;
+import net.runelite.api.Quest;
+import net.runelite.api.QuestState;
 import net.runelite.api.Skill;
+import net.runelite.api.VarPlayer;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.StatChanged;
+import net.runelite.api.events.WidgetLoaded;
+import net.runelite.api.widgets.InterfaceID;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
@@ -40,6 +48,7 @@ import okhttp3.Response;
  *   • bank value  → POST /api/bank (on bank-container change)
  *   • level-ups   → POST /api/events (hub-native events/1 feed; ADR 0005 Phase 1, replacing Dink)
  *   • deaths      → POST /api/events (ADR 0005 Phase 1)
+ *   • quests      → POST /api/events (ADR 0005 Phase 1)
  * Read-only — this plugin never sends input to or acts on the game (see docs/decisions/0002,
  * 0005 and ADR 0001 D2).
  */
@@ -66,6 +75,14 @@ public class OsrsHubPlugin extends Plugin
 	// login/hop so the post-login StatChanged batch re-baselines silently (no spurious level-ups).
 	private final Map<Skill, Integer> levels = new EnumMap<>(Skill.class);
 
+	// Quests already FINISHED for this character, baselined on login so we only emit on a *new*
+	// completion. The quest-complete scroll (InterfaceID.QUEST_COMPLETED) is the trigger; we then scan
+	// the Quest enum for which one flipped to FINISHED — canonical names, no widget-text parsing.
+	// questScanTicks gives the completion varbit a few ticks to settle after the scroll appears.
+	private final Set<Quest> finishedQuests = EnumSet.noneOf(Quest.class);
+	private boolean questsBaselined = false;
+	private int questScanTicks = 0;
+
 	@Provides
 	OsrsHubConfig provideConfig(ConfigManager configManager)
 	{
@@ -79,6 +96,10 @@ public class OsrsHubPlugin extends Plugin
 		if (state == GameState.LOGGING_IN || state == GameState.HOPPING || state == GameState.LOGIN_SCREEN)
 		{
 			levels.clear();
+			// Re-baseline quests for the (possibly different) character now logging in.
+			finishedQuests.clear();
+			questsBaselined = false;
+			questScanTicks = 0;
 		}
 	}
 
@@ -138,6 +159,69 @@ public class OsrsHubPlugin extends Plugin
 		ev.addProperty("key", "death|" + occurredAt);   // each death is a distinct moment → time-keyed
 		ev.add("data", data);
 		postEvent(ev);
+	}
+
+	@Subscribe
+	public void onWidgetLoaded(WidgetLoaded event)
+	{
+		// The quest-complete scroll just appeared — a quest finished. Scan over the next few ticks
+		// (the completion varbit may settle a tick after the scroll renders).
+		if (event.getGroupId() == InterfaceID.QUEST_COMPLETED)
+		{
+			questScanTicks = 3;
+		}
+	}
+
+	@Subscribe
+	public void onGameTick(GameTick event)
+	{
+		if (client.getGameState() != GameState.LOGGED_IN)
+		{
+			return;
+		}
+		// First logged-in tick: snapshot what's already done so login never emits historical quests.
+		if (!questsBaselined)
+		{
+			for (Quest q : Quest.values())
+			{
+				if (q.getState(client) == QuestState.FINISHED)
+				{
+					finishedQuests.add(q);
+				}
+			}
+			questsBaselined = true;
+			return;
+		}
+		if (questScanTicks > 0)
+		{
+			questScanTicks--;
+			scanForNewlyFinishedQuests();
+		}
+	}
+
+	// Emit a quest event for any quest that has flipped to FINISHED since our baseline. The
+	// finishedQuests set makes this idempotent across the multi-tick scan window (and re-fires).
+	private void scanForNewlyFinishedQuests()
+	{
+		for (Quest q : Quest.values())
+		{
+			if (q.getState(client) != QuestState.FINISHED || !finishedQuests.add(q))
+			{
+				continue;
+			}
+			final String name = q.getName();
+			final JsonObject data = new JsonObject();
+			data.addProperty("questName", name);
+			data.addProperty("questPoints", client.getVarpValue(VarPlayer.QUEST_POINTS));
+
+			final JsonObject ev = new JsonObject();
+			ev.addProperty("type", "quest");
+			ev.addProperty("occurredAt", Instant.now().toString());
+			ev.addProperty("summary", "📜 Completed quest: " + name);
+			ev.addProperty("key", "quest|" + name);   // a quest completes once → idempotent
+			ev.add("data", data);
+			postEvent(ev);
+		}
 	}
 
 	@Subscribe
