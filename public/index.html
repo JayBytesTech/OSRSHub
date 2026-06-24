@@ -665,6 +665,10 @@ body {
 .dash-sub { font-size: 11px; color: #8a6030; margin-top: 2px; }
 .dash-stub { background: #e9e2cf; border-style: dashed; opacity: .85; }
 .dash-stub .dash-value { color: #b09050; }
+/* Live play-session tile (ADR 0006): subtle green accent + a pulsing "live" dot. */
+.dash-live { border-color: #3f7d3f; background: #e7eecb; }
+.dash-live .dash-label::after { content: "●"; margin-left: 6px; color: #3f9d3f; font-size: 9px; vertical-align: middle; animation: dash-live-pulse 2s ease-in-out infinite; }
+@keyframes dash-live-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
 .dash-cols {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -1083,6 +1087,7 @@ html[data-theme="dark"] .dash-frac { color: var(--d-mut); }
 html[data-theme="dark"] .dash-sub { color: var(--d-mut); }
 html[data-theme="dark"] .dash-stub { background: #212225; }
 html[data-theme="dark"] .dash-stub .dash-value { color: var(--d-bd4); }
+html[data-theme="dark"] .dash-live { border-color: #3f7d3f; background: #232a20; }
 html[data-theme="dark"] .dash-panel { background: var(--d-surf); border: 1px solid var(--d-bd4); }
 html[data-theme="dark"] .dash-panel-title { color: var(--d-ink2); }
 html[data-theme="dark"] .dash-link { color: #448cd5; }
@@ -2715,6 +2720,46 @@ function stopTimelinePolling() {
   if (timelinePollTimer) { clearInterval(timelinePollTimer); timelinePollTimer = null; }
 }
 
+// ── PLAY SESSION (live XP/hr, ADR 0006 Phase 2) ──────────────────────────────────
+// The plugin's SessionTracker upserts a running aggregate; the dashboard polls the current
+// (ongoing) session for a live "🧭 Session" tile. Null when no session is open.
+let SESSION_CURRENT = null;
+
+function fmtDuration(secs) {
+  secs = Math.max(0, Math.round(Number(secs) || 0));
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return `${secs}s`;
+}
+
+async function loadSession() {
+  try {
+    const r = await fetch('/api/sessions/current');
+    if (!r.ok) throw new Error('sessions ' + r.status);
+    const data = await r.json();
+    SESSION_CURRENT = data.session || null;
+  } catch (e) {
+    SESSION_CURRENT = null;   // server without the route / offline → tile degrades to a stub
+  }
+  if (document.getElementById('dash-body')) renderDashboard();
+}
+
+// Poll the live session while the Dashboard is open (self-cleans when you leave the tab).
+const SESSION_POLL_MS = 20000;
+let sessionPollTimer = null;
+function startSessionPolling() {
+  stopSessionPolling();
+  sessionPollTimer = setInterval(() => {
+    const tab = document.getElementById('tab-dashboard');
+    if (tab && tab.classList.contains('active')) loadSession();
+    else stopSessionPolling();
+  }, SESSION_POLL_MS);
+}
+function stopSessionPolling() {
+  if (sessionPollTimer) { clearInterval(sessionPollTimer); sessionPollTimer = null; }
+}
+
 function timelineItemHTML(ev) {
   return `<div class="timeline-item">
     <span class="tl-icon">${TL_ICON[ev.type] || '📌'}</span>
@@ -3140,7 +3185,8 @@ function switchTab(name) {
   if (navItem) navItem.classList.add('active');
   document.getElementById('tab-'+name).classList.add('active');
   if (name === 'progress')  renderChart();
-  if (name === 'dashboard') renderDashboard();
+  if (name === 'dashboard') { renderDashboard(); loadSession(); startSessionPolling(); }
+  else stopSessionPolling();
   if (name === 'checklist') renderChecklist();
   if (name === 'timeline')  { loadTimeline(); startTimelinePolling(); }
   else stopTimelinePolling();
@@ -3681,6 +3727,10 @@ function renderDashboard() {
      </div>`;
 
   const tiles =
+    (SESSION_CURRENT && SESSION_CURRENT.xpPerHour != null
+      ? tile('🧭', 'Session', `${fmt(SESSION_CURRENT.xpPerHour)} <span class="dash-frac">xp/hr</span>`,
+          `${fmtDuration(SESSION_CURRENT.activeSeconds)} active · ${fmt(SESSION_CURRENT.totalXp)} xp`, { cls: 'dash-live' })
+      : stub('🧭', 'Session')) +
     tile('⚔️', 'Combat', combatLevel(), 'combat level') +
     tile('📊', 'Total Level', totalLevel(), `${SKILL_NAMES.length - 1} skills`) +
     tile('📜', 'Quest Points', `${earnedQP} <span class="dash-frac">/ ${TOTAL_QP}</span>`, `${doneQuests.length} / ${QUESTS.length} quests done`) +
@@ -6008,6 +6058,8 @@ loadTimeline();              // async: pull telemetry event feed (timeline + das
 loadLoot();                  // async: pull aggregated loot/wealth summary (Loot tab + tile)
 loadBank();                  // async: pull bank-value trend (Progress chart series, from the plugin)
 loadMilestones();            // async: pull progression milestones (Collection Log tile + panel)
+loadSession();               // async: pull the live play session (XP/hr tile, ADR 0006)
+startSessionPolling();       // keep the Session tile fresh while the Dashboard (default tab) is open
 loadBosses();                // async: pull per-boss KC + loot summary (Bosses tab)
 loadAccount();               // async: pull account identity (Settings + header name)
 loadMoney();                 // async: pull money methods, auto-bucket vs live stats/quests
