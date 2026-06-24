@@ -7,10 +7,13 @@ import com.google.gson.JsonObject;
 import com.google.inject.Provides;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -24,6 +27,7 @@ import net.runelite.api.GameState;
 import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
+import net.runelite.api.NPC;
 import net.runelite.api.Player;
 import net.runelite.api.Quest;
 import net.runelite.api.QuestState;
@@ -41,7 +45,12 @@ import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.widgets.InterfaceID;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.NpcLootReceived;
+import net.runelite.client.events.PlayerLootReceived;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.ItemStack;
+import net.runelite.client.plugins.loottracker.LootReceived;
+import net.runelite.http.api.loottracker.LootRecordType;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import okhttp3.Call;
@@ -64,6 +73,7 @@ import okhttp3.Response;
  *   • pets        → POST /api/events (ADR 0005 Phase 1)
  *   • slayer      → POST /api/events (ADR 0005 Phase 1)
  *   • kill counts → POST /api/events (ADR 0005 Phase 1)
+ *   • loot        → POST /api/events (ADR 0005 Phase 1; min-value gated)
  * Read-only — this plugin never sends input to or acts on the game (see docs/decisions/0002,
  * 0005 and ADR 0001 D2).
  */
@@ -510,6 +520,97 @@ public class OsrsHubPlugin extends Plugin
 			return s;
 		}
 		return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase();
+	}
+
+	@Subscribe
+	public void onNpcLootReceived(NpcLootReceived event)
+	{
+		final NPC npc = event.getNpc();
+		handleLoot(npc != null && npc.getName() != null ? npc.getName() : "Loot", event.getItems());
+	}
+
+	@Subscribe
+	public void onPlayerLootReceived(PlayerLootReceived event)
+	{
+		final Player player = event.getPlayer();
+		handleLoot(player != null && player.getName() != null ? player.getName() : "Player", event.getItems());
+	}
+
+	@Subscribe
+	public void onLootReceived(LootReceived event)
+	{
+		// NPC + PvP loot already arrive via the core events above; take only EVENT-type loot here
+		// (clue caskets, barrows/raid chests, etc.) so a kill isn't recorded twice.
+		if (event.getType() == LootRecordType.EVENT)
+		{
+			handleLoot(event.getName(), event.getItems());
+		}
+	}
+
+	// Sum the GE value of a drop, build the item list, and emit a `loot` event if it clears the
+	// configured min-value threshold (keeps trash off the timeline). Mirrors the Dink data shape.
+	private void handleLoot(String source, Collection<ItemStack> items)
+	{
+		if (items == null || items.isEmpty())
+		{
+			return;
+		}
+		long total = 0;
+		final JsonArray jsonItems = new JsonArray();
+		final List<String> names = new ArrayList<>();
+		for (ItemStack stack : items)
+		{
+			final int id = stack.getId();
+			final int qty = stack.getQuantity();
+			if (id < 0 || qty <= 0)
+			{
+				continue;
+			}
+			final int priceEach = itemManager.getItemPrice(id);
+			total += (long) priceEach * qty;
+			final String name = itemManager.getItemComposition(id).getName();
+
+			final JsonObject it = new JsonObject();
+			it.addProperty("name", name);
+			it.addProperty("quantity", qty);
+			it.addProperty("priceEach", priceEach);
+			jsonItems.add(it);
+			names.add(qty > 1 ? name + " x" + qty : name);
+		}
+		if (jsonItems.size() == 0 || total < config.lootMinValue())
+		{
+			return;
+		}
+		emitLoot(source == null || source.isEmpty() ? "Loot" : source, total, jsonItems, names);
+	}
+
+	private void emitLoot(String source, long value, JsonArray items, List<String> names)
+	{
+		final StringBuilder preview = new StringBuilder();
+		for (int i = 0; i < Math.min(4, names.size()); i++)
+		{
+			preview.append(i == 0 ? "" : ", ").append(names.get(i));
+		}
+		if (names.size() > 4)
+		{
+			preview.append("…");
+		}
+
+		final JsonObject data = new JsonObject();
+		data.addProperty("source", source);
+		data.addProperty("value", value);
+		data.add("items", items);
+		data.add("category", JsonNull.INSTANCE);
+
+		final String occurredAt = Instant.now().toString();
+		final JsonObject ev = new JsonObject();
+		ev.addProperty("type", "loot");
+		ev.addProperty("occurredAt", occurredAt);
+		ev.addProperty("summary", "💰 " + source + ": " + String.format("%,d", value) + " gp"
+			+ (preview.length() > 0 ? " (" + preview + ")" : ""));
+		ev.addProperty("key", "loot|" + occurredAt);   // drops are frequent + distinct → time-keyed
+		ev.add("data", data);
+		postEvent(ev);
 	}
 
 	@Subscribe

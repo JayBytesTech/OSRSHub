@@ -30,4 +30,14 @@ public interface OsrsHubConfig extends Config
 	{
 		return "";
 	}
+
+	@ConfigItem(
+		keyName = "lootMinValue",
+		name = "Min loot value",
+		description = "Only report a loot drop whose total GE value is at least this many gp (keeps trash off the timeline)."
+	)
+	default int lootMinValue()
+	{
+		return 25000;
+	}
 }
