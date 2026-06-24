@@ -2642,7 +2642,7 @@ function scheduleChecklistSave() {
 
 // ── TIMELINE (passive telemetry feed, F3.4) ─────────────────────────────────────
 let TIMELINE = [];
-const TL_ICON = { level: '🎉', quest: '📜', loot: '💰', kc: '⚔️', diary: '📖', clog: '📒', clue: '🗺️', ca: '🏅', pet: '🐾', slayer: '💀', death: '☠️', other: '📌' };
+const TL_ICON = { level: '🎉', quest: '📜', loot: '💰', kc: '⚔️', diary: '📖', clog: '📒', clue: '🗺️', ca: '🏅', pet: '🐾', slayer: '💀', death: '☠️', session: '🧭', other: '📌' };
 
 function escapeHtml(s) {
   return String(s == null ? '' : s)
@@ -3736,7 +3736,7 @@ function renderDashboard() {
   const tiles =
     (SESSION_CURRENT && SESSION_CURRENT.xpPerHour != null
       ? tile('🧭', 'Session', `${fmt(SESSION_CURRENT.xpPerHour)} <span class="dash-frac">xp/hr</span>`,
-          `${fmtDuration(SESSION_CURRENT.activeSeconds)} active · ${fmt(SESSION_CURRENT.totalXp)} xp${topSkillStr(SESSION_CURRENT.perSkill)}`, { cls: 'dash-live' })
+          `${fmtDuration(SESSION_CURRENT.activeSeconds)} active · ${fmt(SESSION_CURRENT.totalXp)} xp${SESSION_CURRENT.gpPerHour ? ` · ${fmt(SESSION_CURRENT.gpPerHour)} gp/hr` : ''}${topSkillStr(SESSION_CURRENT.perSkill)}`, { cls: 'dash-live' })
       : stub('🧭', 'Session')) +
     tile('⚔️', 'Combat', combatLevel(), 'combat level') +
     tile('📊', 'Total Level', totalLevel(), `${SKILL_NAMES.length - 1} skills`) +
