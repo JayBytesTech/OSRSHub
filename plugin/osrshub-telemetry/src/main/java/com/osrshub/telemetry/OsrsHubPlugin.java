@@ -2,6 +2,7 @@ package com.osrshub.telemetry;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.inject.Provides;
 import java.io.IOException;
@@ -60,6 +61,7 @@ import okhttp3.Response;
  *   • diaries     → POST /api/events (ADR 0005 Phase 1)
  *   • combat achs → POST /api/events (ADR 0005 Phase 1)
  *   • clues       → POST /api/events (ADR 0005 Phase 1)
+ *   • pets        → POST /api/events (ADR 0005 Phase 1)
  * Read-only — this plugin never sends input to or acts on the game (see docs/decisions/0002,
  * 0005 and ADR 0001 D2).
  */
@@ -83,6 +85,14 @@ public class OsrsHubPlugin extends Plugin
 	// Captures the running per-tier completion count and the tier word (lower-case in the message).
 	private static final Pattern CLUE_PATTERN = Pattern.compile(
 		"You have completed (?<count>[0-9,]+) (?<tier>\\w+) Treasure Trails?");
+
+	// Pet drop messages. The game never names the pet here (so neither can we yet — petName is left
+	// null, a later refinement). A new pet either follows you or is stuffed into your pack; the
+	// "would have been followed" variant means you rolled a pet you already own (a duplicate).
+	private static final Pattern PET_DUPLICATE_PATTERN = Pattern.compile(
+		"You (?:have a funny feeling like you would have been followed|feel something weird sneaking into your backpack, but you already own)");
+	private static final Pattern PET_PATTERN = Pattern.compile(
+		"You (?:have a funny feeling like you're being followed|feel something weird sneaking into your backpack)");
 
 	// Each Achievement-Diary tier sets a dedicated completion varbit. Map varbit id → {region, tier}
 	// where region/tier match public/diary-data.json exactly so the hub's diary auto-tick lights up.
@@ -348,6 +358,17 @@ public class OsrsHubPlugin extends Plugin
 		{
 			final int count = Integer.parseInt(clue.group("count").replace(",", ""));
 			emitClue(capitalize(clue.group("tier")), count);
+			return;
+		}
+
+		// Duplicate check first — its text is a near-superset of the normal "sneaking into your pack".
+		if (PET_DUPLICATE_PATTERN.matcher(message).find())
+		{
+			emitPet(true);
+		}
+		else if (PET_PATTERN.matcher(message).find())
+		{
+			emitPet(false);
 		}
 	}
 
@@ -379,6 +400,25 @@ public class OsrsHubPlugin extends Plugin
 		ev.addProperty("occurredAt", Instant.now().toString());
 		ev.addProperty("summary", "🗺️ " + clueType + " clue completed (#" + numberCompleted + ")");
 		ev.addProperty("key", "clue|" + clueType + "|" + numberCompleted);   // count rises each time → idempotent
+		ev.add("data", data);
+		postEvent(ev);
+	}
+
+	// The pet drop is captured; the pet's identity isn't in the message, so petName/milestone stay
+	// null (matching the Dink data shape). duplicate=true means a pet you already own.
+	private void emitPet(boolean duplicate)
+	{
+		final JsonObject data = new JsonObject();
+		data.add("petName", JsonNull.INSTANCE);
+		data.addProperty("duplicate", duplicate);
+		data.add("milestone", JsonNull.INSTANCE);
+
+		final String occurredAt = Instant.now().toString();
+		final JsonObject ev = new JsonObject();
+		ev.addProperty("type", "pet");
+		ev.addProperty("occurredAt", occurredAt);
+		ev.addProperty("summary", "🐾 Pet" + (duplicate ? " (duplicate)" : ""));
+		ev.addProperty("key", "pet|" + occurredAt);   // each drop is a distinct moment → time-keyed
 		ev.add("data", data);
 		postEvent(ev);
 	}
