@@ -59,6 +59,7 @@ import okhttp3.Response;
  *   • quests      → POST /api/events (ADR 0005 Phase 1)
  *   • diaries     → POST /api/events (ADR 0005 Phase 1)
  *   • combat achs → POST /api/events (ADR 0005 Phase 1)
+ *   • clues       → POST /api/events (ADR 0005 Phase 1)
  * Read-only — this plugin never sends input to or acts on the game (see docs/decisions/0002,
  * 0005 and ADR 0001 D2).
  */
@@ -77,6 +78,11 @@ public class OsrsHubPlugin extends Plugin
 	// Same shape RuneLite's own ScreenshotPlugin parses. Captures the tier word and the task name.
 	private static final Pattern COMBAT_ACHIEVEMENT_PATTERN = Pattern.compile(
 		"Congratulations, you've completed an? (?<tier>\\w+) combat task: <col=[0-9a-f]+>(?<task>.+)</col>");
+
+	// Clue casket reward message, e.g. "You have completed 42 medium Treasure Trails."
+	// Captures the running per-tier completion count and the tier word (lower-case in the message).
+	private static final Pattern CLUE_PATTERN = Pattern.compile(
+		"You have completed (?<count>[0-9,]+) (?<tier>\\w+) Treasure Trails?");
 
 	// Each Achievement-Diary tier sets a dedicated completion varbit. Map varbit id → {region, tier}
 	// where region/tier match public/diary-data.json exactly so the hub's diary auto-tick lights up.
@@ -322,20 +328,31 @@ public class OsrsHubPlugin extends Plugin
 	@Subscribe
 	public void onChatMessage(ChatMessage event)
 	{
-		// Combat-achievement completions arrive as a game message. No baseline needed — this only
-		// fires on a fresh completion, never replayed on login.
+		// Combat-achievement + clue completions arrive as game messages. No baseline needed — these
+		// only fire on a fresh completion, never replayed on login.
 		if (event.getType() != ChatMessageType.GAMEMESSAGE)
 		{
 			return;
 		}
-		final Matcher m = COMBAT_ACHIEVEMENT_PATTERN.matcher(event.getMessage());
-		if (!m.find())
+		final String message = event.getMessage();
+
+		final Matcher ca = COMBAT_ACHIEVEMENT_PATTERN.matcher(message);
+		if (ca.find())
 		{
+			emitCombatAchievement(ca.group("task").trim(), ca.group("tier"));
 			return;
 		}
-		final String tier = m.group("tier");
-		final String task = m.group("task").trim();
 
+		final Matcher clue = CLUE_PATTERN.matcher(message);
+		if (clue.find())
+		{
+			final int count = Integer.parseInt(clue.group("count").replace(",", ""));
+			emitClue(capitalize(clue.group("tier")), count);
+		}
+	}
+
+	private void emitCombatAchievement(String task, String tier)
+	{
 		final JsonObject data = new JsonObject();
 		data.addProperty("task", task);   // server maps name → task id via caTaskId() for auto-tick
 		data.addProperty("tier", tier);
@@ -347,6 +364,32 @@ public class OsrsHubPlugin extends Plugin
 		ev.addProperty("key", "ca|" + task);   // task names are unique → idempotent
 		ev.add("data", data);
 		postEvent(ev);
+	}
+
+	// clueType is the tier (Beginner/Easy/Medium/Hard/Elite/Master); numberCompleted is the running
+	// per-tier count from the message. The casket's GP value is owned by the separate `loot` slice.
+	private void emitClue(String clueType, int numberCompleted)
+	{
+		final JsonObject data = new JsonObject();
+		data.addProperty("clueType", clueType);
+		data.addProperty("numberCompleted", numberCompleted);
+
+		final JsonObject ev = new JsonObject();
+		ev.addProperty("type", "clue");
+		ev.addProperty("occurredAt", Instant.now().toString());
+		ev.addProperty("summary", "🗺️ " + clueType + " clue completed (#" + numberCompleted + ")");
+		ev.addProperty("key", "clue|" + clueType + "|" + numberCompleted);   // count rises each time → idempotent
+		ev.add("data", data);
+		postEvent(ev);
+	}
+
+	private static String capitalize(String s)
+	{
+		if (s == null || s.isEmpty())
+		{
+			return s;
+		}
+		return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase();
 	}
 
 	@Subscribe
