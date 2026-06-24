@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.inject.Inject;
@@ -23,11 +25,13 @@ import net.runelite.api.Quest;
 import net.runelite.api.QuestState;
 import net.runelite.api.Skill;
 import net.runelite.api.VarPlayer;
+import net.runelite.api.Varbits;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.StatChanged;
+import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.widgets.InterfaceID;
 import net.runelite.client.config.ConfigManager;
@@ -49,6 +53,7 @@ import okhttp3.Response;
  *   • level-ups   → POST /api/events (hub-native events/1 feed; ADR 0005 Phase 1, replacing Dink)
  *   • deaths      → POST /api/events (ADR 0005 Phase 1)
  *   • quests      → POST /api/events (ADR 0005 Phase 1)
+ *   • diaries     → POST /api/events (ADR 0005 Phase 1)
  * Read-only — this plugin never sends input to or acts on the game (see docs/decisions/0002,
  * 0005 and ADR 0001 D2).
  */
@@ -61,6 +66,36 @@ import okhttp3.Response;
 public class OsrsHubPlugin extends Plugin
 {
 	private static final MediaType JSON = MediaType.parse("application/json");
+
+	// Each Achievement-Diary tier sets a dedicated completion varbit. Map varbit id → {region, tier}
+	// where region/tier match public/diary-data.json exactly so the hub's diary auto-tick lights up.
+	private static final Map<Integer, String[]> DIARY_VARBITS = buildDiaryVarbits();
+
+	private static Map<Integer, String[]> buildDiaryVarbits()
+	{
+		final Map<Integer, String[]> m = new HashMap<>();
+		putDiary(m, "Ardougne", Varbits.DIARY_ARDOUGNE_EASY, Varbits.DIARY_ARDOUGNE_MEDIUM, Varbits.DIARY_ARDOUGNE_HARD, Varbits.DIARY_ARDOUGNE_ELITE);
+		putDiary(m, "Desert", Varbits.DIARY_DESERT_EASY, Varbits.DIARY_DESERT_MEDIUM, Varbits.DIARY_DESERT_HARD, Varbits.DIARY_DESERT_ELITE);
+		putDiary(m, "Falador", Varbits.DIARY_FALADOR_EASY, Varbits.DIARY_FALADOR_MEDIUM, Varbits.DIARY_FALADOR_HARD, Varbits.DIARY_FALADOR_ELITE);
+		putDiary(m, "Fremennik", Varbits.DIARY_FREMENNIK_EASY, Varbits.DIARY_FREMENNIK_MEDIUM, Varbits.DIARY_FREMENNIK_HARD, Varbits.DIARY_FREMENNIK_ELITE);
+		putDiary(m, "Kandarin", Varbits.DIARY_KANDARIN_EASY, Varbits.DIARY_KANDARIN_MEDIUM, Varbits.DIARY_KANDARIN_HARD, Varbits.DIARY_KANDARIN_ELITE);
+		putDiary(m, "Karamja", Varbits.DIARY_KARAMJA_EASY, Varbits.DIARY_KARAMJA_MEDIUM, Varbits.DIARY_KARAMJA_HARD, Varbits.DIARY_KARAMJA_ELITE);
+		putDiary(m, "Kourend & Kebos", Varbits.DIARY_KOUREND_EASY, Varbits.DIARY_KOUREND_MEDIUM, Varbits.DIARY_KOUREND_HARD, Varbits.DIARY_KOUREND_ELITE);
+		putDiary(m, "Lumbridge & Draynor", Varbits.DIARY_LUMBRIDGE_EASY, Varbits.DIARY_LUMBRIDGE_MEDIUM, Varbits.DIARY_LUMBRIDGE_HARD, Varbits.DIARY_LUMBRIDGE_ELITE);
+		putDiary(m, "Morytania", Varbits.DIARY_MORYTANIA_EASY, Varbits.DIARY_MORYTANIA_MEDIUM, Varbits.DIARY_MORYTANIA_HARD, Varbits.DIARY_MORYTANIA_ELITE);
+		putDiary(m, "Varrock", Varbits.DIARY_VARROCK_EASY, Varbits.DIARY_VARROCK_MEDIUM, Varbits.DIARY_VARROCK_HARD, Varbits.DIARY_VARROCK_ELITE);
+		putDiary(m, "Western Provinces", Varbits.DIARY_WESTERN_EASY, Varbits.DIARY_WESTERN_MEDIUM, Varbits.DIARY_WESTERN_HARD, Varbits.DIARY_WESTERN_ELITE);
+		putDiary(m, "Wilderness", Varbits.DIARY_WILDERNESS_EASY, Varbits.DIARY_WILDERNESS_MEDIUM, Varbits.DIARY_WILDERNESS_HARD, Varbits.DIARY_WILDERNESS_ELITE);
+		return m;
+	}
+
+	private static void putDiary(Map<Integer, String[]> m, String region, int easy, int med, int hard, int elite)
+	{
+		m.put(easy, new String[]{region, "Easy"});
+		m.put(med, new String[]{region, "Medium"});
+		m.put(hard, new String[]{region, "Hard"});
+		m.put(elite, new String[]{region, "Elite"});
+	}
 
 	@Inject private Client client;
 	@Inject private ItemManager itemManager;
@@ -83,6 +118,10 @@ public class OsrsHubPlugin extends Plugin
 	private boolean questsBaselined = false;
 	private int questScanTicks = 0;
 
+	// Diary-tier varbit ids already complete at login, so we only emit on a *new* tier completion.
+	private final Set<Integer> completedDiaries = new HashSet<>();
+	private boolean diariesBaselined = false;
+
 	@Provides
 	OsrsHubConfig provideConfig(ConfigManager configManager)
 	{
@@ -96,10 +135,12 @@ public class OsrsHubPlugin extends Plugin
 		if (state == GameState.LOGGING_IN || state == GameState.HOPPING || state == GameState.LOGIN_SCREEN)
 		{
 			levels.clear();
-			// Re-baseline quests for the (possibly different) character now logging in.
+			// Re-baseline quests + diaries for the (possibly different) character now logging in.
 			finishedQuests.clear();
 			questsBaselined = false;
 			questScanTicks = 0;
+			completedDiaries.clear();
+			diariesBaselined = false;
 		}
 	}
 
@@ -179,7 +220,7 @@ public class OsrsHubPlugin extends Plugin
 		{
 			return;
 		}
-		// First logged-in tick: snapshot what's already done so login never emits historical quests.
+		// First logged-in tick: snapshot what's already done so login never emits historical progress.
 		if (!questsBaselined)
 		{
 			for (Quest q : Quest.values())
@@ -189,7 +230,15 @@ public class OsrsHubPlugin extends Plugin
 					finishedQuests.add(q);
 				}
 			}
+			for (int varbit : DIARY_VARBITS.keySet())
+			{
+				if (client.getVarbitValue(varbit) > 0)
+				{
+					completedDiaries.add(varbit);
+				}
+			}
 			questsBaselined = true;
+			diariesBaselined = true;
 			return;
 		}
 		if (questScanTicks > 0)
@@ -222,6 +271,41 @@ public class OsrsHubPlugin extends Plugin
 			ev.add("data", data);
 			postEvent(ev);
 		}
+	}
+
+	@Subscribe
+	public void onVarbitChanged(VarbitChanged event)
+	{
+		// A diary tier's completion varbit just flipped. Emit once per newly-completed tier.
+		if (!diariesBaselined)
+		{
+			return;
+		}
+		final String[] regionTier = DIARY_VARBITS.get(event.getVarbitId());
+		if (regionTier == null || event.getValue() <= 0)
+		{
+			return;
+		}
+		if (!completedDiaries.add(event.getVarbitId()))
+		{
+			return;   // already known complete → idempotent
+		}
+		emitDiary(regionTier[0], regionTier[1]);
+	}
+
+	private void emitDiary(String region, String tier)
+	{
+		final JsonObject data = new JsonObject();
+		data.addProperty("region", region);
+		data.addProperty("tier", tier);
+
+		final JsonObject ev = new JsonObject();
+		ev.addProperty("type", "diary");
+		ev.addProperty("occurredAt", Instant.now().toString());
+		ev.addProperty("summary", "📖 " + region + " " + tier + " diary complete");
+		ev.addProperty("key", "diary|" + region + "|" + tier);   // a tier completes once → idempotent
+		ev.add("data", data);
+		postEvent(ev);
 	}
 
 	@Subscribe
