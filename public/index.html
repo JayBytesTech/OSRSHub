@@ -669,6 +669,27 @@ body {
 .dash-live { border-color: #3f7d3f; background: #e7eecb; }
 .dash-live .dash-label::after { content: "●"; margin-left: 6px; color: #3f9d3f; font-size: 9px; vertical-align: middle; animation: dash-live-pulse 2s ease-in-out infinite; }
 @keyframes dash-live-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+
+/* Sessions tab cards (ADR 0006 2D) */
+.sess-card { background: #ede0b8; border: 1px solid #b09050; border-radius: 6px; padding: 12px 14px; margin-bottom: 10px; }
+.sess-card.sess-live { border-color: #3f7d3f; background: #e7eecb; }
+.sess-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.sess-when { font-weight: bold; color: #1a0a00; }
+.sess-dur { font-size: 12px; color: #8a6030; }
+.sess-stats { display: flex; gap: 22px; margin-bottom: 10px; }
+.sess-stat-v { font-size: 22px; font-weight: bold; color: #1a0a00; line-height: 1.1; }
+.sess-stat-l { font-size: 10px; text-transform: uppercase; letter-spacing: .03em; color: #8a6030; }
+.sess-section { display: flex; gap: 8px; align-items: baseline; margin-top: 6px; flex-wrap: wrap; }
+.sess-section-l { font-size: 10px; text-transform: uppercase; letter-spacing: .03em; color: #6a4a10; min-width: 64px; }
+.sess-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.sess-chip { font-size: 12px; background: #f4ecd2; border: 1px solid #cbb37a; border-radius: 10px; padding: 1px 8px; color: #4a3210; display: inline-flex; align-items: center; gap: 4px; }
+.sess-chip b { color: #1a0a00; }
+.sess-muted { font-size: 12px; color: #b09050; }
+html[data-theme="dark"] .sess-card { background: var(--d-surf); border-color: var(--d-bd4); }
+html[data-theme="dark"] .sess-card.sess-live { border-color: #3f7d3f; background: #232a20; }
+html[data-theme="dark"] .sess-when, html[data-theme="dark"] .sess-stat-v, html[data-theme="dark"] .sess-chip b { color: #e4e5e7; }
+html[data-theme="dark"] .sess-dur, html[data-theme="dark"] .sess-stat-l, html[data-theme="dark"] .sess-section-l, html[data-theme="dark"] .sess-muted { color: var(--d-mut); }
+html[data-theme="dark"] .sess-chip { background: #2c2e32; border-color: var(--d-bd4); color: #c9ccd1; }
 .dash-cols {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -1355,6 +1376,7 @@ html[data-theme="dark"] .skill-card:hover { border-color:#4a4f59; box-shadow:0 3
     <div class="nav-item" onclick="switchTab('progress')"  title="Progress"><span class="nav-ico">📈</span><span class="nav-label">Progress</span></div>
     <div class="nav-item" onclick="switchTab('loot')"      title="Loot"><span class="nav-ico">🪙</span><span class="nav-label">Loot</span></div>
     <div class="nav-item" onclick="switchTab('bosses')"    title="Bosses"><span class="nav-ico">⚔️</span><span class="nav-label">Bosses</span></div>
+    <div class="nav-item" onclick="switchTab('sessions')"  title="Sessions"><span class="nav-ico">🧭</span><span class="nav-label">Sessions</span></div>
     <div class="nav-item" onclick="switchTab('timeline')"  title="Timeline"><span class="nav-ico">🛰️</span><span class="nav-label">Timeline</span></div>
     <div class="nav-item" onclick="switchTab('checklist')" title="Checklist"><span class="nav-ico">📋</span><span class="nav-label">Checklist</span></div>
   </div>
@@ -1574,6 +1596,14 @@ html[data-theme="dark"] .skill-card:hover { border-color:#4a4f59; box-shadow:0 3
   </div>
   <div id="loot-summary"></div>
   <div id="loot-body"></div>
+</div>
+
+<!-- SESSIONS -->
+<div id="tab-sessions" class="tab-content">
+  <div class="section-header">Play Sessions <span class="section-sub" id="sessions-sub">XP/hr · GP/hr · skills trained · resources gathered — from the OSRS Hub plugin</span>
+    <button class="refresh-btn" id="sessions-refresh-btn" onclick="loadSessions()">↻ Refresh</button>
+  </div>
+  <div id="sessions-body"></div>
 </div>
 
 <!-- BOSSES -->
@@ -2758,13 +2788,71 @@ let sessionPollTimer = null;
 function startSessionPolling() {
   stopSessionPolling();
   sessionPollTimer = setInterval(() => {
-    const tab = document.getElementById('tab-dashboard');
-    if (tab && tab.classList.contains('active')) loadSession();
-    else stopSessionPolling();
+    const dash = document.getElementById('tab-dashboard');
+    const sess = document.getElementById('tab-sessions');
+    if (dash && dash.classList.contains('active')) loadSession();
+    else if (sess && sess.classList.contains('active')) loadSessions();
+    else stopSessionPolling();   // self-clean once neither session view is open
   }, SESSION_POLL_MS);
 }
 function stopSessionPolling() {
   if (sessionPollTimer) { clearInterval(sessionPollTimer); sessionPollTimer = null; }
+}
+
+// Full session history (Sessions tab). The live/ongoing session sorts first (it's most recent).
+let SESSIONS = [];
+async function loadSessions() {
+  try {
+    const r = await fetch('/api/sessions');
+    if (!r.ok) throw new Error('sessions ' + r.status);
+    SESSIONS = (await r.json()).sessions || [];
+  } catch (e) {
+    console.warn('Could not load sessions.', e);
+    SESSIONS = [];
+  }
+  renderSessions();
+}
+
+function renderSessions() {
+  const body = document.getElementById('sessions-body');
+  if (!body) return;
+  const sub = document.getElementById('sessions-sub');
+  if (sub && SESSIONS.length) {
+    sub.textContent = `${SESSIONS.length} session${SESSIONS.length === 1 ? '' : 's'} · auto-refreshes every ${SESSION_POLL_MS / 1000}s`;
+  }
+  if (!SESSIONS.length) {
+    body.innerHTML = `<div class="timeline-empty">
+      <p>No sessions yet. Train a skill (or kill things) with the OSRS Hub plugin running and your live session appears here — XP/hr, GP/hr, skills trained, and resources gathered.</p>
+    </div>`;
+    return;
+  }
+  body.innerHTML = SESSIONS.map(sessionCardHTML).join('');
+}
+
+function sessionCardHTML(s) {
+  const live = !s.final;
+  const when = live ? 'Active now' : relTime(s.startedAt);
+  const skills = s.perSkill ? Object.entries(s.perSkill).sort((a, b) => b[1] - a[1]) : [];
+  const res = s.resources ? Object.entries(s.resources).sort((a, b) => b[1] - a[1]) : [];
+  const skillsHtml = skills.length
+    ? skills.map(([k, v]) => `<span class="sess-chip">${skillIcon(k, 14)} ${escapeHtml(k)} <b>${fmt(v)}</b></span>`).join('')
+    : '<span class="sess-muted">—</span>';
+  const resHtml = res.length
+    ? res.map(([k, v]) => `<span class="sess-chip">${escapeHtml(k)} <b>×${v.toLocaleString()}</b></span>`).join('')
+    : '<span class="sess-muted">none</span>';
+  return `<div class="sess-card${live ? ' sess-live' : ''}">
+    <div class="sess-head">
+      <span class="sess-when">${live ? '🟢 ' : ''}${escapeHtml(when)}</span>
+      <span class="sess-dur" title="${escapeHtml(s.startedAt)}">${fmtDuration(s.activeSeconds)} active</span>
+    </div>
+    <div class="sess-stats">
+      <div class="sess-stat"><div class="sess-stat-v">${s.xpPerHour != null ? fmt(s.xpPerHour) : '—'}</div><div class="sess-stat-l">xp/hr</div></div>
+      <div class="sess-stat"><div class="sess-stat-v">${fmt(s.totalXp)}</div><div class="sess-stat-l">total xp</div></div>
+      <div class="sess-stat"><div class="sess-stat-v">${s.gpPerHour ? fmt(s.gpPerHour) : '—'}</div><div class="sess-stat-l">gp/hr</div></div>
+    </div>
+    <div class="sess-section"><span class="sess-section-l">Skills</span><span class="sess-chips">${skillsHtml}</span></div>
+    <div class="sess-section"><span class="sess-section-l">Gathered</span><span class="sess-chips">${resHtml}</span></div>
+  </div>`;
 }
 
 function timelineItemHTML(ev) {
@@ -3193,6 +3281,7 @@ function switchTab(name) {
   document.getElementById('tab-'+name).classList.add('active');
   if (name === 'progress')  renderChart();
   if (name === 'dashboard') { renderDashboard(); loadSession(); startSessionPolling(); }
+  else if (name === 'sessions') { loadSessions(); startSessionPolling(); }
   else stopSessionPolling();
   if (name === 'checklist') renderChecklist();
   if (name === 'timeline')  { loadTimeline(); startTimelinePolling(); }
