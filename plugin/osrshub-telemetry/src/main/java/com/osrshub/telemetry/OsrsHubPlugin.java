@@ -10,11 +10,15 @@ import java.util.EnumMap;
 import java.util.Map;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Actor;
+import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
+import net.runelite.api.Player;
 import net.runelite.api.Skill;
+import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.StatChanged;
@@ -32,9 +36,10 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 /**
- * Passive telemetry for the OSRS Hub. Two feeds today:
+ * Passive telemetry for the OSRS Hub. Feeds today:
  *   • bank value  → POST /api/bank (on bank-container change)
  *   • level-ups   → POST /api/events (hub-native events/1 feed; ADR 0005 Phase 1, replacing Dink)
+ *   • deaths      → POST /api/events (ADR 0005 Phase 1)
  * Read-only — this plugin never sends input to or acts on the game (see docs/decisions/0002,
  * 0005 and ADR 0001 D2).
  */
@@ -48,6 +53,7 @@ public class OsrsHubPlugin extends Plugin
 {
 	private static final MediaType JSON = MediaType.parse("application/json");
 
+	@Inject private Client client;
 	@Inject private ItemManager itemManager;
 	@Inject private OkHttpClient okHttpClient;
 	@Inject private OsrsHubConfig config;
@@ -101,6 +107,35 @@ public class OsrsHubPlugin extends Plugin
 		ev.addProperty("occurredAt", Instant.now().toString());
 		ev.addProperty("summary", "🎉 Reached level " + level + " " + name);
 		ev.addProperty("key", "level|" + name + "|" + level);   // a skill reaches a level once → idempotent
+		ev.add("data", data);
+		postEvent(ev);
+	}
+
+	@Subscribe
+	public void onActorDeath(ActorDeath event)
+	{
+		// Only the local player's death; ActorDeath also fires for every NPC/other player dying.
+		final Player me = client.getLocalPlayer();
+		if (me == null || event.getActor() != me)
+		{
+			return;
+		}
+		// Best-effort killer: whoever we were interacting with as we died. PvP if that's a player.
+		final Actor target = me.getInteracting();
+		final boolean isPvp = target instanceof Player;
+		final String killer = target != null && target.getName() != null ? target.getName() : "";
+
+		final JsonObject data = new JsonObject();
+		data.addProperty("valueLost", 0);            // exact items-kept-on-death valuation is a later refinement
+		data.addProperty("isPvp", isPvp);
+		data.addProperty("killerName", killer.isEmpty() ? null : killer);
+
+		final String occurredAt = Instant.now().toString();
+		final JsonObject ev = new JsonObject();
+		ev.addProperty("type", "death");
+		ev.addProperty("occurredAt", occurredAt);
+		ev.addProperty("summary", "☠️ Died" + (killer.isEmpty() ? "" : " to " + killer));
+		ev.addProperty("key", "death|" + occurredAt);   // each death is a distinct moment → time-keyed
 		ev.add("data", data);
 		postEvent(ev);
 	}
