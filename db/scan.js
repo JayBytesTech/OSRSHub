@@ -76,11 +76,22 @@ module.exports = function makeScan(db) {
     if (d.quests && typeof d.quests === 'object') {
       out.questsFinished = [];
       out.questsInProgress = [];
-      for (const q in d.quests) {
-        const st = String(d.quests[q] || '').toUpperCase();
-        if (st === 'FINISHED') out.questsFinished.push(q);
-        else if (st === 'IN_PROGRESS') out.questsInProgress.push(q);
+      const universe = new Set();   // canonical names this scan can speak to (scopes the replace)
+      let rfdFinalDone = false;
+      for (const raw in d.quests) {
+        const st = String(d.quests[raw] || '').toUpperCase();
+        if (isRfdSub(raw)) {                                  // collapse RFD subquests → one master
+          if (raw === RFD_FINAL && st === 'FINISHED') rfdFinalDone = true;
+          continue;
+        }
+        const name = canonQuest(raw);
+        universe.add(name);
+        if (st === 'FINISHED') out.questsFinished.push(name);
+        else if (st === 'IN_PROGRESS') out.questsInProgress.push(name);
       }
+      universe.add(RFD_MASTER);
+      if (rfdFinalDone) out.questsFinished.push(RFD_MASTER);
+      out.questUniverse = [...universe];
     }
     if (d.diaries && Array.isArray(d.diaries.tiers)) {
       out.diaries = d.diaries.tiers
@@ -133,7 +144,11 @@ module.exports = function makeScan(db) {
     const diff = {};
     if (p.questsFinished) {
       const want = new Set(p.questsFinished);
-      diff.quests = { added: [...want].filter(q => !cur.quests.has(q)), removed: [...cur.quests].filter(q => !want.has(q)) };
+      const universe = p.questUniverse ? new Set(p.questUniverse) : null;   // only flag removals the scan can speak to
+      diff.quests = {
+        added: [...want].filter(q => !cur.quests.has(q)),
+        removed: [...cur.quests].filter(q => !want.has(q) && (!universe || universe.has(q))),
+      };
     }
     if (p.diaries) {
       const want = new Set(p.diaries.map(d => d.region + '|' + d.tier));
@@ -169,9 +184,16 @@ module.exports = function makeScan(db) {
       counts.skills = p.skills.length;
     }
     if (p.questsFinished) {
-      delQuests.run(accountId);                                   // full-replace (game-authoritative)
+      // Full-replace within the scan's KNOWABLE universe only; preserve tracked quests it can't see
+      // (miniquests RuneLite's Quest enum doesn't expose), so they're never wiped.
+      const universe = new Set(p.questUniverse || p.questsFinished);
+      const tracked = db.prepare('SELECT quest FROM quest_completions WHERE account_id = ?').all(accountId).map(r => r.quest);
+      const preserved = tracked.filter(q => !universe.has(q));
+      delQuests.run(accountId);
       for (const q of p.questsFinished) insQuest.run(accountId, q);
+      for (const q of preserved) insQuest.run(accountId, q);
       counts.questsFinished = p.questsFinished.length;
+      counts.questsPreserved = preserved.length;
     }
     if (p.questsInProgress) {
       delQProg.run(accountId);
@@ -256,6 +278,25 @@ module.exports = function makeScan(db) {
 
   return { isFirstSight, buildDiff, applyDump, ingest, getPending, applyPending, clearPending };
 };
+
+// ---- quest name reconciliation -----------------------------------------------
+// RuneLite's Quest.getName() differs from the hub's quest-data.json in a few places. Map RuneLite →
+// hub canonical so the scan ticks the right rows (otherwise real completions get unticked + re-added
+// under names the hub can't display).
+const QUEST_ALIASES = {
+  'Fairytale I - Growing Pains': 'Fairy Tale I - Growing Pains',
+  'Fairytale II - Cure a Queen': 'Fairy Tale II - Cure a Queen',
+  'Lost City': 'The Lost City',
+  'Mage Arena I': 'The Mage Arena',
+  'Mage Arena II': 'The Mage Arena II',
+  'Forgettable Tale...': 'Forgettable Tale of a Drunken Dwarf',
+};
+// RuneLite reports Recipe for Disaster as individual subquests; the hub tracks it as one atomic quest,
+// complete only when the final subquest (Culinaromancer) is done.
+const RFD_MASTER = 'Recipe for Disaster';
+const RFD_FINAL = 'Recipe for Disaster - Culinaromancer';
+const isRfdSub = (name) => /^Recipe for Disaster - /.test(name);
+const canonQuest = (name) => QUEST_ALIASES[name] || name;
 
 // ---- combat-achievement bitset decoding --------------------------------------
 // CA completion is packed across these player varps in this exact order: task id T is complete iff

@@ -481,18 +481,14 @@ public class OsrsHubPlugin extends Plugin
 			skills.add(s);
 		}
 
-		final JsonObject quests = new JsonObject();   // {name: "FINISHED"|"IN_PROGRESS"} (NOT_STARTED omitted)
+		// Full tri-state for EVERY quest (incl. NOT_STARTED) so the hub knows exactly which quests this
+		// scan can speak to — letting it scope the quest replace and preserve miniquests it can't see.
+		final JsonObject quests = new JsonObject();
 		for (Quest q : Quest.values())
 		{
 			final QuestState st = q.getState(client);
-			if (st == QuestState.FINISHED)
-			{
-				quests.addProperty(q.getName(), "FINISHED");
-			}
-			else if (st == QuestState.IN_PROGRESS)
-			{
-				quests.addProperty(q.getName(), "IN_PROGRESS");
-			}
+			quests.addProperty(q.getName(), st == QuestState.FINISHED ? "FINISHED"
+				: st == QuestState.IN_PROGRESS ? "IN_PROGRESS" : "NOT_STARTED");
 		}
 
 		final JsonArray tiers = new JsonArray();
