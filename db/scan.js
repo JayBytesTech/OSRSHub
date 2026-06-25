@@ -76,19 +76,34 @@ module.exports = function makeScan(db) {
     if (d.quests && typeof d.quests === 'object') {
       out.questsFinished = [];
       out.questsInProgress = [];
-      for (const q in d.quests) {
-        const st = String(d.quests[q] || '').toUpperCase();
-        if (st === 'FINISHED') out.questsFinished.push(q);
-        else if (st === 'IN_PROGRESS') out.questsInProgress.push(q);
+      const universe = new Set();   // canonical names this scan can speak to (scopes the replace)
+      let rfdFinalDone = false;
+      for (const raw in d.quests) {
+        const st = String(d.quests[raw] || '').toUpperCase();
+        if (isRfdSub(raw)) {                                  // collapse RFD subquests → one master
+          if (raw === RFD_FINAL && st === 'FINISHED') rfdFinalDone = true;
+          continue;
+        }
+        const name = canonQuest(raw);
+        universe.add(name);
+        if (st === 'FINISHED') out.questsFinished.push(name);
+        else if (st === 'IN_PROGRESS') out.questsInProgress.push(name);
       }
+      universe.add(RFD_MASTER);
+      if (rfdFinalDone) out.questsFinished.push(RFD_MASTER);
+      out.questUniverse = [...universe];
     }
     if (d.diaries && Array.isArray(d.diaries.tiers)) {
       out.diaries = d.diaries.tiers
         .filter(t => t && t.done && typeof t.region === 'string' && typeof t.tier === 'string')
         .map(t => ({ region: t.region, tier: t.tier }));
     }
-    if (d.combatAchievements && Array.isArray(d.combatAchievements.completed)) {
-      out.caCompleted = d.combatAchievements.completed.map(int).filter(Number.isInteger);
+    if (d.combatAchievements && typeof d.combatAchievements === 'object') {
+      if (Array.isArray(d.combatAchievements.completed)) {
+        out.caCompleted = d.combatAchievements.completed.map(int).filter(Number.isInteger);
+      } else if (d.combatAchievements.varps && typeof d.combatAchievements.varps === 'object') {
+        out.caCompleted = caCompletedFromVarps(d.combatAchievements.varps);   // decode the bitset
+      }
       out.caTotalPoints = numOrNull(d.combatAchievements.totalPoints);
     }
     if (Array.isArray(d.unlocks)) {
@@ -129,7 +144,11 @@ module.exports = function makeScan(db) {
     const diff = {};
     if (p.questsFinished) {
       const want = new Set(p.questsFinished);
-      diff.quests = { added: [...want].filter(q => !cur.quests.has(q)), removed: [...cur.quests].filter(q => !want.has(q)) };
+      const universe = p.questUniverse ? new Set(p.questUniverse) : null;   // only flag removals the scan can speak to
+      diff.quests = {
+        added: [...want].filter(q => !cur.quests.has(q)),
+        removed: [...cur.quests].filter(q => !want.has(q) && (!universe || universe.has(q))),
+      };
     }
     if (p.diaries) {
       const want = new Set(p.diaries.map(d => d.region + '|' + d.tier));
@@ -165,9 +184,16 @@ module.exports = function makeScan(db) {
       counts.skills = p.skills.length;
     }
     if (p.questsFinished) {
-      delQuests.run(accountId);                                   // full-replace (game-authoritative)
+      // Full-replace within the scan's KNOWABLE universe only; preserve tracked quests it can't see
+      // (miniquests RuneLite's Quest enum doesn't expose), so they're never wiped.
+      const universe = new Set(p.questUniverse || p.questsFinished);
+      const tracked = db.prepare('SELECT quest FROM quest_completions WHERE account_id = ?').all(accountId).map(r => r.quest);
+      const preserved = tracked.filter(q => !universe.has(q));
+      delQuests.run(accountId);
       for (const q of p.questsFinished) insQuest.run(accountId, q);
+      for (const q of preserved) insQuest.run(accountId, q);
       counts.questsFinished = p.questsFinished.length;
+      counts.questsPreserved = preserved.length;
     }
     if (p.questsInProgress) {
       delQProg.run(accountId);
@@ -252,6 +278,56 @@ module.exports = function makeScan(db) {
 
   return { isFirstSight, buildDiff, applyDump, ingest, getPending, applyPending, clearPending };
 };
+
+// ---- quest name reconciliation -----------------------------------------------
+// RuneLite's Quest.getName() differs from the hub's quest-data.json in a few places. Map RuneLite →
+// hub canonical so the scan ticks the right rows (otherwise real completions get unticked + re-added
+// under names the hub can't display).
+const QUEST_ALIASES = {
+  'Fairytale I - Growing Pains': 'Fairy Tale I - Growing Pains',
+  'Fairytale II - Cure a Queen': 'Fairy Tale II - Cure a Queen',
+  'Lost City': 'The Lost City',
+  'Mage Arena I': 'The Mage Arena',
+  'Mage Arena II': 'The Mage Arena II',
+  'Forgettable Tale...': 'Forgettable Tale of a Drunken Dwarf',
+};
+// RuneLite reports Recipe for Disaster as individual subquests; the hub tracks it as one atomic quest,
+// complete only when the final subquest (Culinaromancer) is done.
+const RFD_MASTER = 'Recipe for Disaster';
+const RFD_FINAL = 'Recipe for Disaster - Culinaromancer';
+const isRfdSub = (name) => /^Recipe for Disaster - /.test(name);
+const canonQuest = (name) => QUEST_ALIASES[name] || name;
+
+// ---- combat-achievement bitset decoding --------------------------------------
+// CA completion is packed across these player varps in this exact order: task id T is complete iff
+// bit (T & 31) is set in CA_COMPLETION_VARPS[T >>> 5]. Varp set/order from reldo's task-json-store
+// (COMBAT task type). The plugin dumps the raw varp values; we decode against ca-data.json's task ids.
+const CA_COMPLETION_VARPS = [
+  3116, 3117, 3118, 3119, 3120, 3121, 3122, 3123, 3124, 3125, 3126, 3127, 3128,
+  3387, 3718, 3773, 3774, 4204, 4496, 4721,
+];
+let _caTaskIds = null;
+function caTaskIds() {
+  if (_caTaskIds) return _caTaskIds;
+  _caTaskIds = [];
+  try {
+    for (const t of (require('../public/ca-data.json').tasks || [])) {
+      if (Number.isInteger(t.id)) _caTaskIds.push(t.id);
+    }
+  } catch { /* dataset missing — CA varp decode disabled */ }
+  return _caTaskIds;
+}
+// Decode { "<varpId>": value, ... } → array of completed task ids.
+function caCompletedFromVarps(varps) {
+  const out = [];
+  for (const id of caTaskIds()) {
+    const varpId = CA_COMPLETION_VARPS[id >>> 5];
+    if (varpId == null) continue;
+    const v = Number(varps[varpId] != null ? varps[varpId] : varps[String(varpId)]) || 0;
+    if (((v >>> (id & 31)) & 1) === 1) out.push(id);
+  }
+  return out;
+}
 
 // ---- small utils -------------------------------------------------------------
 function int(v) { const n = parseInt(v, 10); return Number.isInteger(n) ? n : (Number.isFinite(Number(v)) ? Math.round(Number(v)) : NaN); }

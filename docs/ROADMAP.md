@@ -10,209 +10,134 @@ Legend: 🟢 done · 🟡 in progress · ⚪ not started
 
 ---
 
-## Phase 0 — v1 baseline ✅ (done)
-The launchpad that already exists.
-- 🟢 Skills / Quests / Progress / Money / AI Journey / Goals / Chat tabs
-- 🟢 Live Hiscores + daily history snapshot
-- 🟢 Live GE prices → GP/hr
-- 🟢 Claude agent with vault tools
-- 🟢 Vault-as-source-of-truth (markdown + JSON blocks)
+## Where we are (June 2026)
 
-**Exit criteria:** met. The rest of the roadmap builds on this.
+The **personal decision-dashboard vision (PRD P0–P2) is delivered**: open the app and you get an
+at-a-glance dashboard, prerequisite-aware goals that decompose into live requirement trees, a
+"what to do next" engine, and depth tabs (XP/diary/CA/gear/money planners, trends, checklist,
+Account Value).
 
----
+The **telemetry layer (PRD P3) is largely built and *overshot* its original scope.** What was
+scoped as "a passive plugin for bank value" became:
+- an **in-house RuneLite plugin that fully replaces Dink** — all 11 event categories on a native
+  `events/1` feed (ADR 0005);
+- **live session analytics Dink never could provide** — XP/hr & GP/hr over idle-gated active time,
+  per-skill gains, and XP-correlated gathered-resource counts (ADR 0006);
+- **one-login account onboarding** via a baseline scan of skills/quests/diaries/stats/CAs (ADR 0003);
+- a **one-way SQLite → Obsidian "Live" projection** so chat/AI always reads current data (ADR 0004);
+- **multi-account** identity/switch/delete.
 
-## Phase 1 — Foundations (data & scoping)  ⚪
-*Make the app able to grow. Mostly invisible to the UI, unblocks everything after.*
-
-- ⚪ **F0.1** Introduce SQLite + a migrations setup + a thin repository layer.
-- ⚪ Seed SQLite from the current vault JSON (one-time importer).
-- ⚪ Move stats history, quest state, and goals to SQLite; keep response shapes stable.
-- ⚪ Retire the positional `SKILL_NAMES` coupling by keying snapshots on skill name.
-- ⚪ **F0.2** Add `account_id` to every table + a `getCurrentAccount()` seam (one account for now).
-- ⚪ Keep the vault for journaling/notes only (optional going forward).
-
-**Exit criteria:** all existing tabs work unchanged, backed by SQLite; `RSN` comes from an
-account record; no feature code assumes a single global player.
+What remains is **finishing & hardening** the telemetry/onboarding story (collection log, scan
+verification, tests, Dink decommission) and **the public turn** (auth + hosting + self-serve).
 
 ---
 
-## Phase 2 — The Dashboard (first vision feature)  ⚪
-*Deliver the "open it and know where you stand" moment. (ADR D4)*
+## Phase 0 — v1 baseline ✅
+The launchpad: Skills/Quests/Progress/Money/AI Journey/Goals/Chat tabs, live Hiscores + daily
+history, live GE prices → GP/hr, the Claude vault agent, vault-as-source-of-truth.
 
-- ⚪ **F0.3** Account Dashboard / Home: combat, total, QP, diary %, bank value (manual entry
-  for now), active goals, recent deltas (from history).
-- ⚪ Make it the default landing view.
-- ⚪ Wire deltas off the daily snapshot history already being recorded.
+## Phase 1 — Foundations: SQLite + account scoping ✅
+- 🟢 **F0.1** SQLite + migration runner + repository layer; one-time vault→SQLite import; history,
+  quest state, and goals moved to SQLite (response shapes unchanged); snapshots keyed by skill name.
+- 🟢 **F0.2** `account_id` on every table + a `getCurrentAccount()` seam. Vault is now optional (notes
+  + money methods + the generated Live note).
 
-**Exit criteria:** opening the app answers "where am I?" at a glance with real data.
+## Phase 2 — The Dashboard ✅
+- 🟢 **F0.3** Account dashboard as the default landing view — combat, total, QP, diary %, bank value,
+  active goals, recent deltas, plus telemetry tiles (loot, collection log, session).
 
----
+## Phase 3 — Differentiators ✅
+- 🟢 **F1.1** Unified goal system with auto-prerequisites — skill / quest / diary / unlock / CA /
+  money goals + one-click templates, each decomposing into live requirement trees.
+- 🟢 **F1.2** Quest & unlock dependency graph — recursive, cycle-guarded; full 205-quest wiki-verified
+  dataset; optimal-order baseline; QP reconciliation; a 45-unlock catalogue.
+- 🟢 **F1.3** "What should I do next?" engine — ranked, prerequisite-aware, actionable inline.
 
-## Phase 3 — Differentiators (why this hub is unique)  🟢
-*The features that make it an assistant, not a tracker.*
-
-- 🟢 **F1.1** Goal system with auto-prerequisites (goals decompose into live requirement trees).
-  Every goal type now decomposes: **quest goals** + the **Quest Cape** preset via the F1.2 engine
-  (full transitive requirement tree); **skill goals** into XP-remaining + time-to-go per method
-  (the XP planner); and **diary-tier goals** (new) into their missing skills (with ETA) + missing
-  quests (each startable-now or blocked), via `diaryTierStatus` + the quest engine. Set a diary
-  goal with the 🎯 toggle on any Diaries tier; it shows a decomposition card in Goals, a row in the
-  dashboard Active-Goals peek, and drives the "what to do next" ranker (best startable quest in the
-  tier, else the nearest missing skill). Persisted via a new `diary_goals` table on the `/api/state`
-  path. **Goal templates** (a Templates row in the Goals tab) one-click-expand curated bundles into
-  these goal types — Barrows gloves, Fire cape, Base 70/90 combat, All Hard diaries, Song of the
-  Elves — skipping anything already met/tracked. **Goal system unified** — **unlock goals** and
-  **Combat-Achievement tier goals** are now first-class alongside skill/quest/diary/preset goals:
-  ★ any unlock or CA tier to set it as a goal, each decomposes in the Goals tab (unlock goals via the
-  unlock engine — missing skills/quests/diaries/sub-unlocks with quest chains; CA tier goals into
-  points-to-threshold), shows in the dashboard Active-Goals peek, and drives the "what to do next"
-  ranker with goal-specific next steps. Persisted via new `unlock_goals` + `ca_goals` tables on the
-  `/api/state` path. Exit criteria met: adding any high-level goal yields an accurate
-  outstanding-requirements list.
-- 🟢 **F1.2** Quest **dependency graph** (recursive, "can I start now?") — **engine + full dataset + non-quest unlocks live.**
-  `buildRequirementTree`/`outstandingFor` expand the whole transitive prerequisite tree (cycle-guarded,
-  diamond-deduped) with an ordered to-do list and aggregated skill summary. The prerequisite dataset
-  (`public/quest-data.json`) now covers **every quest in the master list (205)** — direct prereqs only
-  (the engine recurses), wiki-verified, with skill/QP gates. Deep chains resolve with no unknown holes.
-  The master list was **audited against the OSRS Wiki's full quest categories** (MediaWiki API): it
-  added the real quests it was missing (incl. grandmasters — Song of the Elves, While Guthix Sleeps,
-  The Path of Glouphrie) and the untracked miniquests, removed a non-OSRS entry (Fairy Tale III),
-  **excluded unreleased/future quests** (The Blood Moon Rises, The Graveyard, Fallen From Grace), and
-  fixed name/skill-key bugs (Vampyre Slayer, The Hand in the Sand, Runecraft→Runecrafting) that were
-  silently breaking gates. **Non-quest unlocks now live** — an **Unlocks** tab (`public/unlock-data.json`,
-  45 curated high-value unlocks across 6 categories: teleport networks, spellbooks, item/area access, QoL
-  diary rewards) where each unlock is a generic requirement node gated ready/locked against the player's
-  state — skills, **quest prereqs (delegated to the quest engine, so the full transitive quest tree
-  expands inline)**, diary-tier prereqs (`diaryTierStatus`), sub-unlock prereqs (recursive, cycle-guarded),
-  and a QP gate. "Have it" is tracked per name via a new `unlock_done` table on the `/api/state` path; a
-  dashboard tile and a ranker tier ("Unlock X") surface what you can get now. So "what's the full path to
-  this unlock?" is answered for non-quest goals too. Item *upgrade* unlocks remain covered by the Gear tab.
-  **Optimal quest order (baseline) live** — a 🧭 "Optimal order" toggle on the Quests tab re-sorts the
-  log into the **OSRS Wiki Optimal quest guide** sequence (`public/quest-order.json`, scraped from the
-  guide's `data-rowid` order via the MediaWiki API: 193 of the 205 master-list quests sequenced; RFD
-  subquests collapsed to one entry at its final step; 12 miniquests the guide doesn't sequence sink to
-  the bottom). Each row gets a `#n` position badge, and a **"Next in your optimal path"** banner surfaces
-  the first incomplete quest in guide order with its live ready/locked gating and a one-click ✓ Mark done.
-  **QP reconciliation** — since no public API exposes which quests a player has done, the Quests tab shows
-  a banner comparing the hub's ticked QP against a reference (the true total Dink reports on its last quest
-  event — now surfaced via `milestonesSummary().quest` — or a manually-entered in-game QP), counting the
-  gap down to zero so you can find quests completed before tracking and confirm when you're back in sync.
-- 🟢 **F1.3** "What should I do next?" engine — ranked, prerequisite-aware suggestions on the dashboard.
-  **Live** as the "🧭 What to do next" panel: `nextActions()` ranks across tiers — quest-goal next
-  steps, Quest Cape, skill goals, **goal-independent opportunity quests**, a **high-leverage
-  skill-to-train nudge** (`skillUnlockLeverage` — the skill that solely-blocks the most startable
-  quests, with the nearest unlock level + ETA), top money method, and the best diary opportunity.
-  Works even with no goals set. The **goal-independent** quest pick now follows the **OSRS Wiki
-  optimal-order baseline** (`optimalReadyQuestName` — the earliest *startable* quest in the guide
-  sequence, labelled "Next on your optimal quest path #n of 193"), falling back to **reward XP
-  magnitude** when the optimal dataset isn't available or only unsequenced miniquests are startable.
-  Goal-driven and Quest-Cape picks still rank by reward magnitude (`questRewardXp` parses the
-  free-text reward field; `compareQuestValue` is the shared comparator) — so e.g. Monkey Madness I
-  (~35k combat XP) is suggested over a trivial quest. Suggestions are **actionable inline** — quest picks carry a
-  ✓ (mark complete → panel re-ranks live) and ★ (track as a goal); the skill-leverage nudge carries a
-  ★ (add the skill goal) — so the user acts from the dashboard without tab-hopping.
-
-**Exit criteria:** adding a high-level goal yields an accurate outstanding-requirements list,
-and the dashboard recommends agreeable next actions.
+## Phase 4 — Depth & analytics ✅ (one analytics item now unblocked)
+- 🟢 **F2.2** XP planning · **F2.3** diary planner (per-task, 492 tasks, all 12 regions) · **F2.4**
+  daily/weekly checklist · **F2.5** Account Value score · **F2.6** Gear & upgrade ladders (31/88) ·
+  **F2.7** Combat Achievements planner (637 tasks) · **F2.8** GP / money-goal planner.
+- 🟡 **F2.1** Money-maker analytics — trends (XP / Account Value / wealth-from-drops / 🏦 bank value)
+  are live; **per-activity GP/hr is now unblocked by the session feed (Phase 5)** — close it by
+  surfacing session GP/hr per activity. *(moved to Phase 5 remaining work.)*
 
 ---
 
-## Phase 4 — Depth & analytics  ⚪
-*Make progress measurable and motivating.*
+## Phase 5 — Telemetry & living history  🟢 (largely done)
+*The living-history layer, via the in-house plugin.*
 
-- 🟢 **F2.8** GP / money-goal planner. A **money goal** type in the unified goal system
-  (`money_goals` table on the `/api/state` path): set a GP target (with k/m/b shorthand and an
-  optional label like "Twisted bow"), and it decomposes into the **fastest money methods available
-  now** + **time-to-earn** each, ranked by live GE GP/hr (`bestMoneyMethods`/`methodGphr` reuse the
-  Money tab's live-or-estimated rates). Shows a plan card in Goals, a row in the dashboard
-  Active-Goals peek, and a ranker tier ("Earn N for X — best method ~rate → ~time"). `fmt()` gained a
-  billions tier. No progress bar (the hub can't read liquid GP), so it's an honest "how to earn it" planner.
-- 🟡 **F2.1** Money-maker analytics: historical GP/hr, profit per activity, wealth-over-time charts.
-  **Trends view live** — the Progress tab charts XP-over-time (per-skill + Total; the line breaks at
-  the XP-tracking start since legacy history is levels-only), Account Value over time, and cumulative
-  Wealth-from-drops, with a Level/XP toggle and XP deltas in the Recent-gains grid (`getHistory()` now
-  returns an `xp` series), plus a **🏦 Bank value** series fed by the custom plugin (F3.2). Per-activity
-  GP/hr history still pending (awaits the GP/hr half of the custom plugin).
-- 🟢 **F2.2** XP planning: per-skill XP-remaining + time-to-goal per method (curated XP/hr dataset + ad-hoc planner).
-- 🟢 **F2.3** Achievement-diary planner: tier-level requirements for all 12 regions (skill/quest/combat
-  gates, "can I do this now?"), completion tracking, dashboard tile. **Per-task drill-down live** —
-  expand a tier to a checklist of its individual tasks, each with its own requirement gating (ready/
-  locked) and a tickable checkbox (synced via `diaryTasks` in `/api/state`, stored in
-  `diary_task_completions`); tier head shows `n/m tasks`. **All 12 regions curated** (492 tasks);
-  per-task gates validated against the frontend `QUESTS` master list so quest requirements the hub
-  can't verify are surfaced as notes rather than false-locking gates.
-- 🟢 **F2.4** Daily/weekly checklist with reset timers.
-- 🟢 **F2.5** Account Value score, trended over time.
-- 🟢 **F2.6** Gear & upgrade path. A Gear tab with curated progression ladders
-  (`public/gear-data.json`) where each item is gated ready/locked against live stats + completed
-  quests (`gearStatus` reuses the quest/diary engine) and priced via `GET /api/prices` (reuses the GE
-  machinery). **Ownership tracking** (a per-item owned checkbox → `gear_owned` table on the
-  `/api/state` path) makes "next upgrade" the first un-owned rung above your current best (tagged 🎯
-  next, "current" on your best owned), and a ranker tier suggests the cheapest next-rung item you can
-  equip now but don't own — dropping out once owned. **Covers every equipment slot** — weapon, helm,
-  body, legs, boots, amulet, ring, gloves, shield, and cape per style, plus ranged ammo (**31 ladders
-  / 88 items**, grouped by ⚔️/🏹/🔮). Endgame reqs wiki-verified. Optional future: **style-aware
-  prioritisation** (lead with your main style) and "next *affordable* upgrade" once bank value lands
-  from the custom plugin.
-- 🟢 **F2.7** Combat Achievements planner. A "Combat Tasks" tab tracking all **637 CA tasks**
-  (`public/ca-data.json`, scraped from the Wiki's `Combat_Achievements/All_tasks` rendered table —
-  stable `data-ca-task-id`, monster, name, desc, type, tier) **grouped by boss** (89 groups), with a
-  tier filter (Easy→GM), a To-do filter, and task/boss search. Six **tier summary cards** show
-  tasks-done and points-earned per tier with a progress bar and the cumulative **reward-unlock point
-  threshold** (Easy 41 → Medium 161 → Hard 416 → Elite 1064 → Master 1904 → Grandmaster 2630).
-  Completion is tracked **per task id** (manual ticks; the hub can't verify combat capability so there's
-  no ready/locked gating), persisted via a new `ca_completions` table on the `/api/state` path. A
-  **dashboard tile** (points + pts-to-next-tier) and a **ranker tier** ("N pts to <tier> CA rewards",
-  shown once the player is engaged) round it out. **CA tier goals** decompose like diary goals (F1.1),
-  CAs **auto-tick from Dink** `COMBAT_ACHIEVEMENT` telemetry (name→id match, unknown names stored but not
-  ticked), and a **CA-points reconciliation banner** (mirroring the quest-point one) compares hub-tracked
-  points against the plugin-reported total (or a manual entry) so achievements earned before tracking are
-  visible — new ones auto-tick going forward.
-- ⚪ Frontend modularization if/when `index.html` interactivity outgrows hand-editing (ADR first).
+**Done:**
+- 🟢 **F3.1** Ingest contract — native `events/1` handler (`POST /api/events`) + the legacy
+  `normalizeDinkEvent` path (`/api/ingest`) retained for transition.
+- 🟢 **F3.2** In-house RuneLite plugin (passive; ADRs 0002/0005/0006/0003): **replaces Dink** across
+  all 11 categories; **bank value**; **session rates** (XP/hr, GP/hr, per-skill XP, gathered-resource
+  counts + values); **baseline scan** (skills/quests/diaries/scalar-stats/CA on login → first-sight
+  apply or confirm-diff); **vault Live projection** (ADR 0004).
+- 🟢 **F3.3 (partial)** Loot & Wealth, Bosses/kill-tracker, and progression-milestones dashboards;
+  Sessions history tab.
+- 🟢 **F3.4** Account timeline (living feed) + dashboard peek + session-end recap event.
+- 🟢 Multi-account identity / create / switch / delete (Settings).
 
-**Exit criteria:** the hub shows trends over time, not just current state.
+**Remaining:**
+- ⚪ **Collection log** — the deferred baseline-scan section (interface-gated capture on log open) +
+  a full item-grid UI (completes F3.3).
+- ⚪ **Per-tier dashboards** — clue / CA / death breakdowns; boss personal-best tracking (F3.3).
+- ⚪ **Baseline-scan completeness** — live-verify the CA varp decode (needs ≥1 completed CA);
+  slayer-task name resolution (creature index → name).
+- ⚪ **Close F2.1** — per-activity GP/hr history off the session feed.
+- ⚪ **Decommission Dink** — once every category is verified single-owner, remove
+  `normalizeDinkEvent` + `/api/ingest`.
+
+**Exit criteria:** telemetry powers a complete living history with no Dink dependency.
 
 ---
 
-## Phase 5 — Telemetry & going public  ⚪
-*The living-history layer and the multi-user turn. Largest scope; do last.*
+## Phase 6 — Hardening for the public turn  ⚪ (new)
+*Make it robust before strangers depend on it. Mostly invisible; de-risks Phase 7.*
 
-- 🟡 **F3.1** `POST /api/ingest` telemetry contract (ADR D2) — **live via the Dink plugin** (levels,
-  quests, loot, KC, achievement diaries → `account_events`; quests **and diary tiers** auto-tick).
-  Custom-plugin **bank value** now flows via `POST /api/bank` (F3.2); GP/hr still pending.
-- 🟡 **F3.2** RuneLite plugin (passive telemetry: XP, loot, bank, KC, clues, sessions). *Dink covers the
-  common events today; a custom plugin is only needed for bank value + true GP/hr.* **Custom plugin base
-  live** — `plugin/osrshub-telemetry/` (side-loaded, passive; ADR 0002) reads **bank value** on
-  bank-change and POSTs to a dedicated `POST /api/bank`, stored as a daily `bank_snapshots` snapshot and
-  charted as the **🏦 Bank value** trend. True **GP/hr** (session XP/gp rates) is the next plugin slice.
-- 🟡 **F3.3** Boss & collection-log dashboards (KC, PB, profit, deaths, log completion, missing items) —
-  **Loot & Wealth view live** (GP from drops, per-source breakdown, biggest drops, true KC from Dink
-  `KILL_COUNT`); **progression milestones live** (typed collection-log / clue / combat-achievement / pet /
-  slayer / death events → `/api/milestones` → dashboard Collection Log tile + Milestones panel);
-  **Bosses / kill-tracker view live** (per-boss KC + logged loot + avg/drop + expandable drop drilldown,
-  `/api/bosses`). Full collection-log item grid, PB tracking, and per-tier clue/CA/death dashboards still pending.
-- 🟡 **F3.4** Account timeline (living feed of level-ups, drops, completions, net-worth changes) —
-  timeline tab + dashboard peek live; net-worth changes await the custom plugin.
-- 🟡 Real auth + sessions: turn `getCurrentAccount()` into actual accounts. **Slices 1–3 done** —
-  account identity (RSN + display name) is DB-owned and editable in-app (`GET`/`PUT /api/account`),
-  **multiple accounts** can be created / listed / switched from the Settings tab
-  (`GET`/`POST /api/accounts`, `PUT /api/account/current`; active account in an `app_settings`
-  pointer), and accounts can be **deleted** (`DELETE /api/accounts/:id`, transactional cascade;
-  guarded against deleting the only or the active account). The `RSN` env var only seeds the first
-  account. Real **auth/login** + hosting still pending.
-- ⚪ Hosting decision + deployment (its own ADR).
-- ⚪ Self-serve onboarding: enter an RSN, get value with no vault and no local setup.
+- ⚪ **Automated tests** — start with the data layer (scan reconciliation, session rates/staleness,
+  event idempotency, GE/price math). The un-tested quest-scan name bug that corrupted live data
+  (June 2026) is the cautionary tale; the throwaway temp-DB verification scripts should become tests.
+- ⚪ **Frontend modularization** — `public/index.html` is now very large; split it when hand-editing
+  starts to hurt (ADR first, per the long-standing note).
+- ⚪ **Resilience & states** — robust empty / loading / error states across tabs; graceful behaviour
+  when the plugin or hub is offline.
+- ⚪ **Data-integrity guards on destructive paths** — e.g. a scan-apply preview/undo (the
+  `repair-quest-names.js` incident lesson); backups before bulk mutations.
 
-**Exit criteria:** a second person can use a hosted instance with their own account; telemetry
-powers a living account history.
+**Exit criteria:** a regression in a core data flow is caught by a test, not by a user.
+
+---
+
+## Phase 7 — Going public  ⚪ (new)
+*The multi-user turn. Largest scope; gated on Phase 6.*
+
+- ⚪ **Hosting decision + deployment** (its own ADR) — self-host vs managed; what the ingest endpoint
+  looks like on the public internet.
+- ⚪ **Real auth/login + sessions** — turn `getCurrentAccount()` into authenticated accounts.
+- ⚪ **Self-serve onboarding** — enter an RSN, reach a useful dashboard with no vault and no local setup.
+- ⚪ **Privacy, rate-limiting, abuse/ToS posture** for a public telemetry endpoint.
+
+**Exit criteria:** a second person uses a hosted instance with their own account; telemetry powers a
+living account history for them too.
+
+---
+
+## Open questions (updated)
+
+- **Bank value source** — ✅ solved (plugin `POST /api/bank`).
+- **Collection-log read path** — partially solved (incremental clog events); the baseline grid needs
+  interface-open capture (Phase 5 remaining).
+- **Frontend modularization trigger/tool** — now pressing given `index.html` size; needs its own ADR (Phase 6).
+- **Hosting model + auth approach** — still open; the first Phase 7 ADR.
 
 ---
 
 ## Working agreement (how we move between phases)
 
 - **Vertical slices over big bangs.** Ship the thinnest end-to-end version, then iterate.
-- **Don't start a phase's features before its enabler lands** (e.g. analytics charts wait for
-  SQLite history; the optimizer waits for the prerequisite dataset).
+- **Don't start a phase's features before its enabler lands.**
 - **Re-evaluate priorities at each phase boundary** — `ideas.md` is a menu, not a queue.
-- **Record reversals as ADRs.** If we abandon SQLite or change the data split, write it down.
+- **Record significant/hard-to-reverse choices as ADRs** (see `docs/decisions/`).
+- **Each change leaves a working app**; verify before claiming done; no synthetic data on the real account.
+</content>
